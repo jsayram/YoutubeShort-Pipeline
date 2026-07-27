@@ -1,27 +1,26 @@
 [
   {
     "id": "01-hook",
-    "prompt": "Describe the main visual for the opening hook. Use one strong focal subject and leave clear mobile-safe space for the headline."
+    "prompt": "Create a visual metaphor for the viewer's main problem or desired outcome. Show one dominant subject performing one clear action. Use an extreme close-up or low-angle composition with the subject occupying the lower two-thirds. Leave clean negative space in the upper-left for a short HTML headline. Make the foreground, subject, and background visually separable."
   },
   {
     "id": "02-concept",
-    "prompt": "Describe the visual that explains the core concept without relying on readable text."
+    "prompt": "Create a clear editorial metaphor for the video's main promise. Transform the hook's visual world into a more organized or resolved state. Keep one dominant subject, one supporting object, and a clean caption zone. Do not attempt to explain the idea with text."
   },
   {
     "id": "03-process",
-    "prompt": "Describe a visual process or transformation that supports the middle of the explanation."
+    "prompt": "Create three clearly separated physical stages representing the video's three process steps, connected by one directional path. Compose the stages diagonally from lower-left to upper-right so exact HTML nodes, labels, and SVG arrows can be overlaid. Do not generate labels or a finished infographic."
   },
   {
     "id": "04-example",
-    "prompt": "Describe a concrete example or result that makes the explanation feel useful."
+    "prompt": "Create a cinematic environment around an empty vertical phone-shaped focal area. Place supporting objects that suggest the video's real use case around the perimeter. Keep the center-right clean for a real app screenshot or exact HTML infographic. Do not generate an interface inside the phone area."
   },
   {
     "id": "05-contrast",
-    "prompt": "Describe a visual contrast, mistake, warning, or before-and-after moment."
+    "prompt": "Create one continuous scene split into two matching states. The left side represents the problem or before state; the right side represents the improved or after state. Keep the same camera and subject position so an HTML wipe can reveal the transformation. Do not include divider lines or labels."
   },
   {
     "id": "06-close",
-    "prompt": "Describe a simple closing visual with an upward or completed feeling and room for a short call to action."
+    "prompt": "Create a completed, upward-feeling composition for the final benefit. Place one strong resolved object in the lower half and keep the upper half calm and open for a one-line HTML call to action. The scene should feel confident and resolved, not celebratory or cluttered."
   }
 ]
-

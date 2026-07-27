@@ -113,6 +113,8 @@ For optional direct Voicebox control in Claude Code, see [Architecture](docs/ARC
 - [Exact workflow](docs/WORKFLOW.md)
 - [Editing, animation, and visual styling](docs/EDITING-AND-STYLE.md)
 - [Clean integration architecture](docs/ARCHITECTURE.md)
+- [Animated visual style guide](docs/STYLE-GUIDE.html)
+- [Reusable Shorts style specification](templates/STYLE.md)
 
 Keep `.env` private. The whole `videos/` tree is ignored by Git — this repository is the pipeline,
 not the videos it produces. See [Exact workflow](docs/WORKFLOW.md) for what that means for your
