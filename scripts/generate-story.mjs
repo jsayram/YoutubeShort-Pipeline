@@ -213,6 +213,26 @@ for (const [index, text] of lines.entries()) {
 const detail = await api(`/stories/${story.id}`);
 const placed = [...detail.items].sort((a, b) => a.start_time_ms - b.start_time_ms);
 
+// Rewrite the manifest from the server's own view. The in-loop writes above only cover lines
+// this run generated, so a resume that had nothing left to do would otherwise leave stale
+// metadata here — a profile name, engine, or gap that no longer reflects reality.
+await writeJson(manifestPath, {
+  storyId: story.id,
+  storyName: story.name,
+  profile: profile.name,
+  engine,
+  modelSize,
+  language,
+  gapMs,
+  lines: placed.map((item, index) => ({
+    index,
+    text: item.text.trim(),
+    generationId: item.generation_id,
+    startMs: item.start_time_ms,
+    durationMs: Math.round(item.duration * 1000),
+  })),
+});
+
 const audio = await fetch(`${baseUrl}/stories/${story.id}/export-audio`);
 if (!audio.ok) throw new Error(`Voicebox story export failed: ${await audio.text()}`);
 await fs.mkdir(path.dirname(rawPath), { recursive: true });
