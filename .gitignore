@@ -1,0 +1,37 @@
+# Secrets — never commit. .env.example carries the key names instead.
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Generated video projects ------------------------------------------------
+# This repository is the pipeline, not its output.
+#
+# `npm run new` scaffolds videos/<slug>/ and the pipeline fills it with
+# narration audio, generated images, snapshots, and renders. All of it is
+# regenerable work product, so none of it is tracked here.
+#
+# Note this also excludes the per-video creative source — narration.txt,
+# image-prompts.json, STYLE.md, video.json. Those are inputs you write, not
+# generated files, and Git will not back them up. Keep anything worth saving
+# somewhere outside this repo, or force-add a single project with:
+#   git add -f videos/<slug>/content videos/<slug>/video.json
+videos/
+
+# --- Safety net --------------------------------------------------------------
+# Rendered media anywhere, in case a tool writes outside videos/.
+# Deliberately committing a source asset? Use: git add -f <path>
+*.mp4
+*.mov
+*.webm
+*.wav
+*.mp3
+*.m4a

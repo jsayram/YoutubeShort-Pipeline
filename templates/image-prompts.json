@@ -1,0 +1,27 @@
+[
+  {
+    "id": "01-hook",
+    "prompt": "Describe the main visual for the opening hook. Use one strong focal subject and leave clear mobile-safe space for the headline."
+  },
+  {
+    "id": "02-concept",
+    "prompt": "Describe the visual that explains the core concept without relying on readable text."
+  },
+  {
+    "id": "03-process",
+    "prompt": "Describe a visual process or transformation that supports the middle of the explanation."
+  },
+  {
+    "id": "04-example",
+    "prompt": "Describe a concrete example or result that makes the explanation feel useful."
+  },
+  {
+    "id": "05-contrast",
+    "prompt": "Describe a visual contrast, mistake, warning, or before-and-after moment."
+  },
+  {
+    "id": "06-close",
+    "prompt": "Describe a simple closing visual with an upward or completed feeling and room for a short call to action."
+  }
+]
+

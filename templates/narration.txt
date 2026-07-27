@@ -1,0 +1,6 @@
+Replace this file with the final narration.
+One spoken beat per line. Blank lines are ignored.
+Voicebox reads each line separately and places it on the story timeline, so the line breaks control
+both the phrasing and the scene timing.
+For a 60-second video, aim for roughly 125 to 145 spoken words across about six lines.
+

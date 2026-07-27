@@ -1,0 +1,23 @@
+{
+  "title": "New YouTube Short",
+  "duration": 60,
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "hyperframesVersion": "0.7.76",
+  "voicebox": {
+    "profile": "MyOwn",
+    "engine": "qwen",
+    "modelSize": "1.7B",
+    "language": "en",
+    "gapMs": 200,
+    "storyDescription": null
+  },
+  "imageGen": {
+    "model": "gemini-3.1-flash-image",
+    "aspectRatio": "9:16",
+    "imageSize": "2K",
+    "styleSuffix": "Consistent editorial illustration, strong focal hierarchy, clear mobile-safe margins, no readable text, no logos, no watermark."
+  }
+}
+
