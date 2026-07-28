@@ -1,7 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadEnv, parseArgs, readJson, videoDir, writeJson } from "./lib.mjs";
-import { applyStyle, loadPromptProfiles, resolveStyles } from "./image-styles.mjs";
+import { applyStyle, loadStyles, resolveStyles } from "./image-styles.mjs";
+import {
+  loadPromptState,
+  regenerateProjectScenePrompts,
+  resolveProjectPromptProfile,
+} from "./prompt-profiles.mjs";
 
 await loadEnv();
 
@@ -9,16 +14,6 @@ await loadEnv();
 // content/narration.txt (one spoken beat per line) and content/image-prompts.json (one wordless
 // still per beat). Everything downstream already knows how to consume those, so the studio UI
 // does not need its own path into the pipeline.
-
-// Words that carry no visual meaning, so the generated id stays readable. Declared up here
-// because the top-level code below calls promptFor(): the function hoists, a const does not.
-const STOPWORDS = new Set(
-  ("a an the and or but if then than that this these those it its is are was were be been being " +
-    "of to in on at for with from by as into about over under your you i me we us they them he him she her my our " +
-    "can will just also not no do does did have has had how what when where which who why").split(" "),
-);
-const PERSON_SIGNAL =
-  /\b(?:i|me|my|mine|you|your|yours|we|our|ours|he|him|his|she|her|hers|they|them|their|person|people|human|man|woman|boy|girl|child|ghost|thief|lover|friend)\b/i;
 
 const { flags } = parseArgs();
 if (!flags.project) throw new Error("Pass --project <slug>.");
@@ -59,21 +54,40 @@ await fs.writeFile(path.join(projectDir, "content", "narration.txt"), `${lines.j
 const promptsPath = path.join(projectDir, "content", "image-prompts.json");
 const existing = await readJson(promptsPath).catch(() => null);
 const keep = flags["keep-prompts"] === true || flags["keep-prompts"] === "true";
+const selectedStyleId = String(flags.style ?? config.imageGen?.style ?? "photographic");
+const localStyles = await loadStyles();
+const selectedStyle = localStyles.find((style) => style.id === selectedStyleId);
+const profileId = selectedStyle?.promptProfile ?? selectedStyleId;
+const { effective: effectivePromptProfile, projectOverride } =
+  await resolveProjectPromptProfile({ profileId, projectPath: projectDir });
+const promptState = await loadPromptState(projectDir);
+const hasTrackedEdits =
+  promptState.provider === profileId && (promptState.editedSceneIds?.length ?? 0) > 0;
 
-if (keep && Array.isArray(existing) && existing.length >= lines.length) {
+// Old projects predate prompt-state.json. Honour their historical checkbox behavior once by
+// keeping the complete file; after the user edits through Studio, only the explicitly edited
+// scenes are protected and every untouched scene can follow the current template.
+if (
+  keep &&
+  !hasTrackedEdits &&
+  Array.isArray(existing) &&
+  existing.length >= lines.length
+) {
   console.log(`Kept ${existing.length} existing image prompt(s).`);
 } else {
-  const profiles = await loadPromptProfiles();
-  const profileId = String(flags.style ?? config.imageGen?.style ?? "photographic");
-  const profile = profiles[profileId] ?? profiles.photographic;
-  if (!profile?.sceneTemplate) {
-    throw new Error(`Prompt profile "${profileId}" has no sceneTemplate in templates/prompt.json.`);
-  }
-  await writeJson(
-    promptsPath,
-    lines.map((line, index) => promptFor(line, index, profile.sceneTemplate)),
+  const regenerated = await regenerateProjectScenePrompts({
+    profileId,
+    projectPath: projectDir,
+    preserveEdited: keep,
+  });
+  console.log(
+    keep && regenerated.editedSceneIds.length
+      ? `Preserved ${regenerated.editedSceneIds.length} edited scene prompt(s).`
+      : `Regenerated all ${regenerated.scenes.length} scene prompt(s).`,
   );
-  console.log(`Prompt profile: ${profileId} (templates/prompt.json).`);
+  console.log(
+    `Prompt profile: ${profileId} (${projectOverride ? "video override" : "provider default"}).`,
+  );
   console.log(`Wrote ${lines.length} image prompt(s).`);
 }
 
@@ -120,6 +134,10 @@ if (flags.style) {
     fast: flags.fast === true,
     speedLora,
   });
+  // A video's override is deliberately applied after the provider preset. This makes it local
+  // to this project; it cannot leak into future videos unless the user explicitly promotes it.
+  config.imageGen.styleSuffix = effectivePromptProfile.stylePrompt;
+  config.imageGen.negativeExtra = effectivePromptProfile.negativePrompt;
   const bits = [style.label, style.checkpoint].filter(Boolean);
   if (config.imageGen.loras?.length) {
     bits.push(`loras: ${config.imageGen.loras.map((lora) => lora.name).join(", ")}`);
@@ -144,41 +162,6 @@ function splitSentences(text) {
     .split(/(?<=[.!?])\s+/)
     .map((part) => part.trim())
     .filter(Boolean);
-}
-
-function promptFor(line, index, template) {
-  // Resolve a small but destructive ambiguity before keyword extraction. "Leaves" is a visual
-  // noun in "autumn leaves" but a non-visual verb in "leaves me stranded"; tag-trained image
-  // models otherwise turn the latter into a plant.
-  const keywordSource = line.replace(
-    /\bleaves?\b(?=\s+(?:me|you|us|them|him|her|it)\b)/gi,
-    "",
-  );
-  const words = keywordSource
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, " ")
-    .split(/\s+/)
-    .filter((word) => word && !STOPWORDS.has(word));
-  const slug = words.slice(0, 3).join("-") || `beat-${index + 1}`;
-  const subjectType = PERSON_SIGNAL.test(line)
-    ? "one human figure, full body"
-    : "one clearly recognizable non-human subject";
-  const promptLine = line.replace(/[,.!?;:]+$/, "").trim();
-  const prompt = template
-    .replaceAll("{{line}}", promptLine)
-    .replaceAll("{{keywords}}", words.slice(0, 6).join(", "))
-    .replaceAll("{{subjectType}}", subjectType);
-  const unresolved = prompt.match(/\{\{[^}]+\}\}/g);
-  if (unresolved) {
-    throw new Error(`Unknown prompt variable(s): ${[...new Set(unresolved)].join(", ")}.`);
-  }
-
-  return {
-    id: `${String(index + 1).padStart(2, "0")}-${slug}`,
-    // Each dropdown option owns its complete prompt strategy in templates/prompt.json. Local
-    // diffusion profiles use concise tags; natural-language providers can use the full beat.
-    prompt,
-  };
 }
 
 async function readStdin() {

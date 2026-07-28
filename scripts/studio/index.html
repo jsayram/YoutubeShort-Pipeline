@@ -255,6 +255,118 @@
         font-size: 13px;
         margin-left: auto;
       }
+      .prompt-editor {
+        margin: 4px 0 16px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(8, 8, 11, 0.44);
+      }
+      .prompt-editor summary {
+        cursor: pointer;
+        font-weight: 620;
+        font-size: 13px;
+      }
+      .prompt-scope {
+        border-left: 3px solid var(--ok);
+        padding: 8px 10px;
+        margin: 12px 0;
+        background: rgba(111, 207, 142, 0.06);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .prompt-scope.permanent {
+        border-left-color: var(--bad);
+        background: rgba(226, 104, 95, 0.06);
+      }
+      .prompt-fields {
+        display: grid;
+        gap: 11px;
+      }
+      .prompt-fields textarea {
+        min-height: 100px;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .prompt-fields textarea[data-field="sceneTemplate"] {
+        min-height: 135px;
+      }
+      .prompt-label-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .badge {
+        display: inline-block;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 2px 7px;
+        color: var(--muted);
+        font-size: 10px;
+        letter-spacing: 0;
+        text-transform: none;
+      }
+      .badge.edited {
+        color: var(--accent);
+        border-color: rgba(232, 180, 74, 0.5);
+      }
+      .prompt-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        align-items: center;
+      }
+      button.danger {
+        background: transparent;
+        color: var(--bad);
+        border: 1px solid rgba(226, 104, 95, 0.55);
+      }
+      .prompt-message {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 9px;
+      }
+      .prompt-message.bad {
+        color: var(--bad);
+      }
+      .scene-prompts {
+        margin-top: 18px;
+        border-top: 1px solid var(--line);
+        padding-top: 14px;
+      }
+      .scene-prompt-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .scene-prompt {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: var(--panel);
+      }
+      .scene-prompt textarea {
+        min-height: 92px;
+        margin-top: 7px;
+        font-size: 12px;
+      }
+      .scene-line {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .default-preview {
+        margin-top: 12px;
+      }
+      .default-preview pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        color: var(--muted);
+        font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin-top: 8px;
+      }
 
       /* Vertical run: one stage per row, connected by a spine. */
       .stages {
@@ -497,6 +609,73 @@
           </div>
         </div>
 
+        <details class="prompt-editor" id="prompt-editor">
+          <summary>Edit image prompts <span class="badge" id="prompt-scope-badge">provider default</span></summary>
+          <div class="prompt-scope" id="prompt-scope">
+            Changes here are saved only to this video by default. Future videos stay unchanged.
+          </div>
+          <div class="prompt-fields">
+            <div>
+              <div class="prompt-label-line">
+                <label for="prompt-scene-template">Scene template</label>
+                <span class="badge" data-prompt-badge="sceneTemplate">inherited</span>
+              </div>
+              <textarea id="prompt-scene-template" data-field="sceneTemplate" spellcheck="false"></textarea>
+              <div class="hint">Variables: {{line}}, {{keywords}}, {{subjectType}}</div>
+            </div>
+            <div>
+              <div class="prompt-label-line">
+                <label for="prompt-style">Shared style prompt</label>
+                <span class="badge" data-prompt-badge="stylePrompt">inherited</span>
+              </div>
+              <textarea id="prompt-style" data-field="stylePrompt" spellcheck="false"></textarea>
+            </div>
+            <div>
+              <div class="prompt-label-line">
+                <label for="prompt-negative">Negative prompt</label>
+                <span class="badge" data-prompt-badge="negativePrompt">inherited</span>
+              </div>
+              <textarea id="prompt-negative" data-field="negativePrompt" spellcheck="false"></textarea>
+            </div>
+          </div>
+          <div class="prompt-actions">
+            <button type="button" id="save-video-prompt">Save for this video</button>
+            <button type="button" class="ghost" id="reset-video-prompt">Reset video to provider default</button>
+          </div>
+          <details class="default-preview">
+            <summary>Compare with the provider default</summary>
+            <pre id="provider-default-preview"></pre>
+          </details>
+          <div class="prompt-scope permanent">
+            Permanent action: making this the provider default changes every new video using this
+            provider. Existing video overrides and saved scene prompts remain unchanged. The old
+            default is backed up automatically.
+          </div>
+          <div class="prompt-actions">
+            <button type="button" class="danger" id="promote-prompt">Make this the provider default…</button>
+            <select id="prompt-backup" aria-label="Provider default backup"></select>
+            <button type="button" class="ghost" id="restore-prompt">Restore selected backup…</button>
+          </div>
+
+          <section class="scene-prompts hidden" id="scene-prompts">
+            <div class="section-head">
+              <div>
+                <label>Final scene prompts</label>
+                <div class="sub">
+                  Editing a scene protects only that scene when you rerun the pipeline.
+                </div>
+              </div>
+            </div>
+            <div class="scene-prompt-list" id="scene-prompt-list"></div>
+            <div class="prompt-actions">
+              <button type="button" id="save-scene-prompts">Save scene edits</button>
+              <button type="button" class="ghost" id="regenerate-scenes">Regenerate untouched scenes</button>
+              <button type="button" class="danger" id="regenerate-all-scenes">Regenerate every scene…</button>
+            </div>
+          </section>
+          <div class="prompt-message" id="prompt-message"></div>
+        </details>
+
         <div class="row">
           <div>
             <label for="importpath">Import an existing project folder</label>
@@ -530,7 +709,10 @@ Start a recording and talk about your day."></textarea>
             Highlight spoken words
           </label>
           <label><input type="checkbox" id="opt-force" /> Regenerate existing images</label>
-          <label><input type="checkbox" id="opt-keep" /> Keep my edited prompts</label>
+          <label>
+            <input type="checkbox" id="opt-keep" />
+            Preserve my scene prompt edits when rerunning
+          </label>
           <label><input type="checkbox" id="opt-nodoctor" /> Skip environment check</label>
         </div>
 
@@ -760,6 +942,7 @@ Start a recording and talk about your day."></textarea>
         if (event.type === "done") {
           setRunning(false);
           maybeOfferRender(event.slug);
+          loadPromptEditor();
           return;
         }
 
@@ -839,9 +1022,11 @@ Start a recording and talk about your day."></textarea>
           .value.toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "");
+        schedulePromptEditorLoad();
       });
       $("slug").addEventListener("input", () => {
         $("slug").dataset.touched = "1";
+        schedulePromptEditorLoad();
       });
 
       function escapeHtml(value) {
@@ -851,6 +1036,256 @@ Start a recording and talk about your day."></textarea>
             ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character],
         );
       }
+
+      // ------------------------------------------------------------------ layered prompt editor
+
+      const promptFieldIds = {
+        sceneTemplate: "prompt-scene-template",
+        stylePrompt: "prompt-style",
+        negativePrompt: "prompt-negative",
+      };
+      let promptData = null;
+      let editedSceneIds = new Set();
+      let promptLoadTimer = null;
+
+      function promptValues() {
+        return Object.fromEntries(
+          Object.entries(promptFieldIds).map(([field, id]) => [field, $(id).value]),
+        );
+      }
+
+      function promptMessage(text, bad = false) {
+        const host = $("prompt-message");
+        host.textContent = text;
+        host.classList.toggle("bad", bad);
+      }
+
+      function updatePromptBadges() {
+        if (!promptData) return;
+        for (const [field, id] of Object.entries(promptFieldIds)) {
+          const changed = $(id).value !== promptData.providerDefault[field];
+          const badge = document.querySelector(`[data-prompt-badge="${field}"]`);
+          badge.textContent = changed ? "video-specific" : "inherited";
+          badge.classList.toggle("edited", changed);
+        }
+      }
+
+      function renderPromptEditor(data) {
+        promptData = data;
+        editedSceneIds = new Set(data.editedSceneIds ?? []);
+        for (const [field, id] of Object.entries(promptFieldIds)) {
+          $(id).value = data.effective[field] ?? "";
+        }
+        updatePromptBadges();
+
+        $("prompt-scope-badge").textContent = data.projectOverride
+          ? "video override"
+          : "provider default";
+        $("prompt-scope-badge").classList.toggle("edited", Boolean(data.projectOverride));
+        $("prompt-scope").textContent = data.projectExists
+          ? data.projectOverride
+            ? `This video has its own ${data.profileId} prompt. Future videos are unchanged.`
+            : `This video currently inherits the ${data.profileId} provider default. Saving here affects only this video.`
+          : "Saving for this video will create its empty project shell. No images, voice, or render start until you run the pipeline.";
+
+        $("save-video-prompt").disabled =
+          !/^[a-z0-9][a-z0-9-]*$/.test($("slug").value.trim());
+        $("reset-video-prompt").disabled = !data.projectExists || !data.projectOverride;
+        $("provider-default-preview").textContent = [
+          `SCENE TEMPLATE\n${data.providerDefault.sceneTemplate}`,
+          `\nSHARED STYLE\n${data.providerDefault.stylePrompt}`,
+          `\nNEGATIVE\n${data.providerDefault.negativePrompt}`,
+        ].join("\n");
+
+        $("prompt-backup").innerHTML = data.backups?.length
+          ? data.backups.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")
+          : `<option value="">No backups yet</option>`;
+        $("restore-prompt").disabled = !data.backups?.length;
+
+        const sceneSection = $("scene-prompts");
+        if (!data.projectExists || !data.scenes?.length) {
+          sceneSection.classList.add("hidden");
+          $("scene-prompt-list").innerHTML = "";
+        } else {
+          sceneSection.classList.remove("hidden");
+          const generatedByIndex = data.generatedScenes ?? [];
+          $("scene-prompt-list").innerHTML = data.scenes
+            .map((scene, index) => {
+              const edited = editedSceneIds.has(scene.id);
+              return `
+                <article class="scene-prompt" data-scene-index="${index}" data-scene-id="${escapeHtml(scene.id)}">
+                  <div class="prompt-label-line">
+                    <strong>${escapeHtml(scene.id)}</strong>
+                    <span class="badge ${edited ? "edited" : ""}" data-scene-badge>
+                      ${edited ? "protected edit" : "generated"}
+                    </span>
+                  </div>
+                  <div class="scene-line">${escapeHtml(data.lines[index] ?? "")}</div>
+                  <textarea spellcheck="false" data-scene-text>${escapeHtml(scene.prompt)}</textarea>
+                  <div class="prompt-actions">
+                    <button class="ghost compact" type="button" data-reset-scene
+                      data-generated="${escapeHtml(generatedByIndex[index]?.prompt ?? "")}">
+                      Reset this scene
+                    </button>
+                  </div>
+                </article>`;
+            })
+            .join("");
+
+          document.querySelectorAll("[data-scene-text]").forEach((textarea) => {
+            textarea.addEventListener("input", () => {
+              const card = textarea.closest(".scene-prompt");
+              editedSceneIds.add(card.dataset.sceneId);
+              card.querySelector("[data-scene-badge]").textContent = "unsaved edit";
+              card.querySelector("[data-scene-badge]").classList.add("edited");
+              $("opt-keep").checked = true;
+            });
+          });
+          document.querySelectorAll("[data-reset-scene]").forEach((button) => {
+            button.addEventListener("click", () => {
+              const card = button.closest(".scene-prompt");
+              card.querySelector("[data-scene-text]").value = button.dataset.generated;
+              editedSceneIds.delete(card.dataset.sceneId);
+              const badge = card.querySelector("[data-scene-badge]");
+              badge.textContent = "generated";
+              badge.classList.remove("edited");
+              $("opt-keep").checked = editedSceneIds.size > 0;
+            });
+          });
+        }
+        $("opt-keep").checked = data.preserveEditedScenes === true || editedSceneIds.size > 0;
+        promptMessage("");
+      }
+
+      async function loadPromptEditor() {
+        const style = $("style").value;
+        if (!style) return;
+        const slug = $("slug").value.trim();
+        const query = new URLSearchParams({ style });
+        if (/^[a-z0-9][a-z0-9-]*$/.test(slug)) query.set("slug", slug);
+        const response = await fetch(`/api/prompt-editor?${query}`).catch(() => null);
+        if (!response?.ok) {
+          const data = response ? await response.json().catch(() => ({})) : {};
+          promptMessage(data.error ?? "Could not load prompt settings.", true);
+          return;
+        }
+        renderPromptEditor(await response.json());
+      }
+
+      function schedulePromptEditorLoad() {
+        clearTimeout(promptLoadTimer);
+        promptLoadTimer = setTimeout(loadPromptEditor, 220);
+      }
+
+      async function promptRequest(route, method, body) {
+        promptMessage("Saving…");
+        const response = await fetch(route, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          promptMessage(data.error ?? "The prompt change failed.", true);
+          return null;
+        }
+        promptMessage(data.message ?? "Saved.");
+        return data;
+      }
+
+      for (const id of Object.values(promptFieldIds)) {
+        $(id).addEventListener("input", updatePromptBadges);
+      }
+
+      $("save-video-prompt").addEventListener("click", async () => {
+        const data = await promptRequest("/api/prompt-editor/project", "PUT", {
+          slug: $("slug").value.trim(),
+          style: $("style").value,
+          values: promptValues(),
+        });
+        if (data) {
+          await loadProjects();
+          await loadPromptEditor();
+        }
+      });
+
+      $("reset-video-prompt").addEventListener("click", async () => {
+        if (!confirm("Remove this video's prompt override and inherit the provider default?")) return;
+        const data = await promptRequest("/api/prompt-editor/project/reset", "POST", {
+          slug: $("slug").value.trim(),
+          style: $("style").value,
+        });
+        if (data) await loadPromptEditor();
+      });
+
+      function scenePayload() {
+        const scenes = [...document.querySelectorAll(".scene-prompt")].map((card) => ({
+          id: card.dataset.sceneId,
+          prompt: card.querySelector("[data-scene-text]").value,
+        }));
+        return {
+          slug: $("slug").value.trim(),
+          style: $("style").value,
+          scenes,
+          editedSceneIds: [...editedSceneIds],
+        };
+      }
+
+      async function saveSceneEdits(quiet = false) {
+        const data = await promptRequest("/api/prompt-editor/scenes", "PUT", scenePayload());
+        if (data && !quiet) await loadPromptEditor();
+        return data;
+      }
+
+      $("save-scene-prompts").addEventListener("click", () => saveSceneEdits());
+
+      $("regenerate-scenes").addEventListener("click", async () => {
+        if (!(await saveSceneEdits(true))) return;
+        const data = await promptRequest("/api/prompt-editor/scenes/regenerate", "POST", {
+          slug: $("slug").value.trim(),
+          style: $("style").value,
+          preserveEdited: true,
+        });
+        if (data) await loadPromptEditor();
+      });
+
+      $("regenerate-all-scenes").addEventListener("click", async () => {
+        if (!confirm("Regenerate every scene prompt? This removes all protected scene edits.")) return;
+        const data = await promptRequest("/api/prompt-editor/scenes/regenerate", "POST", {
+          slug: $("slug").value.trim(),
+          style: $("style").value,
+          preserveEdited: false,
+        });
+        if (data) await loadPromptEditor();
+      });
+
+      $("promote-prompt").addEventListener("click", async () => {
+        const confirmation = prompt(
+          "PERMANENT FOR FUTURE VIDEOS\n\nThis changes the selected provider default. Existing video overrides and scene prompts stay unchanged, and the old default will be backed up.\n\nType MAKE DEFAULT to continue.",
+        );
+        if (confirmation === null) return;
+        const data = await promptRequest("/api/prompt-editor/default/promote", "POST", {
+          style: $("style").value,
+          values: promptValues(),
+          confirmation,
+        });
+        if (data) await loadPromptEditor();
+      });
+
+      $("restore-prompt").addEventListener("click", async () => {
+        const backup = $("prompt-backup").value;
+        if (!backup) return;
+        const confirmation = prompt(
+          `Restore ${backup} for future videos?\n\nA safety backup of the current default will also be created.\n\nType RESTORE DEFAULT to continue.`,
+        );
+        if (confirmation === null) return;
+        const data = await promptRequest("/api/prompt-editor/default/restore", "POST", {
+          style: $("style").value,
+          backup,
+          confirmation,
+        });
+        if (data) await loadPromptEditor();
+      });
 
       // ------------------------------------------------------------------ local services
 
@@ -1075,6 +1510,7 @@ Start a recording and talk about your day."></textarea>
         hint.textContent = parts.join(" ");
         $("importpath").value = "";
         await loadProjects();
+        await loadPromptEditor();
       }
 
       // The native chooser runs server-side and returns a real absolute path, which a file
@@ -1203,13 +1639,17 @@ Start a recording and talk about your day."></textarea>
             )
             .join("");
           describeStyle();
+          loadPromptEditor();
           if (speed) {
             $("fastwrap").classList.remove("hidden");
             $("fastwrap").lastChild.textContent = ` Fast mode (${speed}, ${data.speedSampling.steps} steps)`;
           }
         });
 
-      $("style").addEventListener("change", describeStyle);
+      $("style").addEventListener("change", () => {
+        describeStyle();
+        loadPromptEditor();
+      });
 
       // Rejoin a run that is already going when the page loads.
       fetch("/api/state")

@@ -6,6 +6,7 @@
 # Dependencies
 node_modules/
 .cache/
+templates/prompt-backups/
 
 # macOS
 .DS_Store

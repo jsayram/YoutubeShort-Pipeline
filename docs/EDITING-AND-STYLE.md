@@ -8,7 +8,7 @@
 | Voice | `video.json` or `--profile` | the voice command again |
 | Pause between verses | `voicebox.gapMs` or Studio's Pause field | regenerate voice and compose |
 | Active-word captions | Studio's Highlight spoken words toggle or `captions.enabled` | align words and compose |
-| One visual | its entry in `content/image-prompts.json` | delete only that generated image, then run the image command |
+| One visual | Studio's Final scene prompts or its entry in `content/image-prompts.json` | delete only that generated image, then run the image command |
 | Overall look | `content/STYLE.md`, prompts, and composition CSS | image generation, snapshots, and preview |
 | Scene timing | `video.json`, clip data attributes, and GSAP positions | check, snapshots, and preview |
 | On-screen text | `index.html` | check and preview |
@@ -45,9 +45,37 @@ ideas. Keep the last frame visible rather than fading to black.
 - Review six scene snapshots side by side. The Short should feel varied but obviously belong to one
   visual system.
 
-Provider prompt profiles live together in `templates/prompt.json`. The selected Studio dropdown
-option imports its scene template, shared style prompt, and negative prompt into the project. Refine
-provider behavior there; use `{{line}}` for the full narration beat, `{{keywords}}` for the
-extracted visual terms, and `{{subjectType}}` for the inferred actor or object. The resulting
-per-scene prompts are written to `image-prompts.json`, while the selected shared and negative
-prompts are flattened into `video.json` for the generator.
+## Prompt scope and safe defaults
+
+Studio shows the scene template, shared style prompt, and negative prompt for the selected content
+provider. Prompt settings have three layers:
+
+| Layer | Stored in | Affects |
+|---|---|---|
+| Provider default | `templates/prompt.json` | new videos that use that provider |
+| Video override | `content/prompt-overrides.json` | only the selected video |
+| Scene edit | `content/image-prompts.json` plus `content/prompt-state.json` | only that scene in that video |
+
+Use **Save for this video** while experimenting. A badge shows when a field is video-specific.
+**Reset video to provider default** removes only the current video's override.
+
+Use **Make this the provider default** only after an experiment should become the new baseline for
+future videos. Studio labels the action as permanent, requires the exact confirmation
+`MAKE DEFAULT`, and saves the complete previous prompt document under
+`templates/prompt-backups/`. Those backups are intentionally ignored by Git because they are a
+local recovery history. **Restore selected backup** also creates a safety backup before it changes
+anything.
+
+Promoting or restoring a provider default does not rewrite existing video overrides or final scene
+prompts. This is the main protection against a successful change for one video unexpectedly
+altering old work.
+
+When **Preserve my scene prompt edits when rerunning** is enabled, the preparation step regenerates
+untouched scenes from the effective template and carries protected scene edits forward by scene
+position. **Regenerate every scene** is the only Studio action that deliberately clears all scene
+edit protection, and it asks for confirmation.
+
+Templates may use `{{line}}` for the full narration beat, `{{keywords}}` for extracted visual
+terms, and `{{subjectType}}` for the inferred actor or object. The effective shared and negative
+prompts are flattened into `video.json` on the next pipeline run, so the image generator continues
+to consume one resolved project configuration.

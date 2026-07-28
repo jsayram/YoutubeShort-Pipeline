@@ -5,7 +5,17 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadEnv, parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
-import { resolveStyles } from "./image-styles.mjs";
+import { loadStyles, resolveStyles } from "./image-styles.mjs";
+import {
+  listPromptBackups,
+  promoteProviderDefault,
+  promptEditorState,
+  regenerateProjectScenePrompts,
+  resetProjectPromptOverride,
+  restoreProviderDefault,
+  saveProjectPromptOverride,
+  saveScenePrompts,
+} from "./prompt-profiles.mjs";
 import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
 
 await loadEnv();
@@ -478,6 +488,25 @@ function sendJson(response, status, body) {
   response.end(text);
 }
 
+function validSlug(slug) {
+  return /^[a-z0-9][a-z0-9-]*$/.test(slug);
+}
+
+async function promptProfileIdFor(styleId) {
+  const styles = await loadStyles();
+  const style = styles.find((entry) => entry.id === styleId);
+  if (!style) throw new Error(`Unknown content provider "${styleId}".`);
+  return style.promptProfile ?? style.id;
+}
+
+function rejectPromptWriteWhileRunning(response) {
+  if (!current || current.done) return false;
+  sendJson(response, 409, {
+    error: "Wait for the current pipeline run to finish before changing prompts.",
+  });
+  return true;
+}
+
 // The spoken script of a project. content/narration.txt is what the pipeline writes and what
 // Voicebox reads, so it is the authoritative copy; the studio's own scratch file is ignored.
 async function readNarration(projectPath) {
@@ -774,6 +803,170 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (route === "/api/prompt-editor" && request.method === "GET") {
+      const slug = String(url.searchParams.get("slug") ?? "").trim();
+      const styleId = String(url.searchParams.get("style") ?? "photographic").trim();
+      if (slug && !validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const profileId = await promptProfileIdFor(styleId);
+      sendJson(response, 200, await promptEditorState({ slug: slug || null, profileId }));
+      return;
+    }
+
+    if (route === "/api/prompt-editor/project" && request.method === "PUT") {
+      if (rejectPromptWriteWhileRunning(response)) return;
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const projectPath = videoDir(slug);
+      const exists = await fs.access(projectPath).then(() => true, () => false);
+      if (!exists) {
+        // Saving an override before the first run is a normal workflow. Scaffold only the empty
+        // project shell; the later Run action still writes narration and generates every asset.
+        await run(node, [script("new-video.mjs"), slug]);
+      }
+      const profileId = await promptProfileIdFor(String(body.style ?? ""));
+      const saved = await saveProjectPromptOverride({
+        profileId,
+        projectPath,
+        values: body.values,
+      });
+      sendJson(response, 200, {
+        saved,
+        scope: "video",
+        createdProject: !exists,
+        message:
+          `Saved only for videos/${slug}. Future videos are unchanged.` +
+          (!exists ? " Created its empty project shell for the first run." : ""),
+      });
+      return;
+    }
+
+    if (route === "/api/prompt-editor/project/reset" && request.method === "POST") {
+      if (rejectPromptWriteWhileRunning(response)) return;
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const profileId = await promptProfileIdFor(String(body.style ?? ""));
+      const removed = await resetProjectPromptOverride({
+        profileId,
+        projectPath: videoDir(slug),
+      });
+      sendJson(response, 200, {
+        removed,
+        scope: "video",
+        message: "This video now inherits the provider default.",
+      });
+      return;
+    }
+
+    if (route === "/api/prompt-editor/scenes" && request.method === "PUT") {
+      if (rejectPromptWriteWhileRunning(response)) return;
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const projectPath = videoDir(slug);
+      const exists = await fs.access(projectPath).then(() => true, () => false);
+      if (!exists) {
+        sendJson(response, 404, { error: "Create or import this video before saving scenes." });
+        return;
+      }
+      const profileId = await promptProfileIdFor(String(body.style ?? ""));
+      const saved = await saveScenePrompts({
+        profileId,
+        projectPath,
+        scenes: body.scenes,
+        editedSceneIds: body.editedSceneIds,
+      });
+      sendJson(response, 200, {
+        ...saved,
+        message: `Saved ${saved.editedSceneIds.length} edited scene prompt(s) for this video.`,
+      });
+      return;
+    }
+
+    if (route === "/api/prompt-editor/scenes/regenerate" && request.method === "POST") {
+      if (rejectPromptWriteWhileRunning(response)) return;
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const projectPath = videoDir(slug);
+      const exists = await fs.access(projectPath).then(() => true, () => false);
+      if (!exists) {
+        sendJson(response, 404, { error: "Create or import this video before regenerating scenes." });
+        return;
+      }
+      const profileId = await promptProfileIdFor(String(body.style ?? ""));
+      const result = await regenerateProjectScenePrompts({
+        profileId,
+        projectPath,
+        preserveEdited: body.preserveEdited !== false,
+      });
+      sendJson(response, 200, {
+        ...result,
+        message: body.preserveEdited === false
+          ? `Regenerated all ${result.scenes.length} scene prompts.`
+          : `Regenerated untouched scenes and preserved ${result.editedSceneIds.length} edit(s).`,
+      });
+      return;
+    }
+
+    if (route === "/api/prompt-editor/default/promote" && request.method === "POST") {
+      if (rejectPromptWriteWhileRunning(response)) return;
+      const body = await readBody(request);
+      const profileId = await promptProfileIdFor(String(body.style ?? ""));
+      const result = await promoteProviderDefault({
+        profileId,
+        values: body.values,
+        confirmation: body.confirmation,
+      });
+      sendJson(response, 200, {
+        backup: path.basename(result.backupPath),
+        message:
+          "Provider default changed for future videos. Existing video overrides and saved scene prompts were not changed.",
+      });
+      return;
+    }
+
+    if (route === "/api/prompt-editor/default/restore" && request.method === "POST") {
+      if (rejectPromptWriteWhileRunning(response)) return;
+      const body = await readBody(request);
+      const profileId = await promptProfileIdFor(String(body.style ?? ""));
+      const result = await restoreProviderDefault({
+        profileId,
+        backupName: String(body.backup ?? ""),
+        confirmation: body.confirmation,
+      });
+      sendJson(response, 200, {
+        safetyBackup: path.basename(result.safetyPath),
+        message:
+          "Provider default restored for future videos. Existing video overrides and scenes were not changed.",
+      });
+      return;
+    }
+
+    if (route === "/api/prompt-editor/default/backups" && request.method === "GET") {
+      const styleId = String(url.searchParams.get("style") ?? "photographic").trim();
+      const profileId = await promptProfileIdFor(styleId);
+      const backups = await listPromptBackups({ profileId });
+      sendJson(response, 200, { backups: backups.map(({ name }) => name) });
+      return;
+    }
+
     if (route === "/api/services") {
       sendJson(response, 200, await serviceSnapshot());
       return;
@@ -927,7 +1120,12 @@ const server = http.createServer(async (request, response) => {
 
     response.writeHead(404).end("Not found");
   } catch (error) {
-    sendJson(response, 500, { error: String(error.message ?? error) });
+    const message = String(error.message ?? error);
+    const clientError =
+      /^(?:Type "|Unknown (?:prompt profile|content provider)|Bad |Invalid backup|.* cannot be empty|The scene template|No scene prompts|Every scene)/.test(
+        message,
+      );
+    sendJson(response, clientError ? 400 : 500, { error: message });
   }
 });
 

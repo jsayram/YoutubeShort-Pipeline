@@ -119,8 +119,9 @@ This repository is the pipeline, not its output. Commit the scripts, templates, 
 docs — the 24 files that make `npm run new` work on a fresh machine.
 
 Everything under `videos/` stays out, including the per-video creative source you write by hand:
-`narration.txt`, `image-prompts.json`, `STYLE.md`, and `video.json`. Git will not back those up.
-Keep a script you care about somewhere outside this repo, or force-add one project:
+`narration.txt`, `image-prompts.json`, `prompt-overrides.json`, `prompt-state.json`, `STYLE.md`, and
+`video.json`. Git will not back those up. Keep a script you care about somewhere outside this repo,
+or force-add one project:
 
 ```sh
 git add -f videos/<slug>/content videos/<slug>/video.json

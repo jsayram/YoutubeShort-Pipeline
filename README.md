@@ -74,11 +74,25 @@ npm run align -- --project my-video-name
 ```
 
 The Studio's Content provider dropdown loads a matching prompt profile from
-`templates/prompt.json`. Each profile keeps its scene template, shared style prompt, and negative
-prompt together. Edit that one file when refining Photographic, Anime, Storybook, Flat vector, Ink
-line art, Living storybook, or Gemini; the next run imports the selected profile automatically.
-Scene templates may use `{{line}}` for the complete narration beat, `{{keywords}}` for its extracted
-visual terms, and `{{subjectType}}` for the inferred actor or object.
+`templates/prompt.json`. Open **Edit image prompts** beneath the dropdown to work at three safe
+levels:
+
+1. **Provider default** — the starting point for future videos.
+2. **This video** — an override saved to `content/prompt-overrides.json`; it cannot affect another
+   video.
+3. **Final scene prompts** — individual prompts in `content/image-prompts.json`. Scenes you edit
+   are marked as protected, so a rerun can rebuild untouched scenes without erasing your work.
+
+**Save for this video** is the normal, safe action. **Make this the provider default** is explicitly
+permanent for future videos, requires typing `MAKE DEFAULT`, and backs up the prior
+`templates/prompt.json` automatically. Studio can restore those backups. Existing per-video
+overrides and saved scene prompts never change when a provider default is promoted or restored.
+
+The **Preserve my scene prompt edits when rerunning** toggle protects only scenes recorded as edits
+by Studio. Older projects without edit tracking retain the historical all-prompts behavior until
+their scenes are saved or regenerated through the new editor. Scene templates may use `{{line}}`
+for the complete narration beat, `{{keywords}}` for its extracted visual terms, and
+`{{subjectType}}` for the inferred actor or object.
 
 `Illustrated monologue (storybook)` keeps the original still-image slideshow treatment.
 `Illustrated monologue (living storybook)` uses the same painted look but also selects its matching
