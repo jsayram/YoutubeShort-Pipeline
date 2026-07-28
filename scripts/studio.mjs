@@ -672,6 +672,7 @@ const server = http.createServer(async (request, response) => {
           duration: config.duration,
           rendered,
           captionsEnabled: config.captions?.enabled === true,
+          styleId: config.imageGen?.style ?? null,
         });
       }
       sendJson(response, 200, { projects });
@@ -744,6 +745,7 @@ const server = http.createServer(async (request, response) => {
           hasComposition,
           script: await readNarration(source),
           captionsEnabled: config?.captions?.enabled === true,
+          styleId: config?.imageGen?.style ?? null,
         });
         return;
       }
@@ -775,6 +777,7 @@ const server = http.createServer(async (request, response) => {
         hasComposition,
         from: source,
         captionsEnabled: imported?.captions?.enabled === true,
+        styleId: imported?.imageGen?.style ?? null,
         // Hand the project's narration back so the script box shows what this video actually
         // says, rather than leaving the previous project's text sitting there.
         script: await readNarration(destination),

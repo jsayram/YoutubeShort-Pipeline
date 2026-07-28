@@ -98,27 +98,38 @@ The **Preserve my scene prompt edits when rerunning** toggle protects only scene
 by Studio. Older projects without edit tracking retain the historical all-prompts behavior until
 their scenes are saved or regenerated through the new editor. Scene templates may use `{{line}}`
 for the complete narration beat, `{{keywords}}` for its extracted visual terms, and
-`{{subjectType}}` for the inferred actor or object.
+`{{subjectType}}` for the inferred actor or object. Story-aware profiles can also use
+`{{sentiment}}`, `{{storyBeat}}`, `{{visualAction}}`, `{{shotPlan}}`, `{{castPlan}}`, and
+`{{continuity}}`. Those values turn a line into an emotional event, a physical action, a solo or
+shared cast decision, and a varied camera plan instead of passing a loose bag of words to the
+image model.
 
-`Illustrated monologue (storybook)` uses a vintage oil-painted relationship-story look: old novel
-illustration, worn canvas and paper texture, warm Japanese animated-film atmosphere, expressive
-adult faces, and script-led scenes of love, sadness, separation, or solitude. It keeps the original
-still-image slideshow treatment.
+`Anime` and `Illustrated monologue (storybook)` now use story-aware prompts and a vintage
+oil-and-paper-watercolor relationship look: old novel illustration, cold-press paper texture,
+warm hand-painted Japanese animated-film atmosphere without copying a specific film, expressive
+adult faces, and script-led scenes of love, sadness, separation, or solitude. Illustrated
+monologue keeps the original still-image slideshow treatment.
 
 `Illustrated monologue (living storybook)` uses the same oil-painted look but also selects its
 matching automatic composition: localized character breathing and sway, a single moving light
 pass, drifting haze and motes, and a restrained camera push. Its prompt stages faces and hands
 clearly while adding loose hair, fabric, grass, water, smoke, or dust that can carry subtle motion.
 
-`FLUX.2 nostalgic storybook (local first)` is the recommended story provider. It renders with the
+`FLUX.2 painted storybook (local first)` is the recommended story provider. It renders with the
 local four-step FLUX.2 Klein model and falls back to Cloudflare only when both Cloudflare values
-are configured. Its look is a nostalgic hand-drawn romance frame: bold ink contours, matte retro
-color, paper and film grain, expressive contemporary people, and large poetic landscapes. It
-automatically creates two stable files under `assets/references/`: a recurring two-person cast
-guide and a wordless nostalgic style guide. Their versioned names prevent old dark-fantasy
-references from being reused after this style change. Scene regeneration reuses the new
-references; use `--force-references` only when you intentionally want a new cast and art
-direction.
+are configured. Its look combines watercolor blooms, selective oil texture, graphite/dry-ink
+contours, paper and film grain, expressive contemporary people, and poetic environments. It
+automatically creates three stable files under `assets/references/`: two separate neutral
+single-character guides and a wordless materials/palette guide. The references deliberately have
+no interaction, location, or story composition to copy. Their versioned names prevent the older
+paired seaside reference from forcing every scene into the same pose and setting. Scene
+regeneration reuses the new references; use `--force-references` only when you intentionally want
+a new cast and art direction.
+
+For an eight-scene story, the story-aware cast plan normally uses three shared turning points and
+five solo frames that alternate the recurring woman and man. Solo FLUX scenes receive only the
+chosen character reference plus the materials reference. The absent person may be suggested by
+an off-frame hand, shadow, reflection, empty chair, second cup, keepsake, or negative space.
 
 `Animagine dark faceless storybook` is separate from the existing Animagine-backed providers. Its
 ordered-tag prompt asks for literal physical actions, a full-body anonymous protagonist, a face

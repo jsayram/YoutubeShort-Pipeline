@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
+  buildScenePrompts,
   imagePromptsPath,
   promoteProviderDefault,
   regenerateProjectScenePrompts,
@@ -12,6 +13,49 @@ import {
   saveProjectPromptOverride,
   saveScenePrompts,
 } from "./prompt-profiles.mjs";
+
+const relationshipLines = [
+  "We met on an ordinary Tuesday, and nothing about it felt special.",
+  "You laughed at something I said, and I forgot what I was saying.",
+  "We stayed up too late talking about everything and nothing at all.",
+  "I noticed your coffee order long before I ever noticed I loved you.",
+  "We fought once over something small, and making up felt like coming home.",
+  "You fall asleep before me, and I lie there thinking how lucky I am.",
+  "Nobody tells you love is not fireworks. It is just quietly wanting to stay.",
+  "So I stay, and every single day I make the choice to stay.",
+];
+const interpreted = buildScenePrompts(
+  relationshipLines,
+  [
+    "{{storyBeat}}",
+    "{{line}}",
+    "{{sentiment}}",
+    "{{visualAction}}",
+    "{{shotPlan}}",
+    "{{castPlan}}",
+    "{{continuity}}",
+  ].join(" | "),
+);
+assert.equal(new Set(interpreted.map((scene) => scene.prompt)).size, relationshipLines.length);
+assert.match(interpreted[0].prompt, /ordinary weekday place/i);
+assert.match(interpreted[1].prompt, /laughter comes from just outside the frame/i);
+assert.match(interpreted[2].prompt, /two cooling mugs/i);
+assert.match(interpreted[3].prompt, /coffee order/i);
+assert.match(interpreted[3].prompt, /close over-the-shoulder detail/i);
+assert.match(interpreted[4].prompt, /opposite sides of a room/i);
+assert.match(interpreted[5].prompt, /awake at the bedside/i);
+assert.match(interpreted[6].prompt, /setting down keys and a coat/i);
+assert.match(interpreted[7].prompt, /joined hands/i);
+assert.match(interpreted[7].prompt, /resolution and emotional choice/i);
+assert.deepEqual(
+  interpreted.map((scene) => scene.castMode),
+  ["pair", "solo-a", "solo-b", "solo-a", "pair", "solo-a", "solo-b", "pair"],
+);
+assert.match(interpreted[1].prompt, /Solo-woman scene/i);
+assert.match(interpreted[2].prompt, /Solo-man scene/i);
+for (const [index, line] of relationshipLines.entries()) {
+  assert.ok(interpreted[index].prompt.includes(line.replace(/[,.!?;:]+$/, "")));
+}
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), "youtube-prompt-test-"));
 const promptPath = path.join(root, "templates", "prompt.json");
@@ -72,6 +116,18 @@ try {
     scenes: first.scenes,
     editedSceneIds: [first.scenes[0].id],
   });
+  await saveScenePrompts({
+    profileId: "test",
+    projectPath,
+    scenes: first.scenes.map(({ id, prompt }) => ({ id, prompt })),
+    editedSceneIds: [first.scenes[0].id],
+  });
+  assert.deepEqual(
+    (await fs.readFile(imagePromptsPath(projectPath), "utf8").then(JSON.parse)).map(
+      (scene) => scene.castMode,
+    ),
+    first.scenes.map((scene) => scene.castMode),
+  );
 
   await saveProjectPromptOverride({
     profileId: "test",
@@ -132,7 +188,7 @@ try {
     await resetProjectPromptOverride({ profileId: "test", projectPath }),
     true,
   );
-  console.log("Prompt layering, preservation, promotion, backup, and restore passed.");
+  console.log("Story interpretation, prompt layering, preservation, promotion, backup, and restore passed.");
 } finally {
   await fs.rm(root, { recursive: true, force: true });
 }

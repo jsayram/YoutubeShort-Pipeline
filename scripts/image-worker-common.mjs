@@ -112,10 +112,30 @@ export function promptWithReferences(prompt, references) {
   const directions = references.map((reference, index) => {
     const number = index + 1;
     return reference.role === "character"
-      ? `Use reference image ${number} for the recurring character's exact clothing, proportions, hidden face, and palette`
-      : `Use reference image ${number} for the painting medium, brush texture, lighting, and color palette`;
+      ? `Use reference image ${number} only for the recurring character's identity, hair, clothing, proportions, and palette; do not copy its pose or background`
+      : `Use reference image ${number} only for the medium, brush texture, lighting language, and color palette; do not copy its layout or subject matter`;
   });
-  return `${prompt}\n\nReference directions: ${directions.join(". ")}. Preserve the references while changing the pose, action, camera position, and setting to match this scene.`;
+  return `${prompt}\n\nReference directions: ${directions.join(
+    ". ",
+  )}. Preserve identity and medium while changing the pose, action, camera, props, location, and composition to match this scene.`;
+}
+
+export function referencesForScene(scene, references) {
+  if (Array.isArray(scene.references)) {
+    if (!scene.references.length) return [];
+    const wanted = new Set(scene.references.map(String));
+    return references.filter((reference) => wanted.has(reference.id));
+  }
+
+  const characters = references.filter((reference) => reference.role === "character");
+  if (characters.length < 2 || !/^solo-[ab]$/.test(String(scene.castMode ?? ""))) {
+    return references;
+  }
+  const chosen = scene.castMode === "solo-a" ? characters[0] : characters[1];
+  return [
+    chosen,
+    ...references.filter((reference) => reference.role !== "character"),
+  ];
 }
 
 export async function writeExactImage({

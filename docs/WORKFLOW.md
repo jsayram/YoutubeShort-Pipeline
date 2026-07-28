@@ -54,10 +54,13 @@ The voice step writes:
 
 The FLUX.2 and Animagine dark-storybook providers generate cast/character and style references
 before their first scene. They live in `assets/references/` and are shown separately in Studio.
-FLUX.2 uses a contemporary two-person cast and nostalgic hand-drawn romance treatment; Animagine
-retains its faceless dark-storybook character. A normal scene reroll preserves the anchors,
-keeping the cast and palette stable. Pass `--force-references` only when you want to redesign
-them.
+FLUX.2 uses two separate neutral contemporary character sheets plus a materials-only nostalgic
+oil-and-paper-watercolor romance treatment. Because those references contain no shared pose or
+location, the scene prompt remains responsible for the action and composition. Most scenes select
+only the woman or man reference plus the materials reference; only shared turning points use both
+characters. Animagine retains its faceless dark-storybook character. A normal scene reroll
+preserves the anchors, keeping the cast and palette stable. Pass `--force-references` only when
+you want to redesign them.
 
 Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
 generated once more, then stops with its line number rather than entering the final mix. Run

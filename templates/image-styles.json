@@ -162,11 +162,11 @@
   },
   {
     "id": "flux2-storybook",
-    "label": "FLUX.2 nostalgic storybook (local first)",
+    "label": "FLUX.2 painted storybook (local first)",
     "provider": "flux2-local",
     "fallbackProvider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "Nostalgic hand-drawn romance panels with ink contours, matte retro color, paper grain, expressive people, and automatic cast/style references. Uses local FLUX.2 Klein first and Cloudflare only as a configured fallback.",
+    "summary": "Oil-and-paper-watercolor relationship scenes with mostly solo women or men, occasional shared turning points, and automatic character/material references. Uses local FLUX.2 Klein first and Cloudflare only as a configured fallback.",
     "requiredModels": {
       "diffusionModel": "flux-2-klein-4b.safetensors",
       "textEncoder": "qwen_3_4b.safetensors",
@@ -184,23 +184,28 @@
     },
     "referencePrompts": [
       {
-        "id": "cast-reference",
-        "role": "cast",
-        "prompt": "A clean wordless cast reference for a nostalgic hand-drawn relationship story. Show two contemporary adults as separate full-body figures with distinct silhouettes: one with shoulder-length dark hair in a simple rust or cream coat, the other with loose shorter dark hair in a deep navy or brown coat. Keep their presentation adaptable so the narration can determine gender and relationship. Natural average proportions, ordinary timeless clothing, quiet expressive posture, relaxed hands, three-quarter and side views, minimal softly drawn facial features, bold dark ink contours, loose pencil hatching, matte flat colors, subtle paper grain, plain warm-cream background. No scene, no props, no lettering, no labels, no symbols, no border."
+        "id": "protagonist-a-reference-v3",
+        "role": "character",
+        "prompt": "A clean wordless character reference for the recurring adult woman in an oil-and-paper-watercolor relationship story. Show only this one woman standing neutrally against a plain warm-cream studio background, with shoulder-length dark hair, an ordinary rust coat, denim trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No man, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "nostalgic-style-reference",
+        "id": "protagonist-b-reference-v3",
+        "role": "character",
+        "prompt": "A clean wordless character reference for the recurring adult man in an oil-and-paper-watercolor relationship story. Show only this one man standing neutrally against a plain warm-cream studio background, with loose shorter dark hair, an ordinary deep-navy coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No woman, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
+      },
+      {
+        "id": "nostalgic-material-reference-v3",
         "role": "style",
-        "prompt": "A representative wordless frame from a nostalgic hand-drawn romance animation: two small contemporary adults seen from behind at the edge of a quiet sea beneath an enormous deep-teal evening sky, burnt-orange grass in the foreground, simple dark horizon, bold ink contours, loose pencil hatching, matte flat color blocks, restrained cel shading, visible paper tooth, subtle halftone and aged film speckles, slightly imperfect screen-printed finish, warm melancholy, large poetic negative space. No lettering, no watermark, no logo, no border."
+        "prompt": "A wordless material and palette study for a nostalgic oil-and-paper-watercolor romance story: aged cream cold-press paper tooth, translucent watercolor blooms and feathered edges, selective textured oil brush marks, loose graphite hatching, dry-ink contours, matte pigment swatches in burnt orange, rust, ochre, moss green, dusty teal, faded denim blue, deep navy, and soft charcoal, faint film speckles, and handmade imperfections. Abstract art-material sample only. No people, no faces, no characters, no landscape, no sea, no room, no recognizable object, no composition to imitate, no lettering, no watermark, no logo, no border."
       }
     ]
   },
   {
     "id": "cloudflare-flux2-storybook",
-    "label": "FLUX.2 nostalgic storybook (Cloudflare)",
+    "label": "FLUX.2 painted storybook (Cloudflare)",
     "provider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "The same referenced nostalgic hand-drawn romance treatment through Cloudflare Workers AI's recurring free allocation.",
+    "summary": "The same story-aware oil-and-paper-watercolor treatment through Cloudflare Workers AI's recurring free allocation.",
     "download": "No model download. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in .env.",
     "sampling": {
       "steps": 4,
@@ -212,14 +217,19 @@
     },
     "referencePrompts": [
       {
-        "id": "cast-reference",
-        "role": "cast",
-        "prompt": "A clean wordless cast reference for a nostalgic hand-drawn relationship story. Show two contemporary adults as separate full-body figures with distinct silhouettes: one with shoulder-length dark hair in a simple rust or cream coat, the other with loose shorter dark hair in a deep navy or brown coat. Keep their presentation adaptable so the narration can determine gender and relationship. Natural average proportions, ordinary timeless clothing, quiet expressive posture, relaxed hands, three-quarter and side views, minimal softly drawn facial features, bold dark ink contours, loose pencil hatching, matte flat colors, subtle paper grain, plain warm-cream background. No scene, no props, no lettering, no labels, no symbols, no border."
+        "id": "protagonist-a-reference-v3",
+        "role": "character",
+        "prompt": "A clean wordless character reference for the recurring adult woman in an oil-and-paper-watercolor relationship story. Show only this one woman standing neutrally against a plain warm-cream studio background, with shoulder-length dark hair, an ordinary rust coat, denim trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No man, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "nostalgic-style-reference",
+        "id": "protagonist-b-reference-v3",
+        "role": "character",
+        "prompt": "A clean wordless character reference for the recurring adult man in an oil-and-paper-watercolor relationship story. Show only this one man standing neutrally against a plain warm-cream studio background, with loose shorter dark hair, an ordinary deep-navy coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No woman, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
+      },
+      {
+        "id": "nostalgic-material-reference-v3",
         "role": "style",
-        "prompt": "A representative wordless frame from a nostalgic hand-drawn romance animation: two small contemporary adults seen from behind at the edge of a quiet sea beneath an enormous deep-teal evening sky, burnt-orange grass in the foreground, simple dark horizon, bold ink contours, loose pencil hatching, matte flat color blocks, restrained cel shading, visible paper tooth, subtle halftone and aged film speckles, slightly imperfect screen-printed finish, warm melancholy, large poetic negative space. No lettering, no watermark, no logo, no border."
+        "prompt": "A wordless material and palette study for a nostalgic oil-and-paper-watercolor romance story: aged cream cold-press paper tooth, translucent watercolor blooms and feathered edges, selective textured oil brush marks, loose graphite hatching, dry-ink contours, matte pigment swatches in burnt orange, rust, ochre, moss green, dusty teal, faded denim blue, deep navy, and soft charcoal, faint film speckles, and handmade imperfections. Abstract art-material sample only. No people, no faces, no characters, no landscape, no sea, no room, no recognizable object, no composition to imitate, no lettering, no watermark, no logo, no border."
       }
     ]
   },

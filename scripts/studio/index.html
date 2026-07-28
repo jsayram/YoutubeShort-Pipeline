@@ -1445,6 +1445,13 @@ Start a recording and talk about your day."></textarea>
       function applyProjectSettings(slug) {
         const project = projectSettings.get(slug);
         $("opt-captions").checked = project?.captionsEnabled === true;
+        if (!styles.length) return false;
+        if (project?.styleId && styles.some((style) => style.id === project.styleId)) {
+          $("style").value = project.styleId;
+        }
+        describeStyle();
+        loadPromptEditor();
+        return true;
       }
 
       function loadProjects() {
@@ -1508,6 +1515,10 @@ Start a recording and talk about your day."></textarea>
         $("slug").dataset.touched = "1";
         if (data.title) $("title").value = data.title;
         $("opt-captions").checked = data.captionsEnabled === true;
+        if (data.styleId && styles.some((style) => style.id === data.styleId)) {
+          $("style").value = data.styleId;
+          describeStyle();
+        }
         activeRunSlug = null;
         stageNodes.clear();
         stagesEl.innerHTML = "";
@@ -1661,8 +1672,10 @@ Start a recording and talk about your day."></textarea>
                 }>${escapeHtml(style.label)}${style.available ? "" : " (needs download)"}</option>`,
             )
             .join("");
-          describeStyle();
-          loadPromptEditor();
+          if (!applyProjectSettings($("slug").value.trim())) {
+            describeStyle();
+            loadPromptEditor();
+          }
           if (speed) {
             $("fastwrap").classList.remove("hidden");
             $("fastwrap").lastChild.textContent = ` Fast mode (${speed}, ${data.speedSampling.steps} steps)`;

@@ -60,16 +60,19 @@ provider. Prompt settings have three layers:
 | Video override | `content/prompt-overrides.json` | only the selected video |
 | Scene edit | `content/image-prompts.json` plus `content/prompt-state.json` | only that scene in that video |
 
-The two **Illustrated monologue** providers share a vintage oil-painted relationship-story
-language: worn canvas, old novel illustration, warm hand-painted animated-film atmosphere,
-expressive adult faces, and narration-led couple, grief, or solitude scenes. The living variant
-adds motion-ready hair, fabric, grass, water, smoke, and dust without changing the still provider.
+**Anime** and the two **Illustrated monologue** providers share story-aware direction and a vintage
+oil-and-paper-watercolor relationship language: cold-press paper, old novel illustration, warm
+hand-painted animated-film atmosphere without copying a specific film, expressive adult faces,
+and narration-led connection, grief, or solitude scenes. The living variant adds motion-ready
+hair, fabric, grass, water, smoke, and dust without changing the still provider.
 
 The FLUX.2 local-first and Animagine dark-storybook choices also own automatic reference prompts.
-FLUX.2 generates a recurring contemporary cast plus a nostalgic ink-and-matte-color style anchor.
-Animagine keeps its separate faceless-character treatment. Regenerating scenes does not regenerate
-those anchors, so a weak scene can be rerolled without changing its cast or visual language.
-Studio shows the references above the scene gallery once they exist.
+FLUX.2 generates two separate neutral contemporary character anchors plus a nostalgic
+ink-and-matte-color materials anchor. None contains an interaction or location, so the references
+preserve identity and medium without making every generated frame copy one couple pose or coastal
+setting. Animagine keeps its separate faceless-character treatment. Regenerating scenes does not
+regenerate those anchors, so a weak scene can be rerolled without changing its cast or visual
+language. Studio shows the references above the scene gallery once they exist.
 
 Use **Save for this video** while experimenting. A badge shows when a field is video-specific.
 **Reset video to provider default** removes only the current video's override.
@@ -91,6 +94,21 @@ position. **Regenerate every scene** is the only Studio action that deliberately
 edit protection, and it asks for confirmation.
 
 Templates may use `{{line}}` for the full narration beat, `{{keywords}}` for extracted visual
-terms, and `{{subjectType}}` for the inferred actor or object. The effective shared and negative
-prompts are flattened into `video.json` on the next pipeline run, so the image generator continues
-to consume one resolved project configuration.
+terms, and `{{subjectType}}` for the inferred actor or object. Story-aware templates can also use:
+
+- `{{sentiment}}`: emotional reading of the complete line.
+- `{{storyBeat}}`: opening, development, turning point, reflection, or resolution.
+- `{{visualAction}}`: a concrete physical action, prop, and setting.
+- `{{shotPlan}}`: camera distance and composition selected for that action.
+- `{{castPlan}}`: a solo woman, solo man, or rare shared two-person turning point.
+- `{{continuity}}`: preserve identity while changing pose, setting, lighting, and framing.
+
+Anime, both Illustrated Monologue profiles, and FLUX.2 use the story-aware variables. Their common
+relationship beats have explicit visual
+interpretations—for example, a coffee-order close detail, post-argument distance across a room,
+or one partner awake beside the sleeping other—and a fallback still requires a physical action
+and varied shot. Most scenes alternate a solo recurring woman and man, while the opening, a
+turning point, and the resolution may show both. In solo scenes the other person is abstracted
+through a hand, shadow, reflection, empty chair, second cup, keepsake, or negative space. The
+effective shared and negative prompts are flattened into `video.json` on the next pipeline run,
+so the image generator continues to consume one resolved project configuration.

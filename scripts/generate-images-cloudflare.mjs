@@ -14,6 +14,7 @@ import {
   finishImageRun,
   installGenerationLock,
   promptWithReferences,
+  referencesForScene,
   seedFor,
   splitImageItems,
   writeExactImage,
@@ -152,10 +153,7 @@ try {
       continue;
     }
     const itemStart = Date.now();
-    const selectedReferences =
-      Array.isArray(item.references) && item.references.length === 0
-        ? []
-        : sharedReferences;
+    const selectedReferences = referencesForScene(item, sharedReferences);
     const seed = Number(item.seed ?? seedFor(item.id));
     const bytes = await cloudflareImage({
       prompt: promptWithReferences(cleanPrompt(item), selectedReferences),

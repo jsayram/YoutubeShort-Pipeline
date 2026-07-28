@@ -4,7 +4,17 @@ import { randomUUID } from "node:crypto";
 import { readJson, repoRoot, videoDir } from "./lib.mjs";
 
 export const PROMPT_FIELDS = ["sceneTemplate", "stylePrompt", "negativePrompt"];
-export const PROMPT_VARIABLES = new Set(["{{line}}", "{{keywords}}", "{{subjectType}}"]);
+export const PROMPT_VARIABLES = new Set([
+  "{{line}}",
+  "{{keywords}}",
+  "{{subjectType}}",
+  "{{sentiment}}",
+  "{{storyBeat}}",
+  "{{visualAction}}",
+  "{{shotPlan}}",
+  "{{castPlan}}",
+  "{{continuity}}",
+]);
 
 const STOPWORDS = new Set(
   ("a an the and or but if then than that this these those it its is are was were be been being " +
@@ -125,7 +135,168 @@ export async function resetProjectPromptOverride({ profileId, projectPath }) {
   return true;
 }
 
-export function buildScenePrompt(line, index, template) {
+function storyBeatFor(index, total) {
+  if (total <= 1) return "standalone emotional beat";
+  if (index === 0) return "opening and first encounter";
+  if (index === total - 1) return "resolution and emotional choice";
+  const progress = index / (total - 1);
+  if (progress < 0.34) return "connection deepening";
+  if (progress < 0.67) return "turning point and emotional complication";
+  return "reflection leading toward resolution";
+}
+
+function sentimentFor(line) {
+  const value = line.toLowerCase();
+  if (/\b(?:fought|fight|argument|argued|angry|hurt|betray|blame)\b/.test(value)) {
+    return "hurt and tension softening into vulnerable reconciliation";
+  }
+  if (/\b(?:left|leave|leaving|goodbye|gone|lost|missing|grief|grieving)\b/.test(value)) {
+    return "grief, distance, and aching absence";
+  }
+  if (/\b(?:alone|lonely|empty|silence|forgotten)\b/.test(value)) {
+    return "quiet loneliness and inward reflection";
+  }
+  if (/\b(?:laughed|laugh|smiled|smile|joy|happy)\b/.test(value)) {
+    return "unforced joy, surprise, and growing affection";
+  }
+  if (/\b(?:love|loved|home|stay|stayed|choose|choice|lucky|together)\b/.test(value)) {
+    return "tender intimacy, safety, and deliberate commitment";
+  }
+  if (/\b(?:remember|memory|noticed|realized|thought|thinking)\b/.test(value)) {
+    return "gentle realization and affectionate reflection";
+  }
+  return "restrained warmth and emotionally honest reflection";
+}
+
+function castPlanFor(index, total) {
+  const turningPoint = Math.round((total - 1) * 0.57);
+  if (index === 0 || index === total - 1 || (total >= 5 && index === turningPoint)) {
+    return {
+      castMode: "pair",
+      castPlan:
+        "Two-person turning-point scene: show the recurring adult woman and adult man together in one shared action, with natural distance or contact dictated by the narration; never pose them as a static matched pair.",
+    };
+  }
+  const womanSolo = index % 2 === 1;
+  return {
+    castMode: womanSolo ? "solo-a" : "solo-b",
+    castPlan: womanSolo
+      ? "Solo-woman scene: show only the recurring adult woman as the complete human figure. Suggest the man only indirectly through an off-frame hand, cast shadow, reflection, empty chair, second cup, keepsake, or negative space when the story needs his presence. Do not show a second complete person."
+      : "Solo-man scene: show only the recurring adult man as the complete human figure. Suggest the woman only indirectly through an off-frame hand, cast shadow, reflection, empty chair, second cup, keepsake, or negative space when the story needs her presence. Do not show a second complete person.",
+  };
+}
+
+function sceneDirectionFor(line, index, castMode) {
+  const value = line.toLowerCase();
+  const featured = castMode === "solo-a" ? "woman" : "man";
+
+  if (/\bmet\b|\bfirst encounter\b/.test(value)) {
+    return {
+      visualAction:
+        "Two adults cross paths in an unmistakably ordinary weekday place such as a small shop, bus stop, or office lobby; one pauses and glances back while a mundane Tuesday detail grounds the meeting.",
+      shotPlan:
+        "Wide establishing view with both people separated in depth, everyday surroundings visible, and the meeting happening through movement rather than a posed face-to-face portrait.",
+    };
+  }
+  if (/\b(?:laughed|laughing|laugh)\b/.test(value)) {
+    return {
+      visualAction:
+        `Feature the solo adult ${featured} smiling and losing their train of thought as laughter comes from just outside the frame; imply the unseen partner through one hand at the edge, a shifted chair, or a cast shadow.`,
+      shotPlan:
+        "Lively medium side view with one expressive face and suspended conversational gesture prominent; keep the unseen partner outside the composition.",
+    };
+  }
+  if (/\b(?:stayed up|up too late|talking all night|talked all night)\b/.test(value)) {
+    return {
+      visualAction:
+        `Show the solo adult ${featured} seated on a sofa or floor late at night, leaning toward someone just beyond the frame in deep conversation; two cooling mugs, an empty foreground seat, a dim lamp, and a late clock imply the relationship.`,
+      shotPlan:
+        "Intimate interior three-quarter view with one complete figure in warm lamplight, an empty conversational space in the foreground, and nighttime darkness around them.",
+    };
+  }
+  if (/\bcoffee\b|\btea\b/.test(value) && /\border\b|\bcup\b|\bdrink\b/.test(value)) {
+    return {
+      visualAction:
+        `Feature the solo adult ${featured} receiving their familiar coffee order before asking; only the unseen partner's hand enters the frame to place the cup as recognition and unspoken affection register.`,
+      shotPlan:
+        "Close over-the-shoulder detail built around the cup, hands, and small surprised expression; use a café counter or kitchen table, not a seaside landscape.",
+    };
+  }
+  if (/\b(?:fought|fight|argument|argued|making up|made up|forgive|forgave)\b/.test(value)) {
+    return {
+      visualAction:
+        "After a small argument, the pair begin on opposite sides of a room with guarded posture, then bridge the distance through a tentative touch that feels like returning home.",
+      shotPlan:
+        "Wide interior composition using negative space between them, a doorway or table dividing the frame, and joined hands becoming the focal point.",
+    };
+  }
+  if (/\b(?:fall asleep|fell asleep|asleep|sleeping)\b/.test(value)) {
+    return {
+      visualAction:
+        `Feature the solo adult ${featured} awake at the bedside with a tender, grateful expression; imply the sleeping partner only as a softly abstracted blanket shape, hand, or shadow rather than a second complete figure.`,
+      shotPlan:
+        "Quiet intimate bedroom view from above or beside the bed, with one readable face, blanket folds, and soft shadow carrying the absent partner's presence.",
+    };
+  }
+  if (/\bfireworks?\b|\bquietly wanting\b|\bwanting to stay\b/.test(value)) {
+    return {
+      visualAction:
+        `Instead of spectacle, show the solo adult ${featured} setting down keys and a coat by the door, choosing not to leave; an empty lit chair, second mug, or familiar shadow quietly implies the loved one.`,
+      shotPlan:
+        "Restrained domestic wide shot with one complete person, the doorway and set-down keys visible, warm evening light, and no fireworks or grand romantic pose.",
+    };
+  }
+  if (
+    /\b(?:choose|choice)\b.*\bstay\b|\bso i stay\b|\bdecide\b.*\bstay\b|\bevery single day\b/.test(
+      value,
+    )
+  ) {
+    return {
+      visualAction:
+        "At morning light, the pair deliberately move further into their shared home together, one reaching back for the other's hand as the open doorway remains behind them.",
+      shotPlan:
+        "Resolved rear three-quarter view with forward movement, joined hands, warm light ahead, and a noticeably different angle from every earlier scene.",
+    };
+  }
+  if (/\b(?:suitcase|packed|depart|goodbye|left me|walked away)\b/.test(value)) {
+    return {
+      visualAction:
+        "A departing adult carries a suitcase through a doorway while the person left behind reaches out but stops short, making the emotional distance physical.",
+      shotPlan:
+        "Deep hallway or station composition with the figures moving in opposite directions and strong distance between foreground and background.",
+    };
+  }
+  if (/\b(?:rain|storm|umbrella)\b/.test(value)) {
+    return {
+      visualAction:
+        "The emotion becomes physical through rain: one adult hesitates beneath an umbrella while the other crosses the wet street toward or away from them.",
+      shotPlan:
+        "Vertical exterior view with reflections, diagonal movement, and the umbrella used as a clear story prop rather than decoration.",
+    };
+  }
+  if (/\b(?:photo|photograph|memory|remember)\b/.test(value)) {
+    return {
+      visualAction:
+        "An adult handles a worn photograph or keepsake while the remembered relationship appears only through their expression, hands, and the empty place beside them.",
+      shotPlan:
+        "Close interior composition focused on hands and the keepsake, with an empty chair or unoccupied side of the frame carrying the absence.",
+    };
+  }
+
+  const fallbackShots = [
+    "Wide environmental view with the character actively moving through the setting.",
+    "Medium side view centered on a specific hand gesture and one meaningful prop.",
+    "Intimate over-the-shoulder composition with foreground depth and a changed location.",
+    "High or low angle that makes the emotional power relationship physically readable.",
+  ];
+  return {
+    visualAction:
+      "Translate the narration into one specific physical action with a meaningful prop and an environment that reveals the emotion; do not merely pose characters together.",
+    shotPlan: fallbackShots[index % fallbackShots.length],
+  };
+}
+
+export function buildScenePrompt(line, index, template, context = {}) {
   const keywordSource = line.replace(
     /\bleaves?\b(?=\s+(?:me|you|us|them|him|her|it)\b)/gi,
     "",
@@ -140,19 +311,33 @@ export function buildScenePrompt(line, index, template) {
     ? "one human figure, full body"
     : "one clearly recognizable non-human subject";
   const promptLine = line.replace(/[,.!?;:]+$/, "").trim();
+  const total = Number(context.total ?? context.lines?.length ?? index + 1);
+  const { castMode, castPlan } = castPlanFor(index, total);
+  const { visualAction, shotPlan } = sceneDirectionFor(promptLine, index, castMode);
+  const continuity =
+    `Scene ${index + 1} of ${total}. Preserve recurring character identity and clothing, ` +
+    "but change the pose, action, prop, location, camera distance, horizon, and lighting from neighboring scenes.";
   const prompt = template
     .replaceAll("{{line}}", promptLine)
     .replaceAll("{{keywords}}", words.slice(0, 6).join(", "))
-    .replaceAll("{{subjectType}}", subjectType);
+    .replaceAll("{{subjectType}}", subjectType)
+    .replaceAll("{{sentiment}}", sentimentFor(promptLine))
+    .replaceAll("{{storyBeat}}", storyBeatFor(index, total))
+    .replaceAll("{{visualAction}}", visualAction)
+    .replaceAll("{{shotPlan}}", shotPlan)
+    .replaceAll("{{castPlan}}", castPlan)
+    .replaceAll("{{continuity}}", continuity);
   const unresolved = prompt.match(/\{\{[^}]+\}\}/g);
   if (unresolved) {
     throw new Error(`Unknown prompt variable(s): ${[...new Set(unresolved)].join(", ")}.`);
   }
-  return { id: `${String(index + 1).padStart(2, "0")}-${slug}`, prompt };
+  return { id: `${String(index + 1).padStart(2, "0")}-${slug}`, prompt, castMode };
 }
 
 export function buildScenePrompts(lines, template) {
-  return lines.map((line, index) => buildScenePrompt(line, index, template));
+  return lines.map((line, index) =>
+    buildScenePrompt(line, index, template, { lines, total: lines.length }),
+  );
 }
 
 export async function loadPromptState(projectPath) {
@@ -171,11 +356,14 @@ export async function saveScenePrompts({
   editedSceneIds,
 }) {
   if (!Array.isArray(scenes) || !scenes.length) throw new Error("No scene prompts were supplied.");
+  const previous = await readJson(imagePromptsPath(projectPath)).catch(() => []);
+  const previousById = new Map(previous.map((scene) => [String(scene.id), scene]));
   const normalized = scenes.map((scene) => {
     const id = String(scene.id ?? "").trim();
     const prompt = String(scene.prompt ?? "").trim();
     if (!id || !prompt) throw new Error("Every scene needs an id and prompt.");
-    return { id, prompt };
+    const castMode = String(scene.castMode ?? previousById.get(id)?.castMode ?? "").trim();
+    return castMode ? { id, prompt, castMode } : { id, prompt };
   });
   const known = new Set(normalized.map((scene) => scene.id));
   const edited = [...new Set((editedSceneIds ?? []).map(String))].filter((id) => known.has(id));
