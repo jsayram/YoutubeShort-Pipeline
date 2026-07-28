@@ -1,6 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { parseArgs, readJson, videoDir, writeJson } from "./lib.mjs";
+import { loadEnv, parseArgs, readJson, videoDir, writeJson } from "./lib.mjs";
+import { applyStyle, resolveStyles } from "./image-styles.mjs";
+
+await loadEnv();
 
 // Turns a pasted script into the two content files the rest of the pipeline reads:
 // content/narration.txt (one spoken beat per line) and content/image-prompts.json (one wordless
@@ -59,6 +62,44 @@ if (keep && Array.isArray(existing) && existing.length >= lines.length) {
 }
 
 if (flags.title) config.title = String(flags.title);
+
+// The voice belongs to the project, not to one invocation. Writing it here means the story step
+// picks it up without being told again, whether it runs from the studio or the command line.
+if (flags.profile) {
+  config.voicebox = { ...config.voicebox, profile: String(flags.profile) };
+  if (flags.engine) config.voicebox.engine = String(flags.engine);
+  console.log(
+    `Voice: ${config.voicebox.profile}${flags.engine ? ` on ${config.voicebox.engine}` : ""}.`,
+  );
+}
+
+// Same idea for the visual style: resolve the preset against the models that are actually
+// installed and flatten it into imageGen, so the generator keeps reading one plain config.
+if (flags.style) {
+  const comfyUrl = process.env.COMFYUI_BASE_URL ?? "http://127.0.0.1:8188";
+  const { styles, speedLora } = await resolveStyles(comfyUrl);
+  const style = styles.find((entry) => entry.id === String(flags.style));
+  if (!style) {
+    throw new Error(
+      `Unknown image style "${flags.style}". Available: ${styles.map((s) => s.id).join(", ")}.`,
+    );
+  }
+  if (!style.available) {
+    throw new Error(`Image style "${style.id}" is unavailable: ${style.reason}`);
+  }
+  config.imageGen = applyStyle(config.imageGen ?? {}, style, {
+    fast: flags.fast === true,
+    speedLora,
+  });
+  const bits = [style.label, style.checkpoint].filter(Boolean);
+  if (config.imageGen.loras?.length) {
+    bits.push(`loras: ${config.imageGen.loras.map((lora) => lora.name).join(", ")}`);
+  }
+  bits.push(`${config.imageGen.steps} steps`);
+  console.log(`Style: ${bits.join(" · ")}.`);
+  if (style.note) console.log(`Note: ${style.note}`);
+}
+
 // The real duration is only known once Voicebox has spoken the lines; compose-slideshow
 // rewrites this from the measured timings. This estimate keeps video.json coherent until then.
 config.duration = Number((estimated + tail).toFixed(2));
@@ -89,12 +130,14 @@ function promptFor(line, index) {
     // The beat itself is the subject. Framing and surface treatment are stated positively —
     // the image generator routes anything phrased as a prohibition to the negative encoder,
     // where it actually works, so prompts here never say "no text".
+    // The subject is the line's content words, not the sentence. Feeding narration verbatim
+    // gives the model a paragraph to illustrate, and it answers with collages and mocked-up
+    // pages. Nothing here names lettering in any form, however it is framed.
     prompt:
-      `A cinematic editorial photograph representing this idea: ${line} ` +
+      `A cinematic editorial photograph. Subject: ${words.slice(0, 6).join(", ")}. ` +
       "One dominant subject and one supporting element, strong silhouette, cinematic depth, " +
-      "clear separation between foreground, subject, and background. Every surface is blank " +
-      "and unmarked. Generous empty space in the lower third, kept clear for captions added " +
-      "afterwards.",
+      "clear separation between foreground, subject, and background. Smooth bare surfaces. " +
+      "Wide empty margins and a calm, uncluttered lower third.",
   };
 }
 

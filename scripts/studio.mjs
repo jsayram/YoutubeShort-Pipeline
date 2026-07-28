@@ -4,7 +4,10 @@ import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { parseArgs, readJson, repoRoot, videoDir } from "./lib.mjs";
+import { loadEnv, parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
+import { resolveStyles } from "./image-styles.mjs";
+
+await loadEnv();
 
 // A local control room for the pipeline. Paste a script, watch every stage run top to bottom,
 // see each still as it lands, and play the finished file at the bottom. It drives the same
@@ -146,6 +149,18 @@ async function startRun({ slug, title, scriptText, options }) {
     const prepareArgs = [script("prepare-script.mjs"), "--project", slug, "--script", scriptFile];
     if (title) prepareArgs.push("--title", title);
     if (options.keepPrompts) prepareArgs.push("--keep-prompts");
+    // Persist the chosen voice into video.json so the project keeps it, and so a later CLI run
+    // speaks in the same voice as the one started from here.
+    if (options.profile) {
+      prepareArgs.push("--profile", options.profile);
+      const voices = (await listVoices()) ?? [];
+      const chosen = voices.find((voice) => voice.name === options.profile);
+      if (chosen?.engine) prepareArgs.push("--engine", chosen.engine);
+    }
+    if (options.style) {
+      prepareArgs.push("--style", options.style);
+      if (options.fast) prepareArgs.push("--fast");
+    }
     await runStage("script", node, prepareArgs);
     await fs.rm(scriptFile, { force: true });
     await emitPrompts(slug);
@@ -297,6 +312,114 @@ async function emitVideo(slug) {
   });
 }
 
+// ---------------------------------------------------------------------------- voicebox
+
+const voiceboxUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
+
+// Voicebox is the authority on which voices exist, so the picker reads them live rather than
+// keeping its own list that can drift out of date.
+async function listVoices() {
+  const response = await fetch(`${voiceboxUrl}/profiles`).catch(() => null);
+  if (!response?.ok) return null;
+  const profiles = await response.json().catch(() => null);
+  if (!Array.isArray(profiles)) return null;
+  return profiles.map((profile) => ({
+    id: profile.id,
+    name: profile.name,
+    description: profile.description ?? "",
+    language: profile.language ?? "",
+    cloned: profile.voice_type === "cloned",
+    // A preset voice carries the engine it was built for. Picking one and leaving the project's
+    // old engine in place is how you get a voice that will not speak.
+    engine: profile.preset_engine ?? profile.default_engine ?? null,
+    generations: profile.generation_count ?? 0,
+  }));
+}
+
+// ---------------------------------------------------------------------------- image styles
+
+const comfyUrl = (process.env.COMFYUI_BASE_URL ?? "http://127.0.0.1:8188").replace(/\/$/, "");
+
+async function fetchJson(url, timeoutMs = 1800) {
+  const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) }).catch(() => null);
+  if (!response?.ok) return null;
+  return response.json().catch(() => null);
+}
+
+async function serviceSnapshot() {
+  const [comfyStats, comfyQueue, voiceHealth, template] = await Promise.all([
+    fetchJson(`${comfyUrl}/system_stats`),
+    fetchJson(`${comfyUrl}/queue`),
+    fetchJson(`${voiceboxUrl}/health`),
+    readJson(path.join(repoRoot, "templates", "video.json")).catch(() => null),
+  ]);
+
+  const device = comfyStats?.devices?.[0] ?? null;
+  const runningJobs = comfyQueue?.queue_running?.length ?? 0;
+  const pendingJobs = comfyQueue?.queue_pending?.length ?? 0;
+  const comfyRunning = Boolean(comfyStats);
+  const voiceRunning = voiceHealth?.status === "healthy";
+
+  return {
+    checkedAt: Date.now(),
+    services: [
+      {
+        id: "studio",
+        name: "Pipeline Studio",
+        status: "running",
+        kind: "service",
+        detail: `This control room · port ${port}`,
+        url: `http://127.0.0.1:${port}`,
+        action: "Current page",
+      },
+      {
+        id: "comfyui",
+        name: "ComfyUI",
+        status: comfyRunning ? (runningJobs ? "busy" : "running") : "offline",
+        kind: "service",
+        detail: comfyRunning
+          ? [
+              `v${comfyStats.system?.comfyui_version ?? "unknown"}`,
+              device?.name ? `${device.name.toUpperCase()} device` : null,
+              `${runningJobs} running`,
+              `${pendingJobs} queued`,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : `Not reachable at ${comfyUrl}`,
+        url: comfyUrl,
+        action: "Open ComfyUI",
+      },
+      {
+        id: "voicebox",
+        name: "Voicebox",
+        status: voiceRunning ? "running" : "offline",
+        kind: "application",
+        detail: voiceRunning
+          ? [
+              voiceHealth.model_size ? `${voiceHealth.model_size} model` : null,
+              voiceHealth.backend_type?.toUpperCase(),
+              voiceHealth.gpu_type,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : `Not reachable at ${voiceboxUrl}`,
+        url: null,
+        action: voiceRunning ? "Open Voicebox" : null,
+      },
+      {
+        id: "hyperframes",
+        name: "HyperFrames",
+        status: "ready",
+        kind: "tool",
+        detail: `CLI ${template?.hyperframesVersion ?? "configured"} · runs on demand`,
+        url: null,
+        action: null,
+      },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------- http
 
 function sendJson(response, status, body) {
@@ -306,6 +429,30 @@ function sendJson(response, status, body) {
     "Content-Length": Buffer.byteLength(text),
   });
   response.end(text);
+}
+
+// Walks a directory adding up file sizes, giving up as soon as it passes the budget so a huge
+// tree costs a partial walk rather than a full one. node_modules and .git are excluded because
+// the copy skips them too.
+async function directorySizeMb(root, budgetMb) {
+  const budgetBytes = budgetMb * 1024 * 1024;
+  let bytes = 0;
+  const queue = [root];
+  while (queue.length) {
+    const dir = queue.pop();
+    const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (entry.name === "node_modules" || entry.name === ".git") continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) queue.push(full);
+      else if (entry.isFile()) {
+        const stat = await fs.stat(full).catch(() => null);
+        bytes += stat?.size ?? 0;
+        if (bytes > budgetBytes) return budgetMb + 1;
+      }
+    }
+  }
+  return bytes / (1024 * 1024);
 }
 
 async function readBody(request) {
@@ -376,6 +523,175 @@ const server = http.createServer(async (request, response) => {
         projects.push({ slug: entry.name, title: config.title, duration: config.duration, rendered });
       }
       sendJson(response, 200, { projects });
+      return;
+    }
+
+    // Bring an existing project directory under videos/ so the studio can drive it. Copies
+    // rather than symlinks: the HyperFrames CLI, npx and the media server all resolve real
+    // paths, and a symlink pointing outside the tree would also defeat the /media path guard.
+    if (route === "/api/import" && request.method === "POST") {
+      const body = await readBody(request);
+      const source = path.resolve(String(body.path ?? "").replace(/^~/, process.env.HOME ?? "~"));
+      const stat = await fs.stat(source).catch(() => null);
+      if (!stat?.isDirectory()) {
+        sendJson(response, 400, { error: `Not a directory: ${source}` });
+        return;
+      }
+
+      // A bare index.html is not enough to call something a project — plenty of ordinary
+      // folders have one, and treating a downloads folder as importable copies gigabytes of
+      // unrelated files. Require a marker only this pipeline or HyperFrames writes.
+      const has = async (name) =>
+        fs.access(path.join(source, name)).then(() => true, () => false);
+      const hasComposition = await has("index.html");
+      const config = await readJson(path.join(source, "video.json")).catch(() => null);
+      const marker = config || (await has("hyperframes.json")) || (await has("meta.json"));
+      if (!marker) {
+        sendJson(response, 400, {
+          error:
+            "That folder has no video.json, hyperframes.json or meta.json, so it is not a " +
+            "video project. An index.html on its own is not enough.",
+        });
+        return;
+      }
+
+      // Second guard: even a real project can sit inside something enormous. Refuse to copy a
+      // surprising amount of data without being told to.
+      const budgetMb = Number(body.maxMb ?? 4096);
+      const totalMb = await directorySizeMb(source, budgetMb);
+      if (totalMb > budgetMb) {
+        sendJson(response, 400, {
+          error: `That folder is over ${budgetMb} MB. Pass a larger maxMb if the copy is intended.`,
+        });
+        return;
+      }
+
+      const slug = String(body.slug || path.basename(source))
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+        sendJson(response, 400, { error: `Cannot derive a usable slug from "${source}".` });
+        return;
+      }
+
+      const destination = path.join(videosRoot, slug);
+      // Pointing at a folder already under videos/ is a select, not a copy.
+      if (source === destination) {
+        sendJson(response, 200, {
+          slug,
+          alreadyHere: true,
+          title: config?.title ?? slug,
+          hasComposition,
+        });
+        return;
+      }
+      const taken = await fs.access(destination).then(() => true, () => false);
+      if (taken && !body.overwrite) {
+        sendJson(response, 409, { error: `videos/${slug} already exists.`, slug });
+        return;
+      }
+
+      // node_modules is regenerable and can dwarf the project itself.
+      await fs.cp(source, destination, {
+        recursive: true,
+        force: true,
+        filter: (entry) => !/(^|\/)(node_modules|\.git)(\/|$)/.test(entry),
+      });
+
+      // A copied project keeps the old project's identity otherwise, and the render step names
+      // its output from the slug.
+      const meta = { id: slug, name: slug };
+      await fs.writeFile(
+        path.join(destination, "meta.json"),
+        `${JSON.stringify(meta, null, 2)}\n`,
+      );
+
+      const imported = await readJson(path.join(destination, "video.json")).catch(() => null);
+      sendJson(response, 200, {
+        slug,
+        title: imported?.title ?? slug,
+        hasComposition,
+        from: source,
+      });
+      return;
+    }
+
+    if (route === "/api/voices") {
+      const voices = await listVoices();
+      if (!voices) {
+        sendJson(response, 200, {
+          voices: [],
+          error: `Voicebox is not reachable at ${voiceboxUrl}. Start the app and reload.`,
+        });
+        return;
+      }
+      const template = await readJson(path.join(repoRoot, "templates", "video.json")).catch(
+        () => null,
+      );
+      sendJson(response, 200, { voices, default: template?.voicebox?.profile ?? null });
+      return;
+    }
+
+    if (route === "/api/providers") {
+      const { styles, speedLora, speedSampling } = await resolveStyles(comfyUrl);
+      sendJson(response, 200, {
+        styles: styles.map((style) => ({
+          id: style.id,
+          label: style.label,
+          summary: style.summary,
+          provider: style.provider,
+          available: style.available,
+          degraded: Boolean(style.degraded),
+          reason: style.reason ?? null,
+          note: style.note ?? null,
+          checkpoint: style.checkpoint ?? null,
+          loras: (style.loras ?? []).map((lora) => lora.name),
+          download: style.download ?? null,
+        })),
+        speedLora,
+        speedSampling,
+        default: "photographic",
+      });
+      return;
+    }
+
+    if (route === "/api/services") {
+      sendJson(response, 200, await serviceSnapshot());
+      return;
+    }
+
+    if (route === "/api/services/voicebox/open" && request.method === "POST") {
+      await run("open", ["-a", "Voicebox"]);
+      sendJson(response, 200, { opened: true });
+      return;
+    }
+
+    if (route === "/api/project-assets") {
+      const slug = String(url.searchParams.get("slug") ?? "").trim();
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+        sendJson(response, 400, { error: "Bad slug." });
+        return;
+      }
+
+      const prompts = await readJson(
+        path.join(videoDir(slug), "content", "image-prompts.json"),
+      ).catch(() => []);
+      const images = [];
+      for (const prompt of Array.isArray(prompts) ? prompts : []) {
+        const file = await findGenerated(slug, prompt.id);
+        images.push({
+          id: prompt.id,
+          ready: Boolean(file),
+          url: file ? `/media/${slug}/public/generated/${file}?v=${Date.now()}` : null,
+        });
+      }
+      sendJson(response, 200, {
+        slug,
+        total: images.length,
+        generated: images.filter((image) => image.ready).length,
+        images,
+      });
       return;
     }
 

@@ -46,6 +46,109 @@
         margin-bottom: 26px;
       }
 
+      .service-panel,
+      .project-assets {
+        margin-bottom: 18px;
+      }
+      .section-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 13px;
+      }
+      .section-head label {
+        margin-bottom: 2px;
+      }
+      .service-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+      }
+      .service {
+        min-height: 92px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--bg);
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 9px;
+      }
+      .service-top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .service-name {
+        font-size: 13px;
+        font-weight: 620;
+      }
+      .service-state {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .status-light {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        flex: 0 0 auto;
+        background: var(--muted);
+        box-shadow: 0 0 0 3px rgba(141, 138, 128, 0.1);
+      }
+      .service[data-status="running"] .status-light,
+      .service[data-status="ready"] .status-light {
+        background: var(--ok);
+        box-shadow: 0 0 0 3px rgba(111, 207, 142, 0.12);
+      }
+      .service[data-status="busy"] .status-light {
+        background: var(--run);
+        box-shadow: 0 0 0 3px rgba(107, 168, 232, 0.14);
+        animation: pulse 1.1s ease-in-out infinite;
+      }
+      .service[data-status="offline"] .status-light {
+        background: var(--bad);
+        box-shadow: 0 0 0 3px rgba(226, 104, 95, 0.12);
+      }
+      .service-detail {
+        color: var(--muted);
+        font-size: 11px;
+        min-height: 17px;
+      }
+      .service-action {
+        align-self: flex-start;
+        color: var(--accent);
+        font-size: 12px;
+        text-decoration: none;
+        background: transparent;
+        padding: 0;
+        border: 0;
+        font-weight: 550;
+      }
+      .service-action:hover {
+        text-decoration: underline;
+      }
+      button.compact {
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      .updated {
+        color: var(--muted);
+        font-size: 11px;
+      }
+      .project-assets .grid {
+        margin-bottom: 0;
+      }
+      @media (max-width: 620px) {
+        .service-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
       .card {
         background: var(--panel);
         border: 1px solid var(--line);
@@ -61,7 +164,8 @@
         margin-bottom: 7px;
       }
       input[type="text"],
-      textarea {
+      textarea,
+      select {
         width: 100%;
         background: var(--bg);
         border: 1px solid var(--line);
@@ -69,6 +173,19 @@
         color: var(--text);
         font: inherit;
         padding: 10px 12px;
+      }
+      select {
+        appearance: none;
+        cursor: pointer;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 6px;
+        min-height: 16px;
+      }
+      .hint.bad {
+        color: var(--bad);
       }
       textarea {
         min-height: 190px;
@@ -224,8 +341,9 @@
         white-space: pre-wrap;
         word-break: break-word;
       }
+      /* Utility class, so it has to win against the more specific element selectors above. */
       .hidden {
-        display: none;
+        display: none !important;
       }
 
       .grid {
@@ -322,15 +440,70 @@
         </div>
       </header>
 
+      <section class="card service-panel">
+        <div class="section-head">
+          <div>
+            <label>Local services</label>
+            <div class="sub">Live status and direct access to the tools behind the pipeline.</div>
+          </div>
+          <div style="text-align: right">
+            <button id="refresh-services" class="ghost compact">Refresh</button>
+            <div class="updated" id="services-updated"></div>
+          </div>
+        </div>
+        <div class="service-grid" id="services">
+          <div class="service"><div class="service-detail">Checking local services…</div></div>
+        </div>
+      </section>
+
       <div class="card">
         <div class="row">
           <div>
             <label for="slug">Project slug</label>
-            <input id="slug" type="text" placeholder="my-video-name" autocomplete="off" />
+            <input
+              id="slug"
+              type="text"
+              placeholder="my-video-name"
+              autocomplete="off"
+              list="project-list"
+            />
+            <datalist id="project-list"></datalist>
           </div>
           <div>
             <label for="title">Title</label>
             <input id="title" type="text" placeholder="My Video Name" autocomplete="off" />
+          </div>
+          <div>
+            <label for="voice">Voice</label>
+            <select id="voice"></select>
+            <div class="hint" id="voicehint"></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="style">Content provider</label>
+            <select id="style"></select>
+            <div class="hint" id="stylehint"></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label for="importpath">Import an existing project folder</label>
+            <div style="display: flex; gap: 10px">
+              <input
+                id="importpath"
+                type="text"
+                placeholder="~/Projects/my-existing-video"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button id="importbtn" class="ghost compact" type="button">Import</button>
+            </div>
+            <div class="hint" id="importhint">
+              Copies the folder into videos/ and selects it. Skips node_modules and .git.
+            </div>
           </div>
         </div>
 
@@ -340,6 +513,7 @@ It is a private audio journal that helps you understand how you spend your time.
 Start a recording and talk about your day."></textarea>
 
         <div class="opts">
+          <label id="fastwrap" class="hidden"><input type="checkbox" id="opt-fast" /> Fast mode</label>
           <label><input type="checkbox" id="opt-render" /> Render to MP4 when the check passes</label>
           <label><input type="checkbox" id="opt-force" /> Regenerate existing images</label>
           <label><input type="checkbox" id="opt-keep" /> Keep my edited prompts</label>
@@ -352,6 +526,17 @@ Start a recording and talk about your day."></textarea>
           <span class="err" id="err"></span>
         </div>
       </div>
+
+      <section class="card project-assets hidden" id="project-assets">
+        <div class="section-head">
+          <div>
+            <label>Saved project images</label>
+            <div class="sub" id="project-assets-count"></div>
+          </div>
+          <button id="refresh-assets" class="ghost compact">Refresh</button>
+        </div>
+        <div class="grid" id="saved-shots"></div>
+      </section>
 
       <div class="stages" id="stages"></div>
 
@@ -372,6 +557,7 @@ Start a recording and talk about your day."></textarea>
       const stagesEl = $("stages");
       const stageNodes = new Map();
       let started = new Map();
+      let assetRefreshTimer = null;
 
       const LABELS = {
         doctor: "Environment check",
@@ -586,6 +772,9 @@ Start a recording and talk about your day."></textarea>
           title: $("title").value.trim(),
           script: $("script").value,
           options: {
+            profile: $("voice").value || undefined,
+            style: $("style").value || undefined,
+            fast: $("opt-fast").checked,
             render: $("opt-render").checked,
             force: $("opt-force").checked,
             keepPrompts: $("opt-keep").checked,
@@ -624,6 +813,272 @@ Start a recording and talk about your day."></textarea>
             ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character],
         );
       }
+
+      // ------------------------------------------------------------------ local services
+
+      async function refreshServices() {
+        const host = $("services");
+        const response = await fetch("/api/services").catch(() => null);
+        if (!response?.ok) {
+          host.innerHTML =
+            `<div class="service" data-status="offline">` +
+            `<div class="service-detail">The Studio could not read local service status.</div></div>`;
+          return;
+        }
+
+        const data = await response.json();
+        host.innerHTML = data.services
+          .map((service) => {
+            let action = "";
+            if (service.url && service.id !== "studio") {
+              action =
+                `<a class="service-action" href="${escapeHtml(service.url)}" ` +
+                `target="_blank" rel="noopener">${escapeHtml(service.action ?? "Open")}</a>`;
+            } else if (service.id === "voicebox" && service.action) {
+              action =
+                `<button class="service-action" data-open-service="voicebox">` +
+                `${escapeHtml(service.action)}</button>`;
+            } else if (service.id === "studio") {
+              action = `<span class="service-detail">You are here</span>`;
+            }
+            return `
+              <article class="service" data-status="${escapeHtml(service.status)}">
+                <div>
+                  <div class="service-top">
+                    <span class="status-light"></span>
+                    <span class="service-name">${escapeHtml(service.name)}</span>
+                    <span class="service-state">${escapeHtml(service.status)}</span>
+                  </div>
+                  <div class="service-detail">${escapeHtml(service.detail)}</div>
+                </div>
+                ${action}
+              </article>`;
+          })
+          .join("");
+        $("services-updated").textContent = `Updated ${new Date(data.checkedAt).toLocaleTimeString()}`;
+
+        host.querySelector('[data-open-service="voicebox"]')?.addEventListener("click", async () => {
+          await fetch("/api/services/voicebox/open", { method: "POST" });
+        });
+      }
+
+      $("refresh-services").addEventListener("click", refreshServices);
+      refreshServices();
+      setInterval(refreshServices, 5000);
+
+      // This view reads the files on disk rather than relying on the live run event stream.
+      // It therefore recovers images that finished before a Studio restart or browser reload.
+      async function refreshProjectAssets() {
+        const slug = $("slug").value.trim();
+        const panel = $("project-assets");
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+          panel.classList.add("hidden");
+          return;
+        }
+
+        const response = await fetch(`/api/project-assets?slug=${encodeURIComponent(slug)}`).catch(
+          () => null,
+        );
+        if (!response?.ok) {
+          panel.classList.add("hidden");
+          return;
+        }
+        const data = await response.json();
+        if (!data.total) {
+          panel.classList.add("hidden");
+          return;
+        }
+
+        panel.classList.remove("hidden");
+        $("project-assets-count").textContent =
+          `${data.generated}/${data.total} images saved locally` +
+          (data.generated < data.total ? " · unfinished images remain outlined" : "");
+        $("saved-shots").innerHTML = data.images
+          .map(
+            (image) =>
+              `<div class="shot ${image.ready ? "" : "waiting"}" data-id="${escapeHtml(image.id)}">` +
+              (image.ready ? `<img src="${escapeHtml(image.url)}" alt="" />` : "") +
+              `<span>${escapeHtml(image.id)}</span></div>`,
+          )
+          .join("");
+      }
+
+      function scheduleAssetRefresh() {
+        clearTimeout(assetRefreshTimer);
+        assetRefreshTimer = setTimeout(refreshProjectAssets, 250);
+      }
+
+      $("refresh-assets").addEventListener("click", refreshProjectAssets);
+      $("slug").addEventListener("input", scheduleAssetRefresh);
+      $("slug").addEventListener("change", refreshProjectAssets);
+      setInterval(refreshProjectAssets, 5000);
+
+      function loadProjects() {
+        return fetch("/api/projects")
+          .then((response) => response.json())
+          .then((data) => {
+            $("project-list").innerHTML = data.projects
+              .map(
+                (project) =>
+                  `<option value="${escapeHtml(project.slug)}">${escapeHtml(project.title)}</option>`,
+              )
+              .join("");
+            refreshProjectAssets();
+          });
+      }
+
+      loadProjects();
+
+      // Import copies an existing project folder under videos/ and selects it, so a video that
+      // started life somewhere else can be driven from here without moving files by hand.
+      async function importProject(overwrite) {
+        const hint = $("importhint");
+        const source = $("importpath").value.trim();
+        if (!source) {
+          hint.textContent = "Give a path to a project folder.";
+          hint.classList.add("bad");
+          return;
+        }
+
+        $("importbtn").disabled = true;
+        hint.classList.remove("bad");
+        hint.textContent = "Copying…";
+
+        const response = await fetch("/api/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: source, overwrite }),
+        });
+        const data = await response.json();
+        $("importbtn").disabled = false;
+
+        if (!response.ok) {
+          // A name collision is recoverable, so offer the overwrite instead of just refusing.
+          if (response.status === 409) {
+            hint.innerHTML = `${escapeHtml(data.error)} <a href="#" id="overwritelink">Replace it</a>`;
+            hint.classList.add("bad");
+            $("overwritelink").addEventListener("click", (event) => {
+              event.preventDefault();
+              importProject(true);
+            });
+            return;
+          }
+          hint.textContent = data.error;
+          hint.classList.add("bad");
+          return;
+        }
+
+        $("slug").value = data.slug;
+        $("slug").dataset.touched = "1";
+        if (data.title) $("title").value = data.title;
+        hint.textContent = data.alreadyHere
+          ? `Already under videos/ as ${data.slug}.`
+          : `Imported as videos/${data.slug}${data.hasComposition ? " (has a composition)" : ""}.`;
+        $("importpath").value = "";
+        await loadProjects();
+      }
+
+      $("importbtn").addEventListener("click", () => importProject(false));
+      $("importpath").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") importProject(false);
+      });
+
+      // Voices come from Voicebox itself, so the list is whatever is actually installed.
+      let voices = [];
+
+      function describeVoice() {
+        const voice = voices.find((entry) => entry.name === $("voice").value);
+        const hint = $("voicehint");
+        hint.classList.remove("bad");
+        if (!voice) {
+          hint.textContent = "";
+          return;
+        }
+        const bits = [voice.cloned ? "cloned" : "preset"];
+        if (voice.engine) bits.push(voice.engine);
+        if (voice.language) bits.push(voice.language);
+        if (voice.generations) bits.push(`${voice.generations} generations`);
+        hint.textContent = voice.description
+          ? `${voice.description} · ${bits.join(" · ")}`
+          : bits.join(" · ");
+      }
+
+      fetch("/api/voices")
+        .then((response) => response.json())
+        .then((data) => {
+          const select = $("voice");
+          if (data.error) {
+            select.innerHTML = `<option value="">Voicebox unavailable</option>`;
+            const hint = $("voicehint");
+            hint.textContent = data.error;
+            hint.classList.add("bad");
+            return;
+          }
+          voices = data.voices;
+          select.innerHTML = voices
+            .map(
+              (voice) =>
+                `<option value="${escapeHtml(voice.name)}"${
+                  voice.name === data.default ? " selected" : ""
+                }>${escapeHtml(voice.name)}</option>`,
+            )
+            .join("");
+          describeVoice();
+        });
+
+      $("voice").addEventListener("change", describeVoice);
+
+      // Content providers: which model makes the stills, and what look it produces. Presets that
+      // need a model you have not downloaded stay visible but disabled, with the download note
+      // shown, so the list doubles as a shopping list.
+      let styles = [];
+      let speed = null;
+
+      function describeStyle() {
+        const style = styles.find((entry) => entry.id === $("style").value);
+        const hint = $("stylehint");
+        hint.classList.remove("bad");
+        if (!style) {
+          hint.textContent = "";
+          return;
+        }
+        if (!style.available) {
+          hint.textContent = `${style.reason} ${style.download ?? ""}`.trim();
+          hint.classList.add("bad");
+          return;
+        }
+        if (style.degraded) {
+          hint.textContent = style.note;
+          hint.classList.add("bad");
+          return;
+        }
+        const bits = [style.summary];
+        if (style.checkpoint) bits.push(style.checkpoint);
+        if (style.loras.length) bits.push(`lora: ${style.loras.join(", ")}`);
+        hint.textContent = bits.join(" · ");
+      }
+
+      fetch("/api/providers")
+        .then((response) => response.json())
+        .then((data) => {
+          styles = data.styles;
+          speed = data.speedLora;
+          $("style").innerHTML = styles
+            .map(
+              (style) =>
+                `<option value="${escapeHtml(style.id)}"${style.available ? "" : " disabled"}${
+                  style.id === data.default && style.available ? " selected" : ""
+                }>${escapeHtml(style.label)}${style.available ? "" : " (needs download)"}</option>`,
+            )
+            .join("");
+          describeStyle();
+          if (speed) {
+            $("fastwrap").classList.remove("hidden");
+            $("fastwrap").lastChild.textContent = ` Fast mode (${speed}, ${data.speedSampling.steps} steps)`;
+          }
+        });
+
+      $("style").addEventListener("change", describeStyle);
 
       // Rejoin a run that is already going when the page loads.
       fetch("/api/state")

@@ -7,6 +7,7 @@ import {
   parseArgs,
   readJson,
   run,
+  scrubTextNouns,
   sleep,
   splitNegations,
   stripQuotedText,
@@ -40,8 +41,11 @@ const scheduler = flags.scheduler ?? gen.scheduler ?? "karras";
 // then scale to the real frame size.
 const genWidth = Number(gen.genWidth ?? 768);
 const genHeight = Number(gen.genHeight ?? 1344);
-const outWidth = Number(config.width ?? 1080);
-const outHeight = Number(config.height ?? 1920);
+// Output framing defaults to the video frame, but a style can override it. Square storybook art
+// is centred over a blurred copy of itself in the composition, so cropping it to 9:16 here would
+// throw away the very margins that framing depends on.
+const outWidth = Number(gen.outWidth ?? config.width ?? 1080);
+const outHeight = Number(gen.outHeight ?? config.height ?? 1920);
 
 // The style suffix historically carried its own "no readable text, no logo, no watermark" tail.
 // Those phrases were being fed to the positive encoder, where they read as a request for text.
@@ -65,7 +69,19 @@ const negativePrompt =
     "orange glow, amber light, warm sunset, moon";
 
 const outputDir = path.join(projectDir, "public", "generated");
+const referenceDir = path.join(projectDir, "assets", "references");
 await fs.mkdir(outputDir, { recursive: true });
+await fs.mkdir(referenceDir, { recursive: true });
+
+// A prompt marked `"kind": "reference"` is art direction, not a scene. It is generated first,
+// written to assets/references/, and then attached to every scene that follows so a recurring
+// character or palette stays put across the whole video. Scenes opt out with
+// `"references": []`.
+const referencePrompts = prompts.filter((item) => item.kind === "reference");
+const scenePrompts = prompts.filter((item) => item.kind !== "reference");
+const sharedReferences = referencePrompts.map(
+  (item) => `assets/references/${item.id}.png`,
+);
 
 if (!Array.isArray(prompts) || prompts.length === 0) {
   throw new Error("content/image-prompts.json must contain at least one prompt.");
@@ -102,24 +118,139 @@ function seedFor(id) {
 // frames are meant to be wordless so captions can be added over them afterwards.
 export function conditioningFor(item) {
   const source = splitNegations(stripQuotedText(item.prompt));
+  // Two passes. splitNegations moves explicit prohibitions to the negative side; scrubTextNouns
+  // then removes any surviving clause that merely mentions lettering, which the encoder would
+  // read as a request for it.
+  const positive = scrubTextNouns([source.positive, styleSuffix].filter(Boolean).join(" "));
+
+  // The handful of terms that actually matter are weighted and placed first. ComfyUI concatenates
+  // long prompts in 77-token chunks rather than truncating, so an unweighted 100-term negative
+  // dilutes every term in it — the emphasis is what keeps these ahead of the noise.
+  const emphasis =
+    "(text:1.6), (letters:1.5), (words:1.5), (typography:1.4), (numbers:1.4), " +
+    "(watermark:1.4), (logo:1.3), (caption:1.3), (subtitle:1.3), (user interface:1.3)";
+
   return {
-    positive: [source.positive, styleSuffix].filter(Boolean).join(" ").trim(),
-    negative: dedupeTerms([
-      negativePrompt,
-      ...TEXT_NEGATIVES,
-      ...styleNegatives,
-      ...source.negatives,
-    ]).join(", "),
+    positive,
+    negative: [
+      emphasis,
+      // A style preset can push against the wrong medium, e.g. "photograph" when the look is
+      // meant to be flat vector.
+      ...(gen.negativeExtra ? [gen.negativeExtra] : []),
+      ...dedupeTerms([negativePrompt, ...TEXT_NEGATIVES, ...styleNegatives, ...source.negatives]),
+    ].join(", "),
   };
 }
 
-function workflowFor(item) {
+// Style and step-reduction LoRAs chain off the checkpoint, each taking the previous one's model
+// and clip. Whatever comes out of the last link is what the sampler and the text encoders use.
+const loras = Array.isArray(gen.loras) ? gen.loras.filter((entry) => entry?.name) : [];
+
+// Reference images keep a recurring character or palette stable across scenes. ComfyUI's
+// LoadImage only reads from its own input directory, so each reference is uploaded once and
+// addressed by the name the server hands back.
+const ipAdapterFile = gen.ipAdapter ?? "ip-adapter-plus_sdxl_vit-h.safetensors";
+const clipVisionFile = gen.clipVision ?? "clip_vision_h.safetensors";
+const referenceWeight = Number(gen.referenceWeight ?? 0.7);
+const uploaded = new Map();
+
+async function uploadReference(relativePath) {
+  if (uploaded.has(relativePath)) return uploaded.get(relativePath);
+
+  const absolute = path.resolve(projectDir, relativePath);
+  const bytes = await fs.readFile(absolute).catch(() => null);
+  if (!bytes) throw new Error(`Reference image not found: ${relativePath}`);
+
+  const form = new FormData();
+  form.append("image", new Blob([bytes]), path.basename(absolute));
+  // Overwrite so a re-rolled character sheet actually replaces the old one server-side.
+  form.append("overwrite", "true");
+  const response = await fetch(`${baseUrl}/upload/image`, { method: "POST", body: form });
+  if (!response.ok) {
+    throw new Error(`ComfyUI rejected reference ${relativePath}: ${await response.text()}`);
+  }
+  const { name, subfolder } = await response.json();
+  const handle = subfolder ? `${subfolder}/${name}` : name;
+  uploaded.set(relativePath, handle);
+  console.log(`  reference: ${relativePath} -> ${handle}`);
+  return handle;
+}
+
+function loraChain() {
+  const nodes = {};
+  let model = ["ckpt", 0];
+  let clip = ["ckpt", 1];
+  for (const [index, lora] of loras.entries()) {
+    const id = `lora${index}`;
+    nodes[id] = {
+      class_type: "LoraLoader",
+      inputs: {
+        lora_name: lora.name,
+        strength_model: Number(lora.strength ?? 1),
+        strength_clip: Number(lora.strengthClip ?? lora.strength ?? 1),
+        model,
+        clip,
+      },
+    };
+    model = [id, 0];
+    clip = [id, 1];
+  }
+  return { nodes, model, clip };
+}
+
+// Each reference gets its own IPAdapter link on the model, so a character sheet and a palette
+// guide can both steer one image without being averaged into mush.
+function referenceChain(handles, startModel) {
+  const nodes = {};
+  let model = startModel;
+  if (!handles.length) return { nodes, model };
+
+  nodes.ipmodel = {
+    class_type: "IPAdapterModelLoader",
+    inputs: { ipadapter_file: ipAdapterFile },
+  };
+  nodes.clipvision = {
+    class_type: "CLIPVisionLoader",
+    inputs: { clip_name: clipVisionFile },
+  };
+
+  for (const [index, handle] of handles.entries()) {
+    const imageId = `refimg${index}`;
+    const applyId = `ipadapter${index}`;
+    nodes[imageId] = { class_type: "LoadImage", inputs: { image: handle } };
+    nodes[applyId] = {
+      class_type: "IPAdapterAdvanced",
+      inputs: {
+        model,
+        ipadapter: ["ipmodel", 0],
+        image: [imageId, 0],
+        clip_vision: ["clipvision", 0],
+        weight: referenceWeight,
+        weight_type: "linear",
+        combine_embeds: "concat",
+        start_at: 0,
+        // Releasing the reference before the end lets the prompt own late detail, so scenes
+        // differ from each other instead of all converging on the reference image.
+        end_at: 0.85,
+        embeds_scaling: "V only",
+      },
+    };
+    model = [applyId, 0];
+  }
+  return { nodes, model };
+}
+
+function workflowFor(item, referenceHandles = []) {
   const { positive, negative } = conditioningFor(item);
+  const chain = loraChain();
+  const refs = referenceChain(referenceHandles, chain.model);
   return {
     ckpt: { class_type: "CheckpointLoaderSimple", inputs: { ckpt_name: checkpoint } },
     vae: { class_type: "VAELoader", inputs: { vae_name: vaeName } },
-    pos: { class_type: "CLIPTextEncode", inputs: { text: positive, clip: ["ckpt", 1] } },
-    neg: { class_type: "CLIPTextEncode", inputs: { text: negative, clip: ["ckpt", 1] } },
+    ...chain.nodes,
+    ...refs.nodes,
+    pos: { class_type: "CLIPTextEncode", inputs: { text: positive, clip: chain.clip } },
+    neg: { class_type: "CLIPTextEncode", inputs: { text: negative, clip: chain.clip } },
     latent: {
       class_type: "EmptyLatentImage",
       inputs: { width: genWidth, height: genHeight, batch_size: 1 },
@@ -133,7 +264,7 @@ function workflowFor(item) {
         sampler_name: sampler,
         scheduler,
         denoise: 1,
-        model: ["ckpt", 0],
+        model: refs.model,
         positive: ["pos", 0],
         negative: ["neg", 0],
         latent_image: ["latent", 0],
@@ -147,11 +278,14 @@ function workflowFor(item) {
   };
 }
 
-async function generate(item) {
+async function generate(item, referenceHandles) {
   const queued = await fetch(`${baseUrl}/prompt`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt: workflowFor(item), client_id: "youtube-short-pipeline" }),
+    body: JSON.stringify({
+      prompt: workflowFor(item, referenceHandles),
+      client_id: "youtube-short-pipeline",
+    }),
   });
   if (!queued.ok) throw new Error(`ComfyUI rejected the workflow: ${await queued.text()}`);
   const { prompt_id: promptId, node_errors: nodeErrors } = await queued.json();
@@ -188,9 +322,19 @@ async function generate(item) {
 const manifest = [];
 const startedAt = Date.now();
 
-for (const [index, item] of prompts.entries()) {
+// Reference art is generated before the scenes that depend on it, and without references of its
+// own — the character sheet is what defines the character, so it cannot be steered by itself.
+const ordered = [...referencePrompts, ...scenePrompts];
+
+for (const [index, item] of ordered.entries()) {
   if (!item.id || !item.prompt) throw new Error("Every image prompt needs an id and prompt.");
-  const finalPath = path.join(outputDir, `${item.id}.png`);
+  const isReference = item.kind === "reference";
+  const finalPath = isReference
+    ? path.join(referenceDir, `${item.id}.png`)
+    : path.join(outputDir, `${item.id}.png`);
+  const relativeFile = isReference
+    ? `assets/references/${item.id}.png`
+    : `public/generated/${item.id}.png`;
 
   if (!flags.force) {
     const existing = await fs.access(finalPath).then(
@@ -198,14 +342,20 @@ for (const [index, item] of prompts.entries()) {
       () => false,
     );
     if (existing) {
-      console.log(`[${index + 1}/${prompts.length}] ${item.id} — already generated, skipping`);
-      manifest.push({ id: item.id, file: `public/generated/${item.id}.png`, skipped: true });
+      console.log(`[${index + 1}/${ordered.length}] ${item.id} — already generated, skipping`);
+      if (!isReference) manifest.push({ id: item.id, file: relativeFile, skipped: true });
       continue;
     }
   }
 
   const itemStart = Date.now();
-  const image = await generate(item);
+  // A scene inherits the shared reference art unless it explicitly declares its own list.
+  const wanted = isReference ? [] : (item.references ?? sharedReferences);
+  const references = [];
+  for (const reference of wanted) {
+    references.push(await uploadReference(reference));
+  }
+  const image = await generate(item, references);
   const query = new URLSearchParams({
     filename: image.filename,
     subfolder: image.subfolder ?? "",
@@ -231,10 +381,11 @@ for (const [index, item] of prompts.entries()) {
   await fs.rm(rawPath, { force: true });
 
   const seconds = ((Date.now() - itemStart) / 1000).toFixed(1);
-  console.log(`[${index + 1}/${prompts.length}] ${item.id} — ${seconds}s`);
+  console.log(`[${index + 1}/${ordered.length}] ${item.id} — ${seconds}s`);
+  if (isReference) continue;
   manifest.push({
     id: item.id,
-    file: `public/generated/${item.id}.png`,
+    file: relativeFile,
     provider: "comfyui",
     checkpoint,
     seed: Number(item.seed ?? seedFor(item.id)),

@@ -117,6 +117,7 @@ For optional direct Voicebox control in Claude Code, see [Architecture](docs/ARC
 - [Exact workflow](docs/WORKFLOW.md)
 - [Editing, animation, and visual styling](docs/EDITING-AND-STYLE.md)
 - [Clean integration architecture](docs/ARCHITECTURE.md)
+- [AI topic-to-asset-pack master prompt](templates/AI-ASSET-PACK-PROMPT.md)
 - [Animated visual style guide](docs/STYLE-GUIDE.html)
 - [Reusable Shorts style specification](templates/STYLE.md)
 
