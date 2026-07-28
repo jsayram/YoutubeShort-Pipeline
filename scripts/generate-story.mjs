@@ -14,6 +14,7 @@ import {
 import {
   analyzeVoiceClip,
   assembleVoiceClips,
+  ensureVoiceClipQuietTail,
   expectedLastWord,
   normalizeVoiceClip,
   probeAudioDuration,
@@ -383,8 +384,31 @@ async function generateAcceptedLine(text, index) {
     );
     await exportGeneration(generation.id, sourceCandidate);
     await normalizeVoiceClip(sourceCandidate, candidate);
-    const qa = await inspectLine(candidate, text, index, attempt);
+    let qa = await inspectLine(candidate, text, index, attempt);
     lastQa = qa;
+
+    // Keep the first re-roll as a chance for Voicebox to produce a naturally safer ending. If
+    // the second take contains the verified final word but still ends too close to the boundary,
+    // preserve every spoken sample and append a short quiet tail instead of failing the project.
+    if (attempt === 2 && !qa.boundaryPassed && qa.lexicalPassed) {
+      const repaired = await ensureVoiceClipQuietTail(candidate, {
+        currentTrailingQuietMs: qa.analysis.trailingQuietMs,
+        targetQuietMs: Math.max(minTailQuietMs, 60),
+      });
+      qa = {
+        ...qa,
+        passed: repaired.analysis.trailingQuietMs >= minTailQuietMs,
+        reason: "",
+        boundaryPassed: repaired.analysis.trailingQuietMs >= minTailQuietMs,
+        tailPaddedMs: repaired.paddedMs,
+        analysis: repaired.analysis,
+      };
+      lastQa = qa;
+      console.warn(
+        `Line ${index + 1}'s final word was verified; appended ` +
+          `${repaired.paddedMs}ms of safe tail without trimming speech.`,
+      );
+    }
 
     if (qa.passed) {
       await fs.rm(file, { force: true });
@@ -463,6 +487,8 @@ async function inspectLine(file, text, index, attempt) {
   return {
     passed: boundaryPassed && lexicalPassed,
     reason: reasons.join("; "),
+    boundaryPassed,
+    lexicalPassed,
     expectedLastWord: expected,
     transcribedLastWord: transcript?.lastWord ?? null,
     transcript: transcript?.text ?? null,
@@ -521,6 +547,7 @@ function buildTimingLines(records) {
       expectedLastWord: line.qa.expectedLastWord,
       transcribedLastWord: line.qa.transcribedLastWord,
       attempts: line.qa.attempts,
+      tailPaddedMs: line.qa.tailPaddedMs ?? 0,
     },
   }));
 }
@@ -551,7 +578,13 @@ function validateTimingPlan(timingData, assembledDuration) {
 }
 
 function logAccepted(index, text, qa, resumed) {
-  const label = resumed ? "checked" : qa.attempts > 1 ? "accepted after retry" : "accepted";
+  const label = resumed
+    ? "checked"
+    : qa.tailPaddedMs
+      ? "accepted after safe-tail repair"
+      : qa.attempts > 1
+        ? "accepted after retry"
+        : "accepted";
   console.log(
     `[${index + 1}/${lines.length}] ${label} · ` +
       `${(qa.analysis.durationMs / 1000).toFixed(2)}s · ` +
@@ -620,6 +653,7 @@ async function writeStoryManifest(targetStory, storyLines) {
             expectedLastWord: line.qa.expectedLastWord,
             transcribedLastWord: line.qa.transcribedLastWord,
             attempts: line.qa.attempts,
+            tailPaddedMs: line.qa.tailPaddedMs ?? 0,
           }
         : undefined,
     })),

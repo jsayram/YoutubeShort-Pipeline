@@ -4,7 +4,7 @@
     "label": "Photographic",
     "provider": "comfyui",
     "promptProfile": "photographic",
-    "summary": "Cinematic editorial stills. The pipeline default.",
+    "summary": "Distant cinematic editorial photography with warm sunrise/sunset color, deep shadows, grain, and restrained red-orange-green tones.",
     "match": [
       "realvis",
       "juggernaut",
@@ -24,7 +24,7 @@
     "label": "Anime",
     "provider": "comfyui",
     "promptProfile": "anime",
-    "summary": "Cel-shaded anime illustration with clean linework.",
+    "summary": "Loose painterly adult story illustration with visible oil-and-gouache strokes, distant staging, and warm sunset color rather than clean cel animation.",
     "match": [
       "animagine",
       "illustrious",
@@ -46,7 +46,7 @@
     "label": "Illustrated monologue (storybook)",
     "provider": "comfyui",
     "promptProfile": "storybook",
-    "summary": "Vintage oil-painted relationship storybook art with aged canvas texture, warm animated-film atmosphere, and visible loving, grieving, or solitary faces. Square 1:1 for blurred-fill framing.",
+    "summary": "Rough vintage relationship paintings with broad bristlework, distant environmental staging, warm sunset pigments, and readable loving, grieving, or solitary figures. Square 1:1 for blurred-fill framing.",
     "match": [
       "animagine",
       "illustrious",
@@ -77,7 +77,7 @@
     "provider": "comfyui",
     "promptProfile": "living-storybook",
     "compositionPreset": "living-storybook",
-    "summary": "The vintage oil-painted relationship look with expressive faces, plus subtle character breathing, drifting atmosphere, moving light, and a restrained camera push.",
+    "summary": "The distant rough-brush relationship-painting look, plus subtle breathing, drifting atmosphere, moving sunset light, and a restrained camera push.",
     "match": [
       "animagine",
       "illustrious",
@@ -107,7 +107,7 @@
     "label": "Flat vector",
     "provider": "comfyui",
     "promptProfile": "flat-vector",
-    "summary": "Bold geometric shapes and hard edges. Closest to motion-graphics art.",
+    "summary": "Rough brush-shaped vector silhouettes, distressed screen-print texture, distant staging, and the shared warm sunset palette.",
     "match": [
       "realvis",
       "juggernaut",
@@ -138,7 +138,7 @@
     "label": "Ink line art",
     "provider": "comfyui",
     "promptProfile": "ink-line",
-    "summary": "Single-weight monoline strokes on dark ground. Matches the drawn-stroke motion style.",
+    "summary": "Graphite, broken ink contours, broad dry-brush masses, restrained warm washes, and distant environmental storytelling.",
     "match": [
       "realvis",
       "juggernaut",
@@ -166,7 +166,7 @@
     "provider": "flux2-local",
     "fallbackProvider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "Oil-and-paper-watercolor relationship scenes with mostly solo women or men, occasional shared turning points, and automatic character/material references. Uses local FLUX.2 Klein first and Cloudflare only as a configured fallback.",
+    "summary": "Distant rough-brush relationship paintings with deep reds, ember orange, muted gold and subtle greens under sunrise or sunset light. Uses recurring character/material references, local FLUX.2 first, and Cloudflare only as configured fallback.",
     "requiredModels": {
       "diffusionModel": "flux-2-klein-4b.safetensors",
       "textEncoder": "qwen_3_4b.safetensors",
@@ -184,19 +184,19 @@
     },
     "referencePrompts": [
       {
-        "id": "protagonist-a-reference-v3",
+        "id": "protagonist-a-painted-reference-v4",
         "role": "character",
-        "prompt": "A clean wordless character reference for the recurring adult woman in an oil-and-paper-watercolor relationship story. Show only this one woman standing neutrally against a plain warm-cream studio background, with shoulder-length dark hair, an ordinary rust coat, denim trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No man, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
+        "prompt": "A wordless loose painted character study for the recurring adult woman in a mature relationship story. Show only this one woman standing neutrally against a simple burnt-ochre and deep-umber ground, with shoulder-length dark hair, an ordinary rust-red coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body view painted with broad visible bristle strokes, dry-brush drag, broken charcoal contours, palette-knife scumbling, uneven opaque gouache and oil pigment, rough canvas and paper tooth, warm sunset rim light, and deep velvety shadow. Restrained brick red, ember orange, muted golden yellow, moss green, deep teal, navy, and charcoal. Not cute, not clean cel animation, not polished anime key art. No man, no second person, no interaction, no landscape, no room, no props, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "protagonist-b-reference-v3",
+        "id": "protagonist-b-painted-reference-v4",
         "role": "character",
-        "prompt": "A clean wordless character reference for the recurring adult man in an oil-and-paper-watercolor relationship story. Show only this one man standing neutrally against a plain warm-cream studio background, with loose shorter dark hair, an ordinary deep-navy coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No woman, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
+        "prompt": "A wordless loose painted character study for the recurring adult man in a mature relationship story. Show only this one man standing neutrally against a simple burnt-ochre and deep-umber ground, with loose shorter dark hair, an ordinary deep-navy coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body view painted with broad visible bristle strokes, dry-brush drag, broken charcoal contours, palette-knife scumbling, uneven opaque gouache and oil pigment, rough canvas and paper tooth, warm sunset rim light, and deep velvety shadow. Restrained brick red, ember orange, muted golden yellow, moss green, deep teal, navy, and charcoal. Not cute, not clean cel animation, not polished anime key art. No woman, no second person, no interaction, no landscape, no room, no props, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "nostalgic-material-reference-v3",
+        "id": "sunset-brush-material-reference-v4",
         "role": "style",
-        "prompt": "A wordless material and palette study for a nostalgic oil-and-paper-watercolor romance story: aged cream cold-press paper tooth, translucent watercolor blooms and feathered edges, selective textured oil brush marks, loose graphite hatching, dry-ink contours, matte pigment swatches in burnt orange, rust, ochre, moss green, dusty teal, faded denim blue, deep navy, and soft charcoal, faint film speckles, and handmade imperfections. Abstract art-material sample only. No people, no faces, no characters, no landscape, no sea, no room, no recognizable object, no composition to imitate, no lettering, no watermark, no logo, no border."
+        "prompt": "A wordless material and palette study for a distant nostalgic relationship painting: rough canvas and coarse paper tooth, broad visible bristle strokes, dry-brush drag, palette-knife scumbling, broken charcoal marks, uneven opaque oil and gouache pigment, matte surface, aged grain, and subtle print wear. Dominant deep burnt umber, brick red, alizarin crimson, rust, ember orange, ochre and muted golden yellow, balanced by restrained moss and olive green, deep teal, navy, warm cream, and near-black. Include abstract bands of sunrise and sunset glow, amber rim-light color, long-shadow color, and a luminous warm horizon. Abstract material sample only. No people, faces, characters, landscape, room, recognizable object, composition to imitate, lettering, watermark, logo, or border."
       }
     ]
   },
@@ -205,7 +205,7 @@
     "label": "FLUX.2 painted storybook (Cloudflare)",
     "provider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "The same story-aware oil-and-paper-watercolor treatment through Cloudflare Workers AI's recurring free allocation.",
+    "summary": "The same distant rough-brush sunset relationship treatment through Cloudflare Workers AI's recurring free allocation.",
     "download": "No model download. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in .env.",
     "sampling": {
       "steps": 4,
@@ -217,19 +217,19 @@
     },
     "referencePrompts": [
       {
-        "id": "protagonist-a-reference-v3",
+        "id": "protagonist-a-painted-reference-v4",
         "role": "character",
-        "prompt": "A clean wordless character reference for the recurring adult woman in an oil-and-paper-watercolor relationship story. Show only this one woman standing neutrally against a plain warm-cream studio background, with shoulder-length dark hair, an ordinary rust coat, denim trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No man, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
+        "prompt": "A wordless loose painted character study for the recurring adult woman in a mature relationship story. Show only this one woman standing neutrally against a simple burnt-ochre and deep-umber ground, with shoulder-length dark hair, an ordinary rust-red coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body view painted with broad visible bristle strokes, dry-brush drag, broken charcoal contours, palette-knife scumbling, uneven opaque gouache and oil pigment, rough canvas and paper tooth, warm sunset rim light, and deep velvety shadow. Restrained brick red, ember orange, muted golden yellow, moss green, deep teal, navy, and charcoal. Not cute, not clean cel animation, not polished anime key art. No man, no second person, no interaction, no landscape, no room, no props, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "protagonist-b-reference-v3",
+        "id": "protagonist-b-painted-reference-v4",
         "role": "character",
-        "prompt": "A clean wordless character reference for the recurring adult man in an oil-and-paper-watercolor relationship story. Show only this one man standing neutrally against a plain warm-cream studio background, with loose shorter dark hair, an ordinary deep-navy coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and softly expressive facial features. Three-quarter full-body view, graphite and dry-ink contours, translucent watercolor washes, selective oil-paint texture, matte pigment, and visible cold-press paper grain. No woman, no second person, no interaction, no landscape, no sea, no room, no props, no action, no lettering, no labels, no symbols, no border."
+        "prompt": "A wordless loose painted character study for the recurring adult man in a mature relationship story. Show only this one man standing neutrally against a simple burnt-ochre and deep-umber ground, with loose shorter dark hair, an ordinary deep-navy coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body view painted with broad visible bristle strokes, dry-brush drag, broken charcoal contours, palette-knife scumbling, uneven opaque gouache and oil pigment, rough canvas and paper tooth, warm sunset rim light, and deep velvety shadow. Restrained brick red, ember orange, muted golden yellow, moss green, deep teal, navy, and charcoal. Not cute, not clean cel animation, not polished anime key art. No woman, no second person, no interaction, no landscape, no room, no props, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "nostalgic-material-reference-v3",
+        "id": "sunset-brush-material-reference-v4",
         "role": "style",
-        "prompt": "A wordless material and palette study for a nostalgic oil-and-paper-watercolor romance story: aged cream cold-press paper tooth, translucent watercolor blooms and feathered edges, selective textured oil brush marks, loose graphite hatching, dry-ink contours, matte pigment swatches in burnt orange, rust, ochre, moss green, dusty teal, faded denim blue, deep navy, and soft charcoal, faint film speckles, and handmade imperfections. Abstract art-material sample only. No people, no faces, no characters, no landscape, no sea, no room, no recognizable object, no composition to imitate, no lettering, no watermark, no logo, no border."
+        "prompt": "A wordless material and palette study for a distant nostalgic relationship painting: rough canvas and coarse paper tooth, broad visible bristle strokes, dry-brush drag, palette-knife scumbling, broken charcoal marks, uneven opaque oil and gouache pigment, matte surface, aged grain, and subtle print wear. Dominant deep burnt umber, brick red, alizarin crimson, rust, ember orange, ochre and muted golden yellow, balanced by restrained moss and olive green, deep teal, navy, warm cream, and near-black. Include abstract bands of sunrise and sunset glow, amber rim-light color, long-shadow color, and a luminous warm horizon. Abstract material sample only. No people, faces, characters, landscape, room, recognizable object, composition to imitate, lettering, watermark, logo, or border."
       }
     ]
   },
@@ -238,7 +238,7 @@
     "label": "Animagine dark faceless storybook",
     "provider": "comfyui",
     "promptProfile": "animagine-dark-storybook",
-    "summary": "A separate Animagine preset for literal, dark, faceless story scenes instead of abstract shapes or visible anime portraits.",
+    "summary": "A concise Animagine preset for distant rough-brush story scenes in deep reds, warm gold, subtle greens, and sunrise/sunset light.",
     "match": [
       "animagine"
     ],
@@ -261,9 +261,9 @@
     },
     "referencePrompts": [
       {
-        "id": "animagine-paper-material-v2",
+        "id": "animagine-sunset-brush-material-v3",
         "role": "style",
-        "prompt": "safe, wordless material study, rough ivory paper, translucent watercolor blooms, dry oil brush marks, graphite and charcoal contour samples, matte pigment swatches in muted ochre, rust, dusty teal, faded olive, deep navy, warm brown and charcoal, handmade dark storybook texture, no person, no character, no face, no pose, no streetlamp, no room, no landscape, no object, no composition to copy, no text, masterpiece, high score, great score, absurdres"
+        "prompt": "safe, wordless material study, rough canvas and coarse paper, broad visible bristle strokes, dry-brush drag, palette-knife scumbling, broken charcoal marks, uneven matte oil and gouache pigment, deep burnt umber, brick red, rust, ember orange, ochre, muted golden yellow, restrained moss and olive green, deep teal, navy and near-black, sunrise sunset glow, amber rim light, aged grain, no person, no character, no face, no pose, no room, no landscape, no object, no composition to copy, no text, masterpiece, high score, great score, absurdres"
       }
     ]
   },
@@ -272,7 +272,7 @@
     "label": "Google Gemini (cloud)",
     "provider": "gemini",
     "promptProfile": "gemini",
-    "summary": "Cloud generation. Needs GEMINI_API_KEY and billing. No local GPU time.",
+    "summary": "Cloud-generated painterly editorial scenes using the shared distant rough-brush sunset palette. Needs GEMINI_API_KEY and billing.",
     "download": "No download. Set GEMINI_API_KEY in .env with image-generation quota enabled.",
     "sampling": {}
   }

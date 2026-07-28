@@ -108,21 +108,23 @@ Every content provider uses the same story-aware scene interpretation and solo/s
 rhythm. Across the pipeline, a two-person relationship scene is constrained to exactly one adult
 man and one adult woman; solo scenes still alternate between a woman and a man. Each provider
 keeps its own medium:
-nostalgic 35mm editorial photography, paper-cut screen-printed vector shapes, graphite/sepia ink
-with restrained watercolor accents, or vintage oil-and-paper-watercolor illustration. The
-illustrated choices use warm hand-painted Japanese animated-film atmosphere without copying a
-specific film, expressive adult faces, and script-led scenes of love, sadness, separation, or
-solitude.
+nostalgic 35mm editorial photography, rough screen-printed vector shapes, dry-brush ink with
+restrained color washes, or rough oil-and-gouache illustration. They share a house direction:
+mostly medium-long or wide storytelling, visible handmade texture, deep reds and burnt oranges,
+muted golds and yellows, restrained moss and olive greens, and low sunrise, sunset, or amber
+interior light. Illustrated choices favor broad bristlework and distant emotional staging over a
+clean animation or cel-rendered finish.
 
-`Illustrated monologue (living storybook)` uses the same oil-painted look but also selects its
+`Illustrated monologue (living storybook)` uses the same rough painted look but also selects its
 matching automatic composition: localized character breathing and sway, a single moving light
 pass, drifting haze and motes, and a restrained camera push. Its prompt stages faces and hands
 clearly while adding loose hair, fabric, grass, water, smoke, or dust that can carry subtle motion.
 
 `FLUX.2 painted storybook (local first)` is the recommended story provider. It renders with the
 local four-step FLUX.2 Klein model and falls back to Cloudflare only when both Cloudflare values
-are configured. Its look combines watercolor blooms, selective oil texture, graphite/dry-ink
-contours, paper and film grain, expressive contemporary people, and poetic environments. It
+are configured. Its look combines broad bristle strokes, dry-brush drag, palette-knife scumbling,
+broken charcoal contours, rough paper or canvas, aged grain, distant figures, and poetic
+environments lit like sunrise or sunset. It
 automatically creates three stable files under `assets/references/`: two separate neutral
 single-character guides and a wordless materials/palette guide. The references deliberately have
 no interaction, location, or story composition to copy. Their versioned names prevent the older

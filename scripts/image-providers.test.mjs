@@ -25,20 +25,25 @@ assert.equal(flux.fallbackProvider, "cloudflare-flux2");
 assert.equal(flux.requiredModels.diffusionModel, "flux-2-klein-4b.safetensors");
 assert.equal(flux.referencePrompts.length, 3);
 assert.match(flux.sceneTemplate, /interpret the full sentence as a story event/i);
-assert.match(flux.stylePrompt, /oil-and-paper-watercolor romance storybook/i);
-assert.match(flux.stylePrompt, /cold-press paper/i);
+assert.match(flux.stylePrompt, /rough editorial oil or gouache plate/i);
+assert.match(flux.stylePrompt, /broad visible bristle strokes/i);
+assert.match(flux.stylePrompt, /sunrise, sunset/i);
+assert.doesNotMatch(flux.stylePrompt, /Japanese animated|Ghibli/i);
 assert.doesNotMatch(flux.sceneTemplate, /hooded|faceless/i);
 assert.deepEqual(
   flux.referencePrompts.map((item) => item.role),
   ["character", "character", "style"],
 );
 assert.match(flux.referencePrompts[2].prompt, /No people/i);
+assert.match(flux.referencePrompts[0].prompt, /broad visible bristle strokes/i);
+assert.match(flux.referencePrompts[2].prompt, /brick red/i);
 
 const storybook = styles.find((style) => style.id === "storybook");
 const livingStorybook = styles.find((style) => style.id === "living-storybook");
 for (const style of [storybook, livingStorybook]) {
-  assert.match(style.stylePrompt, /vintage oil-and-paper-watercolor storybook/i);
-  assert.match(style.stylePrompt, /expressive adult faces/i);
+  assert.match(style.stylePrompt, /vintage painterly relationship-story illustration/i);
+  assert.match(style.stylePrompt, /broad visible bristlework/i);
+  assert.match(style.stylePrompt, /medium-long or wide/i);
   assert.match(style.sceneTemplate, /\{\{castPlan\}\}/i);
   assert.match(style.negativeExtra, /faceless/i);
 }
@@ -72,18 +77,20 @@ assert.match(referencedPrompt, /do not copy its pose or background/i);
 assert.doesNotMatch(referencedPrompt, /hidden face/i);
 assert.deepEqual(
   referencesForScene({ castMode: "solo-a" }, references).map((item) => item.id),
-  ["protagonist-a-reference-v3", "nostalgic-material-reference-v3"],
+  ["protagonist-a-painted-reference-v4", "sunset-brush-material-reference-v4"],
 );
 assert.deepEqual(
   referencesForScene({ castMode: "solo-b" }, references).map((item) => item.id),
-  ["protagonist-b-reference-v3", "nostalgic-material-reference-v3"],
+  ["protagonist-b-painted-reference-v4", "sunset-brush-material-reference-v4"],
 );
 assert.equal(referencesForScene({ castMode: "pair" }, references).length, 3);
 
 const anime = styles.find((style) => style.id === "anime");
 assert.match(anime.sceneTemplate, /\{\{sentiment\}\}/i);
 assert.match(anime.sceneTemplate, /\{\{castPlan\}\}/i);
-assert.match(anime.stylePrompt, /paper watercolor/i);
+assert.match(anime.stylePrompt, /broad visible bristle strokes/i);
+assert.match(anime.stylePrompt, /medium-long and wide/i);
+assert.doesNotMatch(anime.stylePrompt, /Japanese animated|Ghibli/i);
 
 const photographic = styles.find((style) => style.id === "photographic");
 const flatVector = styles.find((style) => style.id === "flat-vector");
@@ -99,17 +106,22 @@ for (const style of [photographic, flatVector, inkLine]) {
   assert.match(style.negativeExtra, /static matched couple/i);
 }
 assert.match(photographic.stylePrompt, /cinematic editorial photography/i);
+assert.match(photographic.stylePrompt, /painter's sunset palette/i);
+assert.match(photographic.stylePrompt, /medium-long or wide/i);
 assert.match(photographic.negativeExtra, /two adult women together/i);
 assert.match(photographic.negativeExtra, /two adult men together/i);
 assert.match(photographic.negativeExtra, /same-sex couple/i);
-assert.match(flatVector.stylePrompt, /flat-vector relationship storybook/i);
-assert.match(inkLine.stylePrompt, /cold-press ivory paper grain/i);
+assert.match(flatVector.stylePrompt, /rough brush-shaped geometry/i);
+assert.match(inkLine.stylePrompt, /broad dry-brush ink masses/i);
 
 for (const style of styles) {
   assert.match(style.sceneTemplate, /\{\{cast(?:Plan|Brief)\}\}/i);
   assert.match(style.negativeExtra, /two adult women together/i);
   assert.match(style.negativeExtra, /two adult men together/i);
   assert.match(style.negativeExtra, /same-sex couple/i);
+  assert.match(style.stylePrompt, /brick red|rust/i);
+  assert.match(style.stylePrompt, /sunrise|sunset/i);
+  assert.doesNotMatch(style.stylePrompt, /Japanese animated-film|Ghibli/i);
 }
 
 console.log("Story-aware photographic, vector, ink, anime, storybook, FLUX, and reference routing passed.");

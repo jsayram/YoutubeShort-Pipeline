@@ -34,6 +34,55 @@ export async function normalizeVoiceClip(sourcePath, outputPath) {
   ]);
 }
 
+// Voicebox sometimes exports a complete, transcribable phrase with almost no samples after the
+// final phoneme. Preserve the entire normalized clip and append only the missing silence. This is
+// used only after the final-word transcription has passed, so padding cannot conceal a missing or
+// truncated word.
+export async function ensureVoiceClipQuietTail(
+  filePath,
+  { currentTrailingQuietMs, targetQuietMs = 60 } = {},
+) {
+  const before =
+    currentTrailingQuietMs === undefined
+      ? await analyzeVoiceClip(filePath)
+      : { trailingQuietMs: Number(currentTrailingQuietMs) };
+  const missingMs = Math.max(0, Number(targetQuietMs) - before.trailingQuietMs);
+  if (missingMs <= 0) {
+    return { paddedMs: 0, analysis: await analyzeVoiceClip(filePath) };
+  }
+
+  // Five extra milliseconds absorb sample rounding and filter-boundary differences.
+  const paddedMs = Math.ceil(missingMs + 5);
+  const temporary = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath, path.extname(filePath))}-tail-padded.wav`,
+  );
+  try {
+    await commandOutput("ffmpeg", [
+      "-y",
+      "-i",
+      filePath,
+      "-af",
+      `apad=pad_dur=${(paddedMs / 1000).toFixed(6)}`,
+      "-ar",
+      "48000",
+      "-c:a",
+      "pcm_s16le",
+      temporary,
+    ]);
+    const analysis = await analyzeVoiceClip(temporary);
+    if (analysis.trailingQuietMs < targetQuietMs) {
+      throw new Error(
+        `Tail repair produced only ${analysis.trailingQuietMs.toFixed(1)}ms of quiet audio.`,
+      );
+    }
+    await fs.rename(temporary, filePath);
+    return { paddedMs, analysis };
+  } finally {
+    await fs.rm(temporary, { force: true });
+  }
+}
+
 // Voicebox currently exports mono PCM16 WAV files. Reading the samples directly lets the
 // pipeline distinguish a complete phrase with a quiet tail from speech that reaches the final
 // sample and may sound clipped. No samples are trimmed or rewritten here.

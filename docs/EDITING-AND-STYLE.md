@@ -64,15 +64,16 @@ provider. Prompt settings have three layers:
 monologue** providers share story-aware direction and the same solo/shared cast rhythm while
 retaining their medium. Every content provider constrains a two-person relationship scene to one
 adult man and one adult woman while solo scenes can feature either one. Photographic uses
-nostalgic 35mm editorial warmth; Flat vector uses
-paper-cut, screen-printed geometry; Ink uses graphite and sepia contour work with restrained
-watercolor accents; and Anime/Illustrated Monologue use vintage oil-and-paper-watercolor
-relationship art with hand-painted animated-film warmth without copying a specific film. The
-living variant adds motion-ready hair, fabric, grass, water, smoke, and dust.
+nostalgic 35mm editorial warmth; Flat vector uses rough brush-shaped, screen-printed geometry; Ink
+uses broad dry-brush masses and restrained color washes; and Anime/Illustrated Monologue use rough
+oil-and-gouache relationship art. All carry the same palette and staging direction: mostly
+medium-long or wide scenes, deep reds and burnt oranges, muted golds and yellows, restrained moss
+and olive greens, and low sunrise, sunset, or amber interior light. The living variant adds
+motion-ready hair, fabric, grass, water, smoke, and dust.
 
 The FLUX.2 local-first and Animagine dark-storybook choices also own automatic reference prompts.
-FLUX.2 generates two separate neutral contemporary character anchors plus a nostalgic
-ink-and-matte-color materials anchor. None contains an interaction or location, so the references
+FLUX.2 generates two separate loose-painted contemporary character anchors plus a rough
+sunset-brush materials anchor. None contains an interaction or location, so the references
 preserve identity and medium without making every generated frame copy one couple pose or coastal
 setting. Animagine keeps its separate faceless-character treatment. Regenerating scenes does not
 regenerate those anchors, so a weak scene can be rerolled without changing its cast or visual

@@ -54,11 +54,12 @@ The voice step writes:
 
 The FLUX.2 and Animagine dark-storybook providers generate cast/character and style references
 before their first scene. They live in `assets/references/` and are shown separately in Studio.
-FLUX.2 uses two separate neutral contemporary character sheets plus a materials-only nostalgic
-oil-and-paper-watercolor romance treatment. Because those references contain no shared pose or
-location, the scene prompt remains responsible for the action and composition. Most scenes select
-only the woman or man reference plus the materials reference; only shared turning points use both
-characters. Animagine retains its faceless dark-storybook character. A normal scene reroll
+FLUX.2 uses two separate loose-painted contemporary character sheets plus a materials-only study
+of rough bristlework, deep reds, burnt oranges, muted golds, restrained greens, and sunrise or
+sunset light. Because those references contain no shared pose or location, the scene prompt
+remains responsible for the action and composition. Most scenes select only the woman or man
+reference plus the materials reference; only shared turning points use both characters.
+Animagine retains its faceless dark-storybook character. A normal scene reroll
 preserves the anchors, keeping the cast and palette stable. Animagine uses one subject-free
 paper/material anchor at low weight and puts the exact narration line first in a concise scene
 prompt. Pass `--force-references` only when you want to redesign the applicable references.
@@ -72,7 +73,9 @@ shot plan, and a cast plan. Their visual media differ, but the default eight-sce
 alternating solo woman/man scenes and three shared turning points.
 
 Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
-generated once more, then stops with its line number rather than entering the final mix. Run
+generated once more. If the retry contains the verified final word but merely ends without enough
+quiet samples, the pipeline preserves every spoken sample and appends a short safe tail before
+mixing. A missing or unverified final word still stops with its line number. Run
 `npm run validate:narration -- --project topic-name` to repeat the audio and timing checks.
 
 If generation stops partway, `npm run story -- --project topic-name --resume` continues from the
