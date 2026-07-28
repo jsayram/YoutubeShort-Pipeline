@@ -8,6 +8,19 @@ const { flags } = parseArgs();
 if (!flags.project) throw new Error("Pass --project <slug>.");
 
 const config = await readJson(path.join(videoDir(flags.project), "video.json"));
+if (config.captions?.enabled === true) {
+  const timing = await readJson(
+    path.join(videoDir(flags.project), "public", "audio", "narration.timing.json"),
+  ).catch(() => null);
+  if (!Array.isArray(timing?.words) || !timing.words.length) {
+    console.log("Captions are enabled; aligning narration words first.");
+    await run(process.execPath, [
+      path.join(repoRoot, "scripts", "align-words.mjs"),
+      "--project",
+      flags.project,
+    ]);
+  }
+}
 const preset = config.imageGen?.compositionPreset ?? "slideshow";
 const composers = {
   slideshow: "compose-slideshow.mjs",

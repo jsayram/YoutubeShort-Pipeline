@@ -18,6 +18,15 @@
     "qaModel": "tiny.en",
     "storyDescription": null
   },
+  "captions": {
+    "enabled": false,
+    "maxWordsPerGroup": 4,
+    "accent": "#f4c75b",
+    "color": "#fffaf0",
+    "panel": "rgba(8, 8, 11, 0.78)",
+    "bottomPx": 238,
+    "fontSizePx": 64
+  },
   "imageGen": {
     "provider": "comfyui",
     "checkpoint": "RealVisXL_V5.0_fp16.safetensors",

@@ -64,6 +64,15 @@ against. The default is three seconds of audible silence between beats. The curr
 animating through that pause, and the next image finishes its 0.5-second entrance before its voice
 begins. Change the pause in Studio or with `voicebox.gapMs` in `video.json`.
 
+Active-word captions are optional and off by default. Turn on **Highlight spoken words** in
+Studio to align the narration, show short phrase groups, and highlight the current word in gold
+inside the HyperFrames composition. The captions disappear during silent pauses. The saved setting
+lives at `captions.enabled` in `video.json`; command-line projects can prepare the timings with:
+
+```sh
+npm run align -- --project my-video-name
+```
+
 The Studio's Content provider dropdown loads a matching prompt profile from
 `templates/prompt.json`. Each profile keeps its scene template, shared style prompt, and negative
 prompt together. Edit that one file when refining Photographic, Anime, Storybook, Flat vector, Ink

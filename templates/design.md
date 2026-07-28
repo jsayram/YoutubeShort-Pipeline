@@ -125,9 +125,12 @@ Deliberate and unhurried. Nothing bounces for decoration.
 
 ## Captions
 
-- One caption per spoken beat, timed from `narration.timing.json` — measured, never estimated.
-- `--paper`, 46–62px, weight 600, centered, max-width 880px, two lines maximum.
-- They rise ~26px over 0.36s on `power2.out`. No sideways slide, no scale.
+- Active-word captions are optional and off by default through `captions.enabled`.
+- When enabled, use word timings from `narration.timing.json` — measured, never estimated.
+- Show two to four words at a time, centered, max-width 940px, two lines maximum.
+- Keep inactive words warm white. Highlight only the currently spoken word with the caption accent
+  and a restrained seek-safe pop.
+- Hide the caption card during silent pauses rather than holding the previous phrase.
 - Safe area: 72px from the sides, 120px from the top, 160px from the bottom. Captions sit in
   the lower third, clear of platform UI.
 

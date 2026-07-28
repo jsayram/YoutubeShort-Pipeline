@@ -33,6 +33,7 @@ and the list of seek-safe properties live in the project's `design.md`.
 5. Run `npm run images -- --project <slug>`.
 6. Run `npm run story -- --project <slug> --dry-run` to confirm the line split, then
    `npm run story -- --project <slug>`.
+   If `captions.enabled` is true, run `npm run align -- --project <slug>` after the voice step.
 7. Fill in the **Storyboard** section of `design.md` — one beat per spoken line, timestamps
    taken from `public/audio/narration.timing.json`, naming the dominant element, the supporting
    element, and the animation blueprint for each scene. Show it to the user and get it approved
@@ -61,6 +62,9 @@ and the list of seek-safe properties live in the project's `design.md`.
   ends up with stills in one palette and graphics in another.
 - Change timing in `video.json` and the corresponding `data-start`, `data-duration`, and GSAP
   positions together.
+- Active-word captions are opt-in through `captions.enabled` or Studio's **Highlight spoken
+  words** toggle. Leave them absent when the option is off; when it is on, use the shared
+  `scripts/caption-overlay.mjs` layer rather than creating a second caption style.
 - Preserve a readable final frame. Avoid blank or fade-to-black endings.
 - Keep important text inside mobile safe margins and use large type.
 

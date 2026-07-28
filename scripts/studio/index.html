@@ -437,7 +437,8 @@
         <h1>YouTube Short studio</h1>
         <div class="sub">
           Paste a script. Every stage runs top to bottom — stills appear as they render, the
-          finished file plays at the bottom. Images come back wordless; add captions afterwards.
+          finished file plays at the bottom. Images come back wordless; optional captions are
+          rendered by HyperFrames.
         </div>
       </header>
 
@@ -524,6 +525,10 @@ Start a recording and talk about your day."></textarea>
         <div class="opts">
           <label id="fastwrap" class="hidden"><input type="checkbox" id="opt-fast" /> Fast mode</label>
           <label><input type="checkbox" id="opt-render" /> Render to MP4 when the check passes</label>
+          <label title="Adds phrase captions with the spoken word highlighted">
+            <input type="checkbox" id="opt-captions" />
+            Highlight spoken words
+          </label>
           <label><input type="checkbox" id="opt-force" /> Regenerate existing images</label>
           <label><input type="checkbox" id="opt-keep" /> Keep my edited prompts</label>
           <label><input type="checkbox" id="opt-nodoctor" /> Skip environment check</label>
@@ -576,6 +581,7 @@ Start a recording and talk about your day."></textarea>
         script: "Script and prompts",
         images: "Images",
         voice: "Narration",
+        captions: "Caption timing",
         compose: "Composition",
         check: "Validation",
         render: "Render",
@@ -801,6 +807,7 @@ Start a recording and talk about your day."></textarea>
             profile: $("voice").value || undefined,
             style: $("style").value || undefined,
             gapMs: Math.round(Number($("pause").value || 0) * 1000),
+            captions: $("opt-captions").checked,
             fast: $("opt-fast").checked,
             render: $("opt-render").checked,
             force: $("opt-force").checked,
@@ -974,19 +981,31 @@ Start a recording and talk about your day."></textarea>
 
       $("refresh-assets").addEventListener("click", refreshProjectAssets);
       $("slug").addEventListener("input", scheduleAssetRefresh);
-      $("slug").addEventListener("change", refreshProjectAssets);
+      $("slug").addEventListener("change", () => {
+        refreshProjectAssets();
+        applyProjectSettings($("slug").value.trim());
+      });
       setInterval(refreshProjectAssets, 5000);
+
+      let projectSettings = new Map();
+
+      function applyProjectSettings(slug) {
+        const project = projectSettings.get(slug);
+        $("opt-captions").checked = project?.captionsEnabled === true;
+      }
 
       function loadProjects() {
         return fetch("/api/projects")
           .then((response) => response.json())
           .then((data) => {
+            projectSettings = new Map(data.projects.map((project) => [project.slug, project]));
             $("project-list").innerHTML = data.projects
               .map(
                 (project) =>
                   `<option value="${escapeHtml(project.slug)}">${escapeHtml(project.title)}</option>`,
               )
               .join("");
+            applyProjectSettings($("slug").value.trim());
             refreshProjectAssets();
           });
       }
@@ -1035,6 +1054,7 @@ Start a recording and talk about your day."></textarea>
         $("slug").value = data.slug;
         $("slug").dataset.touched = "1";
         if (data.title) $("title").value = data.title;
+        $("opt-captions").checked = data.captionsEnabled === true;
         activeRunSlug = null;
         stageNodes.clear();
         stagesEl.innerHTML = "";

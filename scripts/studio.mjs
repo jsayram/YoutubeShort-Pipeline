@@ -130,6 +130,9 @@ function stageList(options) {
     { id: "compose", label: "Composition", status: "pending" },
     { id: "check", label: "Validation", status: "pending" },
   ];
+  if (options.captions) {
+    stages.splice(5, 0, { id: "captions", label: "Caption timing", status: "pending" });
+  }
   if (options.render) stages.push({ id: "render", label: "Render", status: "pending" });
   return stages;
 }
@@ -169,6 +172,7 @@ async function startRun({ slug, title, scriptText, options }) {
     if (title) prepareArgs.push("--title", title);
     if (options.keepPrompts) prepareArgs.push("--keep-prompts");
     prepareArgs.push("--gap", String(gapMs));
+    prepareArgs.push("--captions", String(options.captions === true));
     // Persist the chosen voice into video.json so the project keeps it, and so a later CLI run
     // speaks in the same voice as the one started from here.
     if (options.profile) {
@@ -211,6 +215,10 @@ async function startRun({ slug, title, scriptText, options }) {
       if (options.resume) voiceArgs.push("--resume");
       await runStage("voice", node, voiceArgs);
       await emitTiming(slug);
+    }
+
+    if (options.captions) {
+      await runStage("captions", node, [script("align-words.mjs"), "--project", slug]);
     }
 
     // The selected content provider may own a matching motion treatment. The dispatcher reads
@@ -609,7 +617,13 @@ const server = http.createServer(async (request, response) => {
         const rendered = await fs
           .access(path.join(videosRoot, entry.name, "renders", `${entry.name}.mp4`))
           .then(() => true, () => false);
-        projects.push({ slug: entry.name, title: config.title, duration: config.duration, rendered });
+        projects.push({
+          slug: entry.name,
+          title: config.title,
+          duration: config.duration,
+          rendered,
+          captionsEnabled: config.captions?.enabled === true,
+        });
       }
       sendJson(response, 200, { projects });
       return;
@@ -680,6 +694,7 @@ const server = http.createServer(async (request, response) => {
           title: config?.title ?? slug,
           hasComposition,
           script: await readNarration(source),
+          captionsEnabled: config?.captions?.enabled === true,
         });
         return;
       }
@@ -710,6 +725,7 @@ const server = http.createServer(async (request, response) => {
         title: imported?.title ?? slug,
         hasComposition,
         from: source,
+        captionsEnabled: imported?.captions?.enabled === true,
         // Hand the project's narration back so the script box shows what this video actually
         // says, rather than leaving the previous project's text sitting there.
         script: await readNarration(destination),

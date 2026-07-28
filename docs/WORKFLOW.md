@@ -59,6 +59,17 @@ generated once more, then stops with its line number rather than entering the fi
 If generation stops partway, `npm run story -- --project topic-name --resume` continues from the
 first line that never made it onto the timeline.
 
+Optional active-word captions are disabled by default. Turn on **Highlight spoken words** in
+Studio, or set `captions.enabled` to `true` in `video.json`. The pipeline then runs the word
+alignment step automatically. For a command-line project:
+
+```sh
+npm run align -- --project topic-name
+```
+
+The automatic composers use those timings to render short phrase groups in HyperFrames, highlight
+the currently spoken word, and hide the caption card during silent pauses.
+
 ## 4. Compose the video
 
 In `videos/topic-name/index.html`:

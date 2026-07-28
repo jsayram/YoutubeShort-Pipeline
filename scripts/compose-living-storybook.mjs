@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { parseArgs, readJson, videoDir, writeJson } from "./lib.mjs";
+import { buildCaptionOverlay } from "./caption-overlay.mjs";
 
 // A motion-enabled companion to the original storybook provider.
 //
@@ -109,6 +110,12 @@ const scenes = lines.map((line, index) => {
     glowY: 59 + ((index * 7) % 12),
   };
 });
+const captions = buildCaptionOverlay({
+  timing,
+  config,
+  duration,
+  trackIndex: scenes.length + 2,
+});
 
 const vendored = await fs
   .access(path.join(projectDir, "public", "vendor", "gsap.min.js"))
@@ -150,6 +157,11 @@ if (missing.length) {
 }
 if (files.length < lines.length) {
   console.log(`Note: ${files.length} image(s) for ${lines.length} line(s) — stills repeat.`);
+}
+if (captions.enabled) {
+  console.log(
+    `Captions: ${captions.wordCount} words in ${captions.chunkCount} highlighted phrase groups.`,
+  );
 }
 
 function round(value) {
@@ -396,6 +408,7 @@ ${moteMarkup(scene)}
 <rect width='160' height='160' filter='url(%23n)'/></svg>");
         background-size: 320px 320px;
       }
+${captions.css}
     </style>
   </head>
   <body>
@@ -425,12 +438,14 @@ ${sceneMarkup}
         <div id="grain"></div>
       </div>
 
+${captions.markup}
+
       <audio
         id="vo"
         src="public/audio/narration.wav"
         data-start="0"
         data-duration="${round(Math.min(narrationDuration, duration))}"
-        data-track-index="${scenes.length + 2}"
+        data-track-index="${scenes.length + 2 + captions.trackOffset}"
         data-volume="1"
       ></audio>
     </div>
@@ -596,6 +611,8 @@ ${sceneData}
           );
         });
       }
+
+${captions.script}
 
       window.__timelines["main"] = tl;
     </script>

@@ -7,6 +7,7 @@
 | Spoken words | `content/narration.txt` | `npm run voice -- --project topic-name` |
 | Voice | `video.json` or `--profile` | the voice command again |
 | Pause between verses | `voicebox.gapMs` or Studio's Pause field | regenerate voice and compose |
+| Active-word captions | Studio's Highlight spoken words toggle or `captions.enabled` | align words and compose |
 | One visual | its entry in `content/image-prompts.json` | delete only that generated image, then run the image command |
 | Overall look | `content/STYLE.md`, prompts, and composition CSS | image generation, snapshots, and preview |
 | Scene timing | `video.json`, clip data attributes, and GSAP positions | check, snapshots, and preview |

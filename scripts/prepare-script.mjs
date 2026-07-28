@@ -94,6 +94,14 @@ config.voicebox = {
   finalHoldMs: Number(config.voicebox?.finalHoldMs ?? gapMs),
 };
 
+// Captions are opt-in. Studio always passes an explicit value so a project's saved setting
+// matches the toggle that produced its current composition.
+if (flags.captions !== undefined) {
+  const enabled = parseBoolean(flags.captions);
+  config.captions = { ...config.captions, enabled };
+  console.log(`Active-word captions: ${enabled ? "enabled" : "off"}.`);
+}
+
 // Same idea for the visual style: resolve the preset against the models that are actually
 // installed and flatten it into imageGen, so the generator keeps reading one plain config.
 if (flags.style) {
@@ -177,4 +185,9 @@ async function readStdin() {
   const chunks = [];
   for await (const chunk of process.stdin) chunks.push(chunk);
   return Buffer.concat(chunks).toString("utf8");
+}
+
+function parseBoolean(value) {
+  if (typeof value === "boolean") return value;
+  return ["1", "true", "yes", "on"].includes(String(value).trim().toLowerCase());
 }
