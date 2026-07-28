@@ -10,13 +10,15 @@ import {
   videoDir,
   writeJson,
 } from "./lib.mjs";
+import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
 
 await loadEnv();
 const { flags } = parseArgs();
 if (!flags.project) throw new Error("Pass --project <slug>.");
 
 const projectDir = videoDir(flags.project);
-const config = await readJson(path.join(projectDir, "video.json"));
+const configPath = path.join(projectDir, "video.json");
+const config = await readJson(configPath);
 const voice = config.voicebox ?? {};
 
 const baseUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
@@ -24,7 +26,7 @@ const scriptPath = flags.script
   ? path.resolve(flags.script)
   : path.join(projectDir, "content", "narration.txt");
 const profileName = flags.profile ?? voice.profile ?? "MyOwn";
-const engine = flags.engine ?? voice.engine ?? "qwen";
+const requestedEngine = flags.engine ?? voice.engine ?? "qwen";
 const modelSize = flags.model ?? voice.modelSize ?? "1.7B";
 const language = flags.language ?? voice.language ?? "en";
 const gapMs = Math.max(0, Math.round(Number(flags.gap ?? voice.gapMs ?? 200)));
@@ -59,7 +61,9 @@ if (flags["dry-run"]) {
   for (const [index, line] of lines.entries()) {
     console.log(`${String(index + 1).padStart(2)}. (${line.split(/\s+/).length}w) ${line}`);
   }
-  console.log(`\nWould build story "${storyName}" as ${profileName} / ${engine} ${modelSize}.`);
+  console.log(
+    `\nWould build story "${storyName}" as ${profileName} / ${requestedEngine} ${modelSize}.`,
+  );
   process.exit(0);
 }
 
@@ -96,12 +100,33 @@ if (!profile) {
   );
 }
 
+const resolvedEngine = resolveVoiceboxEngine(profile, requestedEngine);
+const engine = resolvedEngine.engine;
+if (resolvedEngine.changed) {
+  config.voicebox = { ...voice, profile: profile.name, engine };
+  await writeJson(configPath, config);
+  console.log(`Voice engine corrected: ${requestedEngine} → ${engine} (${resolvedEngine.reason}).`);
+}
+
 // --resume picks up a run that stopped partway. It only continues a story whose finished
 // lines still match the script, so a rewritten line always forces a clean rebuild.
 let story = null;
 let completed = [];
 
-if (flags.resume) {
+if (flags["story-id"]) {
+  const existing = await api(`/stories/${flags["story-id"]}`).catch(() => null);
+  if (!existing) {
+    throw new Error(`Voicebox story "${flags["story-id"]}" was not found.`);
+  }
+  ({ story, completed } = adoptStory(existing));
+  console.log(
+    completed.length
+      ? `Continuing "${story.name}" at line ${completed.length + 1} of ${lines.length}.`
+      : `Using existing empty story "${story.name}" (${story.id}).`,
+  );
+}
+
+if (flags.resume && !story) {
   const previous = await readJson(manifestPath).catch(() => null);
   const existing = previous?.storyId
     ? await api(`/stories/${previous.storyId}`).catch(() => null)
@@ -110,22 +135,7 @@ if (flags.resume) {
   if (!existing) {
     console.log("No resumable story found. Building a new one.");
   } else {
-    // The story on the server is the truth. A manifest written just before a crash can
-    // lag the timeline by one item, and replaying that item would duplicate it.
-    const placed = [...existing.items].sort((a, b) => a.start_time_ms - b.start_time_ms);
-    if (placed.length > lines.length || placed.some((item, i) => item.text.trim() !== lines[i])) {
-      throw new Error(
-        "The script changed since that story was built. Re-run without --resume to rebuild it.",
-      );
-    }
-    story = existing;
-    completed = placed.map((item, index) => ({
-      index,
-      text: lines[index],
-      generationId: item.generation_id,
-      startMs: item.start_time_ms,
-      durationMs: Math.round(item.duration * 1000),
-    }));
+    ({ story, completed } = adoptStory(existing));
     console.log(
       completed.length === lines.length
         ? `"${story.name}" already has all ${lines.length} lines. Re-exporting audio and timings.`
@@ -141,6 +151,10 @@ if (!story) {
   });
   console.log(`Created story "${story.name}" (${story.id}).`);
 }
+
+// Persist the story before the first generation. If Voicebox rejects line one or the process
+// stops, --resume can recover the empty story instead of creating an orphan.
+await writeStoryManifest(story, completed);
 
 let cursorMs = completed.length
   ? completed.at(-1).startMs + completed.at(-1).durationMs + gapMs
@@ -191,16 +205,7 @@ for (const [index, text] of lines.entries()) {
     startMs: cursorMs,
     durationMs,
   });
-  await writeJson(manifestPath, {
-    storyId: story.id,
-    storyName: story.name,
-    profile: profile.name,
-    engine,
-    modelSize,
-    language,
-    gapMs,
-    lines: completed,
-  });
+  await writeStoryManifest(story, completed);
 
   const seconds = (cursorMs / 1000).toFixed(1);
   console.log(
@@ -216,22 +221,16 @@ const placed = [...detail.items].sort((a, b) => a.start_time_ms - b.start_time_m
 // Rewrite the manifest from the server's own view. The in-loop writes above only cover lines
 // this run generated, so a resume that had nothing left to do would otherwise leave stale
 // metadata here — a profile name, engine, or gap that no longer reflects reality.
-await writeJson(manifestPath, {
-  storyId: story.id,
-  storyName: story.name,
-  profile: profile.name,
-  engine,
-  modelSize,
-  language,
-  gapMs,
-  lines: placed.map((item, index) => ({
+await writeStoryManifest(
+  story,
+  placed.map((item, index) => ({
     index,
     text: item.text.trim(),
     generationId: item.generation_id,
     startMs: item.start_time_ms,
     durationMs: Math.round(item.duration * 1000),
   })),
-});
+);
 
 const audio = await fetch(`${baseUrl}/stories/${story.id}/export-audio`);
 if (!audio.ok) throw new Error(`Voicebox story export failed: ${await audio.text()}`);
@@ -320,4 +319,40 @@ if (spokenDuration > target + 0.001) {
     `\nNarration runs ${spokenDuration.toFixed(1)}s but video.json asks for ${target}s. ` +
       "Shorten the script, raise duration, or re-run with --fit.",
   );
+}
+
+function adoptStory(existing) {
+  // The story on the server is the truth. A manifest written just before a crash can lag the
+  // timeline by one item, and replaying that item would duplicate it.
+  const placed = [...(existing.items ?? [])].sort(
+    (a, b) => a.start_time_ms - b.start_time_ms,
+  );
+  if (placed.length > lines.length || placed.some((item, i) => item.text.trim() !== lines[i])) {
+    throw new Error(
+      "The script changed since that story was built. Use a new empty story or rebuild it.",
+    );
+  }
+  return {
+    story: existing,
+    completed: placed.map((item, index) => ({
+      index,
+      text: lines[index],
+      generationId: item.generation_id,
+      startMs: item.start_time_ms,
+      durationMs: Math.round(item.duration * 1000),
+    })),
+  };
+}
+
+async function writeStoryManifest(targetStory, storyLines) {
+  await writeJson(manifestPath, {
+    storyId: targetStory.id,
+    storyName: targetStory.name,
+    profile: profile.name,
+    engine,
+    modelSize,
+    language,
+    gapMs,
+    lines: storyLines,
+  });
 }

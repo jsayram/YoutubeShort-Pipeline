@@ -1145,6 +1145,9 @@ Start a recording and talk about your day."></textarea>
         if (style.promptProfile) {
           bits.push(`prompt: ${style.promptProfile} in templates/prompt.json`);
         }
+        if (style.compositionPreset) {
+          bits.push(`motion: ${style.compositionPreset}`);
+        }
         hint.textContent = bits.join(" · ");
       }
 

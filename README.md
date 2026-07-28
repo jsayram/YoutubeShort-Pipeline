@@ -65,9 +65,16 @@ against.
 The Studio's Content provider dropdown loads a matching prompt profile from
 `templates/prompt.json`. Each profile keeps its scene template, shared style prompt, and negative
 prompt together. Edit that one file when refining Photographic, Anime, Storybook, Flat vector, Ink
-line art, or Gemini; the next run imports the selected profile automatically. Scene templates may
-use `{{line}}` for the complete narration beat, `{{keywords}}` for its extracted visual terms, and
-`{{subjectType}}` for the inferred actor or object.
+line art, Living storybook, or Gemini; the next run imports the selected profile automatically.
+Scene templates may use `{{line}}` for the complete narration beat, `{{keywords}}` for its extracted
+visual terms, and `{{subjectType}}` for the inferred actor or object.
+
+`Illustrated monologue (storybook)` keeps the original still-image slideshow treatment.
+`Illustrated monologue (living storybook)` uses the same painted look but also selects its matching
+automatic composition: localized character breathing and sway, a single moving light pass,
+drifting haze and motes, and a restrained camera push. Its prompt intentionally places the subject
+near the lower centre with loose fabric, hair, smoke, foliage, or particles that support those
+motion cues.
 
 Generate the media:
 

@@ -4,7 +4,7 @@
   "width": 1080,
   "height": 1920,
   "fps": 30,
-  "hyperframesVersion": "0.7.76",
+  "hyperframesVersion": "0.7.77",
   "voicebox": {
     "profile": "MyOwn",
     "engine": "qwen",

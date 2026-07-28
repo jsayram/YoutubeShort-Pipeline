@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadEnv, parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
 import { resolveStyles } from "./image-styles.mjs";
+import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
 
 await loadEnv();
 
@@ -204,7 +205,9 @@ async function startRun({ slug, title, scriptText, options }) {
       await emitTiming(slug);
     }
 
-    const composeArgs = [script("compose-slideshow.mjs"), "--project", slug];
+    // The selected content provider may own a matching motion treatment. The dispatcher reads
+    // the saved video.json, so Studio and the command line always choose the same composer.
+    const composeArgs = [script("compose-video.mjs"), "--project", slug];
     if (options.forceCompose) composeArgs.push("--force");
     await runStage("compose", node, composeArgs);
 
@@ -340,17 +343,20 @@ async function listVoices() {
   if (!response?.ok) return null;
   const profiles = await response.json().catch(() => null);
   if (!Array.isArray(profiles)) return null;
-  return profiles.map((profile) => ({
-    id: profile.id,
-    name: profile.name,
-    description: profile.description ?? "",
-    language: profile.language ?? "",
-    cloned: profile.voice_type === "cloned",
-    // A preset voice carries the engine it was built for. Picking one and leaving the project's
-    // old engine in place is how you get a voice that will not speak.
-    engine: profile.preset_engine ?? profile.default_engine ?? null,
-    generations: profile.generation_count ?? 0,
-  }));
+  return profiles.map((profile) => {
+    const resolved = resolveVoiceboxEngine(profile, null);
+    return {
+      id: profile.id,
+      name: profile.name,
+      description: profile.description ?? "",
+      language: profile.language ?? "",
+      cloned: profile.voice_type === "cloned",
+      // A profile type determines the engine family. Always return a usable engine so choosing
+      // a clone cannot inherit the previous preset voice's qwen_custom_voice setting.
+      engine: resolved.engine,
+      generations: profile.generation_count ?? 0,
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------- image styles
@@ -728,6 +734,7 @@ const server = http.createServer(async (request, response) => {
           note: style.note ?? null,
           checkpoint: style.checkpoint ?? null,
           promptProfile: style.promptProfile,
+          compositionPreset: style.compositionPreset ?? null,
           loras: (style.loras ?? []).map((lora) => lora.name),
           download: style.download ?? null,
         })),

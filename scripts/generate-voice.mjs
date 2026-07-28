@@ -8,16 +8,19 @@ import {
   run,
   sleep,
   videoDir,
+  writeJson,
 } from "./lib.mjs";
+import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
 
 await loadEnv();
 const { flags } = parseArgs();
 const projectDir = videoDir(flags.project);
-const config = await readJson(path.join(projectDir, "video.json"));
+const configPath = path.join(projectDir, "video.json");
+const config = await readJson(configPath);
 const narration = (await fs.readFile(path.join(projectDir, "content", "narration.txt"), "utf8")).trim();
 const baseUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
-const profile = flags.profile ?? config.voicebox.profile;
-const engine = flags.engine ?? config.voicebox.engine;
+const profileName = flags.profile ?? config.voicebox.profile;
+const requestedEngine = flags.engine ?? config.voicebox.engine;
 const rawPath = path.join(projectDir, "public", "audio", "narration-raw.wav");
 const finalPath = path.join(projectDir, "public", "audio", "narration.wav");
 
@@ -30,6 +33,24 @@ if (!health?.ok) {
   );
 }
 
+const profilesResponse = await fetch(`${baseUrl}/profiles`);
+if (!profilesResponse.ok) {
+  throw new Error(`Voicebox profile lookup failed: ${await profilesResponse.text()}`);
+}
+const profiles = await profilesResponse.json();
+const profile = profiles.find(
+  (candidate) =>
+    candidate.id === profileName || candidate.name.toLowerCase() === profileName.toLowerCase(),
+);
+if (!profile) throw new Error(`Voicebox profile "${profileName}" was not found.`);
+const resolvedEngine = resolveVoiceboxEngine(profile, requestedEngine);
+const engine = resolvedEngine.engine;
+if (resolvedEngine.changed) {
+  config.voicebox = { ...config.voicebox, profile: profile.name, engine };
+  await writeJson(configPath, config);
+  console.log(`Voice engine corrected: ${requestedEngine} → ${engine} (${resolvedEngine.reason}).`);
+}
+
 const start = await fetch(`${baseUrl}/speak`, {
   method: "POST",
   headers: {
@@ -38,7 +59,7 @@ const start = await fetch(`${baseUrl}/speak`, {
   },
   body: JSON.stringify({
     text: narration,
-    profile,
+    profile: profile.name,
     engine,
     language: config.voicebox.language,
     personality: false,
@@ -111,4 +132,3 @@ const finalDuration = await commandOutput("ffprobe", [
   finalPath,
 ]);
 console.log(`Saved ${finalPath} (${Number(finalDuration).toFixed(3)}s)`);
-

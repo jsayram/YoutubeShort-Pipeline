@@ -72,6 +72,37 @@
     }
   },
   {
+    "id": "living-storybook",
+    "label": "Illustrated monologue (living storybook)",
+    "provider": "comfyui",
+    "promptProfile": "living-storybook",
+    "compositionPreset": "living-storybook",
+    "summary": "The storybook look with subtle character breathing, drifting atmosphere, moving light, and a restrained camera push.",
+    "match": [
+      "animagine",
+      "illustrious",
+      "dreamshaper",
+      "pony"
+    ],
+    "prefersCheckpoint": [
+      "animagine",
+      "illustrious"
+    ],
+    "download": "Needs an illustration checkpoint. Animagine XL is installed and works.",
+    "sampling": {
+      "steps": 30,
+      "cfg": 6,
+      "sampler": "euler_ancestral",
+      "scheduler": "normal"
+    },
+    "framing": {
+      "genWidth": 1024,
+      "genHeight": 1024,
+      "outWidth": 1024,
+      "outHeight": 1024
+    }
+  },
+  {
     "id": "flat-vector",
     "label": "Flat vector",
     "provider": "comfyui",

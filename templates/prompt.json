@@ -27,6 +27,13 @@
       "stylePrompt": "hand-painted storybook illustration, dark folklore mood, muted ochre, dusty teal, faded olive, warm brown, charcoal, soft paper grain, visible imperfect brushwork, restrained low-key lighting, melancholy atmosphere, one dominant emotional action, strong readable silhouette, painterly environment with depth",
       "negativePrompt": "photograph, photorealistic, 3d render, glossy, neon, oversaturated, harsh flash, cluttered composition, multiple competing subjects, lowres, cropped, worst quality, low quality, blurry"
     },
+    "living-storybook": {
+      "label": "Illustrated monologue (living storybook)",
+      "format": "ordered-tags",
+      "sceneTemplate": "safe, solo, {{subjectType}}, {{keywords}}, literal storybook scene, one clear emotional action, recognizable figure interacting with the environment, full subject visible in the lower center, feet near the lower edge and head near the middle of the square, asymmetrical natural pose, loose hair or fabric responding to a gentle breeze, suspended dust or embers, one soft directional light source, separated foreground midground and background planes, painterly environment, layered depth, melancholy atmosphere, balanced square composition, masterpiece, high score, great score, absurdres",
+      "stylePrompt": "hand-painted storybook illustration, dark folklore mood, muted ochre, dusty teal, faded olive, warm brown, charcoal, soft paper grain, visible imperfect brushwork, restrained low-key lighting, melancholy atmosphere, one dominant emotional action, strong readable silhouette, motion-ready staging, lower-center subject with clear space around the body, loose fabric hair foliage smoke or dust that can imply gentle movement, separated depth planes, painterly environment with depth",
+      "negativePrompt": "photograph, photorealistic, 3d render, glossy, neon, oversaturated, harsh flash, motion blur, stiff symmetrical pose, frozen statue pose, cluttered composition, multiple competing subjects, subject at extreme edge, close-up portrait, lowres, cropped, worst quality, low quality, blurry"
+    },
     "flat-vector": {
       "label": "Flat vector",
       "format": "style-tags",

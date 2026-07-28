@@ -125,6 +125,10 @@ export async function resolveStyles(baseUrl) {
 // the studio stay on one code path.
 export function applyStyle(imageGen, style, { fast = false, speedLora = null } = {}) {
   const next = { ...imageGen, provider: style.provider, style: style.id };
+  // A visual provider may opt into a matching automatic composition. Clear the field when a
+  // different provider is selected so switching back to the original storybook style restores
+  // the ordinary slideshow instead of inheriting the living treatment.
+  next.compositionPreset = style.compositionPreset ?? null;
   if (style.checkpoint) next.checkpoint = style.checkpoint;
   Object.assign(next, style.sampling ?? {});
   // Some looks are not 9:16. The storybook preset paints square art that the composition
