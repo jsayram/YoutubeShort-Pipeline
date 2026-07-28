@@ -1,107 +1,36 @@
-import fs from "node:fs/promises";
 import path from "node:path";
-import { GoogleGenAI } from "@google/genai";
-import {
-  loadEnv,
-  parseArgs,
-  readJson,
-  videoDir,
-  writeJson,
-} from "./lib.mjs";
+import { parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
 
-await loadEnv();
+// Dispatcher. `imageGen.provider` in video.json decides which backend renders the stills:
+//   "comfyui" — local ComfyUI over HTTP. Offline, no key, no quota. The default.
+//   "gemini"  — Google GenAI. Needs GEMINI_API_KEY and a billed project; image generation
+//               has a zero free-tier allowance, so an unbilled key fails with 429 limit:0.
+
 const { flags } = parseArgs();
-const slug = flags.project;
-const projectDir = videoDir(slug);
-const config = await readJson(path.join(projectDir, "video.json"));
-const prompts = await readJson(path.join(projectDir, "content", "image-prompts.json"));
-const apiKey = process.env.GEMINI_API_KEY;
+if (!flags.project) throw new Error("Pass --project <slug>.");
 
-if (!apiKey) throw new Error("GEMINI_API_KEY is missing. Copy .env.example to .env and add the key.");
-if (!Array.isArray(prompts) || prompts.length === 0) {
-  throw new Error("content/image-prompts.json must contain at least one prompt.");
+const config = await readJson(path.join(videoDir(flags.project), "video.json"));
+const provider = flags.provider ?? config.imageGen?.provider ?? "comfyui";
+
+const backends = {
+  comfyui: "generate-images-local.mjs",
+  local: "generate-images-local.mjs",
+  gemini: "generate-images-gemini.mjs",
+  google: "generate-images-gemini.mjs",
+};
+
+const script = backends[provider];
+if (!script) {
+  throw new Error(
+    `Unknown image provider "${provider}". Use one of: ${[...new Set(Object.keys(backends))].join(", ")}.`,
+  );
 }
 
-const ai = new GoogleGenAI({ apiKey });
-const outputDir = path.join(projectDir, "public", "generated");
-await fs.mkdir(outputDir, { recursive: true });
-const manifest = [];
+const forwarded = process.argv.slice(2).filter((argument, index, all) => {
+  if (argument === "--provider") return false;
+  if (all[index - 1] === "--provider") return false;
+  return !argument.startsWith("--provider=");
+});
 
-function findImage(interaction) {
-  const blocks = [];
-  for (const step of interaction.steps ?? []) blocks.push(...(step.content ?? []));
-  blocks.push(...(interaction.outputs ?? []));
-  for (const candidate of interaction.candidates ?? []) {
-    blocks.push(...(candidate.content?.parts ?? []));
-  }
-
-  for (const block of blocks) {
-    if (block.type === "image" && block.data) {
-      return { data: block.data, mimeType: block.mime_type ?? "image/jpeg" };
-    }
-    if (block.inlineData?.data) {
-      return {
-        data: block.inlineData.data,
-        mimeType: block.inlineData.mimeType ?? "image/png",
-      };
-    }
-  }
-  return null;
-}
-
-for (const item of prompts) {
-  if (!item.id || !item.prompt) throw new Error("Every image prompt needs an id and prompt.");
-  if (!flags.force) {
-    for (const extension of ["jpg", "png"]) {
-      const existingPath = path.join(outputDir, `${item.id}.${extension}`);
-      try {
-        await fs.access(existingPath);
-        manifest.push({
-          id: item.id,
-          file: `public/generated/${item.id}.${extension}`,
-          skipped: true,
-        });
-        break;
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error;
-      }
-    }
-    if (manifest.at(-1)?.id === item.id) continue;
-  }
-
-  const fullPrompt = `${item.prompt}\n\n${config.imageGen.styleSuffix}`;
-  let interaction;
-  try {
-    interaction = await ai.interactions.create({
-      model: config.imageGen.model,
-      input: fullPrompt,
-      response_format: {
-        type: "image",
-        aspect_ratio: config.imageGen.aspectRatio,
-        image_size: config.imageGen.imageSize,
-      },
-    });
-  } catch (error) {
-    if (String(error).includes("429") || String(error).toLowerCase().includes("quota")) {
-      throw new Error(
-        "Google image quota is unavailable for this project. Enable billing/quota or create the image in Gemini and save it under public/generated with the expected filename.",
-      );
-    }
-    throw error;
-  }
-
-  const image = findImage(interaction);
-  if (!image) throw new Error(`Google returned no image for prompt ${item.id}.`);
-  const extension = image.mimeType.includes("png") ? "png" : "jpg";
-  const outputPath = path.join(outputDir, `${item.id}.${extension}`);
-  await fs.writeFile(outputPath, Buffer.from(image.data, "base64"));
-  manifest.push({
-    id: item.id,
-    file: `public/generated/${item.id}.${extension}`,
-    model: config.imageGen.model,
-    prompt: fullPrompt,
-  });
-  console.log(`Saved ${outputPath}`);
-}
-
-await writeJson(path.join(outputDir, "manifest.json"), manifest);
+console.log(`Image provider: ${provider}`);
+await run(process.execPath, [path.join(repoRoot, "scripts", script), ...forwarded]);

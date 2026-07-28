@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YouTube Short studio</title>
+    <style>
+      :root {
+        --bg: #0b0b0f;
+        --panel: #141419;
+        --panel-2: #1b1b22;
+        --line: #2a2a33;
+        --text: #f2efe8;
+        --muted: #8d8a80;
+        --accent: #e8b44a;
+        --ok: #6fcf8e;
+        --bad: #e2685f;
+        --run: #6ba8e8;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+        padding: 32px 20px 96px;
+      }
+      .wrap {
+        max-width: 860px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 21px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 4px;
+      }
+      header {
+        margin-bottom: 26px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 18px;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin-bottom: 7px;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--text);
+        font: inherit;
+        padding: 10px 12px;
+      }
+      textarea {
+        min-height: 190px;
+        resize: vertical;
+        line-height: 1.6;
+      }
+      input:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .row {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 14px;
+        flex-wrap: wrap;
+      }
+      .row > div {
+        flex: 1 1 200px;
+      }
+      .opts {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin: 14px 0 16px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .opts label {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 13px;
+        margin: 0;
+        cursor: pointer;
+      }
+      button {
+        background: var(--accent);
+        color: #16130c;
+        border: 0;
+        border-radius: 8px;
+        padding: 11px 20px;
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--line);
+        font-weight: 500;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      .err {
+        color: var(--bad);
+        font-size: 13px;
+        margin-left: auto;
+      }
+
+      /* Vertical run: one stage per row, connected by a spine. */
+      .stages {
+        margin-top: 30px;
+        position: relative;
+      }
+      .stage {
+        position: relative;
+        padding-left: 34px;
+        padding-bottom: 14px;
+      }
+      .stage::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 22px;
+        bottom: -4px;
+        width: 2px;
+        background: var(--line);
+      }
+      .stage:last-child::before {
+        display: none;
+      }
+      .dot {
+        position: absolute;
+        left: 3px;
+        top: 7px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid var(--line);
+        background: var(--bg);
+      }
+      .stage[data-status="running"] .dot {
+        border-color: var(--run);
+        animation: pulse 1.1s ease-in-out infinite;
+      }
+      .stage[data-status="done"] .dot {
+        border-color: var(--ok);
+        background: var(--ok);
+      }
+      .stage[data-status="failed"] .dot,
+      .stage[data-status="cancelled"] .dot {
+        border-color: var(--bad);
+        background: var(--bad);
+      }
+      .stage[data-status="skipped"] .dot {
+        border-style: dashed;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          box-shadow: 0 0 0 0 rgba(107, 168, 232, 0.5);
+        }
+        50% {
+          box-shadow: 0 0 0 6px rgba(107, 168, 232, 0);
+        }
+      }
+      .stage h2 {
+        font-size: 15px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .stage h2 .meta {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 400;
+      }
+      .body {
+        margin-top: 10px;
+      }
+      pre.log {
+        background: #08080b;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 11px 13px;
+        font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #b9b5aa;
+        max-height: 230px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .hidden {
+        display: none;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+        gap: 10px;
+        margin-bottom: 11px;
+      }
+      .shot {
+        position: relative;
+        aspect-ratio: 9 / 16;
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+      }
+      .shot img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .shot span {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 5px 7px;
+        font-size: 10px;
+        color: #e8e4da;
+        background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+      }
+      .shot.waiting::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.06) 50%, transparent 65%);
+        background-size: 300% 100%;
+        animation: sweep 1.4s linear infinite;
+      }
+      @keyframes sweep {
+        to {
+          background-position: -200% 0;
+        }
+      }
+
+      ol.lines {
+        list-style: none;
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 11px;
+      }
+      ol.lines li {
+        padding: 5px 0;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 12px;
+      }
+      ol.lines b {
+        color: var(--accent);
+        font-weight: 500;
+        font-variant-numeric: tabular-nums;
+        flex: 0 0 84px;
+      }
+      audio,
+      video {
+        width: 100%;
+        border-radius: 10px;
+        display: block;
+      }
+      video {
+        max-height: 74vh;
+        background: #000;
+      }
+      .final {
+        margin-top: 26px;
+      }
+      .final .card {
+        border-color: var(--accent);
+      }
+      a.dl {
+        color: var(--accent);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>YouTube Short studio</h1>
+        <div class="sub">
+          Paste a script. Every stage runs top to bottom — stills appear as they render, the
+          finished file plays at the bottom. Images come back wordless; add captions afterwards.
+        </div>
+      </header>
+
+      <div class="card">
+        <div class="row">
+          <div>
+            <label for="slug">Project slug</label>
+            <input id="slug" type="text" placeholder="my-video-name" autocomplete="off" />
+          </div>
+          <div>
+            <label for="title">Title</label>
+            <input id="title" type="text" placeholder="My Video Name" autocomplete="off" />
+          </div>
+        </div>
+
+        <label for="script">Script — one spoken beat per line</label>
+        <textarea id="script" spellcheck="false" placeholder="I built an iOS app called Life Wrapped.
+It is a private audio journal that helps you understand how you spend your time.
+Start a recording and talk about your day."></textarea>
+
+        <div class="opts">
+          <label><input type="checkbox" id="opt-render" /> Render to MP4 when the check passes</label>
+          <label><input type="checkbox" id="opt-force" /> Regenerate existing images</label>
+          <label><input type="checkbox" id="opt-keep" /> Keep my edited prompts</label>
+          <label><input type="checkbox" id="opt-nodoctor" /> Skip environment check</label>
+        </div>
+
+        <div class="actions">
+          <button id="run">Run pipeline</button>
+          <button id="cancel" class="ghost" disabled>Cancel</button>
+          <span class="err" id="err"></span>
+        </div>
+      </div>
+
+      <div class="stages" id="stages"></div>
+
+      <div class="final hidden" id="final">
+        <div class="card">
+          <label>Final video</label>
+          <video id="player" controls playsinline></video>
+          <div style="margin-top: 10px; display: flex; gap: 14px; align-items: center">
+            <a class="dl" id="dl" download>Download MP4</a>
+            <span class="sub" id="videometa"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const stagesEl = $("stages");
+      const stageNodes = new Map();
+      let started = new Map();
+
+      const LABELS = {
+        doctor: "Environment check",
+        scaffold: "Project",
+        script: "Script and prompts",
+        images: "Images",
+        voice: "Narration",
+        compose: "Composition",
+        check: "Validation",
+        render: "Render",
+      };
+
+      function buildStages(stages) {
+        stagesEl.innerHTML = "";
+        stageNodes.clear();
+        started = new Map();
+        for (const stage of stages) {
+          const el = document.createElement("section");
+          el.className = "stage";
+          el.dataset.status = stage.status ?? "pending";
+          el.innerHTML = `
+            <div class="dot"></div>
+            <h2><span>${LABELS[stage.id] ?? stage.id}</span><span class="meta"></span></h2>
+            <div class="body">
+              <div class="extra"></div>
+              <pre class="log hidden"></pre>
+            </div>`;
+          const log = el.querySelector(".log");
+          el.querySelector("h2").addEventListener("click", () => log.classList.toggle("hidden"));
+          stagesEl.append(el);
+          stageNodes.set(stage.id, el);
+        }
+      }
+
+      function stageEl(id) {
+        return stageNodes.get(id);
+      }
+
+      function setMeta(id, text) {
+        const el = stageEl(id);
+        if (el) el.querySelector(".meta").textContent = text;
+      }
+
+      function appendLog(id, line) {
+        const el = stageEl(id);
+        if (!el) return;
+        const log = el.querySelector(".log");
+        log.textContent += line + "\n";
+        log.scrollTop = log.scrollHeight;
+      }
+
+      function extra(id) {
+        return stageEl(id)?.querySelector(".extra");
+      }
+
+      // ------------------------------------------------------------------ events
+
+      const source = new EventSource("/api/events");
+      source.onmessage = (message) => handle(JSON.parse(message.data));
+
+      function handle(event) {
+        if (event.type === "run") {
+          buildStages(event.stages);
+          $("final").classList.add("hidden");
+          setRunning(true);
+          return;
+        }
+
+        if (event.type === "stage") {
+          const el = stageEl(event.id);
+          if (!el) return;
+          el.dataset.status = event.status;
+          if (event.status === "running") {
+            started.set(event.id, Date.now());
+            setMeta(event.id, "running…");
+            el.querySelector(".log").classList.remove("hidden");
+          } else if (event.status === "done") {
+            const ms = Date.now() - (started.get(event.id) ?? Date.now());
+            setMeta(event.id, `${(ms / 1000).toFixed(1)}s`);
+            el.querySelector(".log").classList.add("hidden");
+          } else {
+            setMeta(event.id, event.detail ?? event.status);
+          }
+          return;
+        }
+
+        if (event.type === "log") {
+          appendLog(event.stage, event.line);
+          return;
+        }
+
+        if (event.type === "prompts") {
+          const host = extra("script");
+          if (!host) return;
+          host.innerHTML =
+            `<ol class="lines">` +
+            event.prompts
+              .map(
+                (prompt, index) =>
+                  `<li><b>${prompt.id.split("-")[0]}</b><span>${escapeHtml(
+                    event.lines[index] ?? prompt.id,
+                  )}</span></li>`,
+              )
+              .join("") +
+            `</ol>`;
+          // Placeholders so the image grid shows what is still coming.
+          const grid = document.createElement("div");
+          grid.className = "grid";
+          grid.id = "shots";
+          grid.innerHTML = event.prompts
+            .map(
+              (prompt) =>
+                `<div class="shot waiting" data-id="${prompt.id}"><span>${escapeHtml(
+                  prompt.id,
+                )}</span></div>`,
+            )
+            .join("");
+          extra("images")?.replaceChildren(grid);
+          return;
+        }
+
+        if (event.type === "image") {
+          const cell = document.querySelector(`.shot[data-id="${CSS.escape(event.id)}"]`);
+          const markup = `<img src="${event.url}" alt="" /><span>${escapeHtml(event.id)}</span>`;
+          if (cell) {
+            cell.classList.remove("waiting");
+            cell.innerHTML = markup;
+          } else {
+            const grid = document.getElementById("shots");
+            if (grid) {
+              const div = document.createElement("div");
+              div.className = "shot";
+              div.dataset.id = event.id;
+              div.innerHTML = markup;
+              grid.append(div);
+            }
+          }
+          if (event.total) setMeta("images", `${event.index}/${event.total}`);
+          return;
+        }
+
+        if (event.type === "audio") {
+          const host = extra("voice");
+          if (!host) return;
+          host.innerHTML =
+            `<audio controls src="${event.url}"></audio>` +
+            `<ol class="lines">` +
+            event.lines
+              .map(
+                (line) =>
+                  `<li><b>${line.start.toFixed(2)}s</b><span>${escapeHtml(line.text)}</span></li>`,
+              )
+              .join("") +
+            `</ol>`;
+          setMeta("voice", `${Number(event.spokenDuration).toFixed(1)}s spoken`);
+          return;
+        }
+
+        if (event.type === "video") {
+          $("player").src = event.url;
+          $("dl").href = event.url;
+          $("videometa").textContent = `${(event.bytes / 1e6).toFixed(1)} MB`;
+          $("final").classList.remove("hidden");
+          $("final").scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+
+        if (event.type === "done") {
+          setRunning(false);
+          maybeOfferRender(event.slug);
+          return;
+        }
+
+        if (event.type === "error") {
+          $("err").textContent = event.message;
+          setRunning(false);
+        }
+      }
+
+      // ------------------------------------------------------------------ controls
+
+      function setRunning(busy) {
+        $("run").disabled = busy;
+        $("cancel").disabled = !busy;
+      }
+
+      // When the run stopped before rendering, offer it as a one-click follow-up rather than
+      // rendering unasked.
+      function maybeOfferRender(slug) {
+        if (stageNodes.has("render")) return;
+        const host = extra("check");
+        if (!host || host.querySelector("button")) return;
+        const button = document.createElement("button");
+        button.textContent = "Approve and render";
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          $("err").textContent = "";
+          const response = await fetch("/api/render", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug }),
+          });
+          if (!response.ok) $("err").textContent = (await response.json()).error;
+        });
+        host.append(button);
+      }
+
+      $("run").addEventListener("click", async () => {
+        $("err").textContent = "";
+        const body = {
+          slug: $("slug").value.trim(),
+          title: $("title").value.trim(),
+          script: $("script").value,
+          options: {
+            render: $("opt-render").checked,
+            force: $("opt-force").checked,
+            keepPrompts: $("opt-keep").checked,
+            doctor: !$("opt-nodoctor").checked,
+          },
+        };
+        const response = await fetch("/api/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) $("err").textContent = (await response.json()).error;
+      });
+
+      $("cancel").addEventListener("click", () => {
+        fetch("/api/cancel", { method: "POST" });
+      });
+
+      // Derive a slug from the title unless one was typed.
+      $("title").addEventListener("input", () => {
+        const slugField = $("slug");
+        if (slugField.dataset.touched) return;
+        slugField.value = $("title")
+          .value.toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+      });
+      $("slug").addEventListener("input", () => {
+        $("slug").dataset.touched = "1";
+      });
+
+      function escapeHtml(value) {
+        return String(value).replace(
+          /[&<>"']/g,
+          (character) =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character],
+        );
+      }
+
+      // Rejoin a run that is already going when the page loads.
+      fetch("/api/state")
+        .then((response) => response.json())
+        .then((state) => setRunning(Boolean(state.busy)));
+    </script>
+  </body>
+</html>

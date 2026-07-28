@@ -11,27 +11,37 @@ external tools:
 Do not clone, vendor, import from, or edit the Voicebox or HyperFrames repositories. Voicebox is a
 running local application. HyperFrames is invoked through its versioned `npx` CLI.
 
+Animation is authored in GSAP against the HyperFrames contract. The motion rules, ease vocabulary,
+and the list of seek-safe properties live in the project's `design.md`.
+
 ## When asked to create a new short
 
 1. Run `npm run doctor`.
 2. Run `npm run new -- <slug>`.
 3. Read the supplied source and write:
+   - `videos/<slug>/design.md` — the design spec. Fill in the palette, type, components,
+     motion, and caption rules before anything else. It is the single source of truth for the
+     build; when it and a prompt disagree, it wins. `templates/STYLE.md` is the house playbook
+     behind it — the reasoning and the pattern library — not a per-project file.
    - `videos/<slug>/content/narration.txt`
    - `videos/<slug>/content/image-prompts.json`
-   - `videos/<slug>/content/STYLE.md`
    - `videos/<slug>/video.json`
 4. Keep a 60-second script near 125 to 145 spoken words. Use six scenes by default. Write
    `narration.txt` with one spoken beat per line — the line breaks become the clip boundaries.
 5. Run `npm run images -- --project <slug>`.
 6. Run `npm run story -- --project <slug> --dry-run` to confirm the line split, then
    `npm run story -- --project <slug>`.
-7. Use the HyperFrames skills before authoring `videos/<slug>/index.html`.
-8. Build direct-child timed clips, a paused seekable GSAP timeline, and framework-owned audio.
-   Read `public/audio/narration.timing.json` and drive `data-start` and `data-duration` from the
-   real spoken timings instead of estimating them.
-9. Run HyperFrames `check` and capture midpoint snapshots for every scene.
-10. Open the final preview. Render only after the user approves it.
-11. After approval, run `npm run render -- --project <slug> --approved`.
+7. Fill in the **Storyboard** section of `design.md` — one beat per spoken line, timestamps
+   taken from `public/audio/narration.timing.json`, naming the dominant element, the supporting
+   element, and the animation blueprint for each scene. Show it to the user and get it approved
+   before writing any composition. A storyboard is cheap to change; a built composition is not.
+8. Use the HyperFrames skills before authoring `videos/<slug>/index.html`.
+9. Build direct-child timed clips, a paused seekable animation timeline, and framework-owned
+   audio. Read `public/audio/narration.timing.json` and drive `data-start` and `data-duration`
+   from the real spoken timings instead of estimating them.
+10. Run HyperFrames `check` and capture midpoint snapshots for every scene.
+11. Open the final preview. Render only after the user approves it.
+12. After approval, run `npm run render -- --project <slug> --approved`.
 
 ## Editing rules
 
@@ -41,7 +51,9 @@ running local application. HyperFrames is invoked through its versioned `npx` CL
   `npm run story -- --project <slug> --resume` to re-export the mix and refresh the timings.
 - Change an image prompt in `content/image-prompts.json`, delete only that generated asset, and run
   the image command again.
-- Change visual direction in `content/STYLE.md`, then update both image prompts and composition CSS.
+- Change visual direction in `design.md`, then update the image prompts, the composition CSS, and
+  the `imageGen.styleSuffix` in `video.json` together. Those three drifting apart is how a video
+  ends up with stills in one palette and graphics in another.
 - Change timing in `video.json` and the corresponding `data-start`, `data-duration`, and GSAP
   positions together.
 - Preserve a readable final frame. Avoid blank or fade-to-black endings.

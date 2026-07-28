@@ -1,26 +1,26 @@
 [
   {
     "id": "01-hook",
-    "prompt": "Create a visual metaphor for the viewer's main problem or desired outcome. Show one dominant subject performing one clear action. Use an extreme close-up or low-angle composition with the subject occupying the lower two-thirds. Leave clean negative space in the upper-left for a short HTML headline. Make the foreground, subject, and background visually separable."
+    "prompt": "Create a visual metaphor for the viewer's main problem or desired outcome. Show one dominant subject performing one clear action. Use an extreme close-up or low-angle composition with the subject occupying the lower two-thirds. Leave clean negative space in the upper-left for a headline added afterwards. Make the foreground, subject, and background visually separable."
   },
   {
     "id": "02-concept",
-    "prompt": "Create a clear editorial metaphor for the video's main promise. Transform the hook's visual world into a more organized or resolved state. Keep one dominant subject, one supporting object, and a clean caption zone. Do not attempt to explain the idea with text."
+    "prompt": "Create a clear editorial metaphor for the video's main promise. Transform the hook's visual world into a more organized or resolved state. Keep one dominant subject, one supporting object, and a clean caption zone. Carry the idea entirely through imagery, every surface left blank."
   },
   {
     "id": "03-process",
-    "prompt": "Create three clearly separated physical stages representing the video's three process steps, connected by one directional path. Compose the stages diagonally from lower-left to upper-right so exact HTML nodes, labels, and SVG arrows can be overlaid. Do not generate labels or a finished infographic."
+    "prompt": "Create three clearly separated physical stages representing the video's three process steps, connected by one directional path. Compose the stages diagonally from lower-left to upper-right so nodes and arrows can be overlaid afterwards. Keep the stages as bare physical objects with unmarked surfaces."
   },
   {
     "id": "04-example",
-    "prompt": "Create a cinematic environment around an empty vertical phone-shaped focal area. Place supporting objects that suggest the video's real use case around the perimeter. Keep the center-right clean for a real app screenshot or exact HTML infographic. Do not generate an interface inside the phone area."
+    "prompt": "Create a cinematic environment around an empty vertical phone-shaped focal area. Place supporting objects that suggest the video's real use case around the perimeter. Keep the center-right clean for a screenshot placed afterwards. The phone-shaped area stays a blank dark surface."
   },
   {
     "id": "05-contrast",
-    "prompt": "Create one continuous scene split into two matching states. The left side represents the problem or before state; the right side represents the improved or after state. Keep the same camera and subject position so an HTML wipe can reveal the transformation. Do not include divider lines or labels."
+    "prompt": "Create one continuous scene split into two matching states. The left side represents the problem or before state; the right side represents the improved or after state. Keep the same camera and subject position so a wipe can reveal the transformation. The two halves meet seamlessly across an unbroken frame."
   },
   {
     "id": "06-close",
-    "prompt": "Create a completed, upward-feeling composition for the final benefit. Place one strong resolved object in the lower half and keep the upper half calm and open for a one-line HTML call to action. The scene should feel confident and resolved, not celebratory or cluttered."
+    "prompt": "Create a completed, upward-feeling composition for the final benefit. Place one strong resolved object in the lower half and keep the upper half calm and open for a one-line call to action added afterwards. The scene should feel confident and resolved, not celebratory or cluttered."
   }
 ]

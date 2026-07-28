@@ -49,10 +49,14 @@ npm run new -- my-video-name
 
 Then edit these four files:
 
+- `videos/my-video-name/design.md` — the design spec: palette, type, components, motion,
+  captions, and the storyboard. Single source of truth for the build; fill it in first.
 - `videos/my-video-name/content/narration.txt`
 - `videos/my-video-name/content/image-prompts.json`
-- `videos/my-video-name/content/STYLE.md`
 - `videos/my-video-name/video.json`
+
+On-screen material goes in `videos/my-video-name/assets/` (`logos/`, `clips/`, `fonts/`), which
+is already where `hyperframes.json` points its asset path.
 
 Write `narration.txt` with one spoken beat per line. Voicebox speaks each line separately and lays
 them out as a story, which keeps the delivery tight and gives you exact per-line timings to animate

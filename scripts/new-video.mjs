@@ -48,9 +48,21 @@ await fs.mkdir(path.join(destination, "content"), { recursive: true });
 await fs.mkdir(path.join(destination, "public", "generated"), { recursive: true });
 await fs.mkdir(path.join(destination, "public", "audio"), { recursive: true });
 
-for (const name of ["narration.txt", "image-prompts.json", "STYLE.md", "PIPELINE.md"]) {
+// On-screen material the agent can reach for. hyperframes.json already points its asset path
+// here, so anything dropped in these folders is addressable from the composition.
+for (const name of ["logos", "clips", "fonts"]) {
+  await fs.mkdir(path.join(destination, "assets", name), { recursive: true });
+  await fs.writeFile(path.join(destination, "assets", name, ".gitkeep"), "");
+}
+
+for (const name of ["narration.txt", "image-prompts.json", "PIPELINE.md"]) {
   await fs.copyFile(path.join(repoRoot, "templates", name), path.join(destination, "content", name));
 }
+
+// design.md sits at the project root, not under content/. It is the spec the whole build is
+// held against — stills, composition, captions, and motion — so it stays the first file you
+// see when you open the project.
+await fs.copyFile(path.join(repoRoot, "templates", "design.md"), path.join(destination, "design.md"));
 
 await fs.writeFile(path.join(destination, "public", "generated", ".gitkeep"), "");
 await fs.writeFile(path.join(destination, "public", "audio", ".gitkeep"), "");
@@ -62,4 +74,4 @@ templateConfig.title = slug
 await writeJson(path.join(destination, "video.json"), templateConfig);
 
 console.log(`Created ${destination}`);
-console.log(`Next: edit videos/${slug}/content and videos/${slug}/video.json`);
+console.log(`Next: fill in videos/${slug}/design.md, then edit content/ and video.json`);

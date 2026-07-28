@@ -17,22 +17,25 @@ await fs.mkdir(path.dirname(output), { recursive: true });
 await run("npx", ["--yes", `hyperframes@${config.hyperframesVersion}`, "check"], {
   cwd: projectDir,
 });
-await run(
-  "npx",
-  [
-    "--yes",
-    `hyperframes@${config.hyperframesVersion}`,
-    "render",
-    "--quality",
-    flags.quality ?? "high",
-    "--resolution",
-    "portrait",
-    "--strict",
-    "--output",
-    output,
-  ],
-  { cwd: projectDir },
-);
+const renderArgs = [
+  "--yes",
+  `hyperframes@${config.hyperframesVersion}`,
+  "render",
+  "--quality",
+  flags.quality ?? "high",
+  "--fps",
+  String(config.fps ?? 30),
+  "--resolution",
+  "portrait",
+  "--strict",
+  "--output",
+  output,
+];
+// Docker mode pins the Chrome version and font set, so a re-render months from now matches the
+// original. Slower, and it needs Docker running — worth it for a final master, not for iteration.
+if (flags.docker) renderArgs.push("--docker");
+
+await run("npx", renderArgs, { cwd: projectDir });
 await run(process.execPath, [
   path.join(repoRoot, "scripts", "verify-video.mjs"),
   "--project",

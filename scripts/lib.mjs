@@ -121,3 +121,106 @@ export async function commandOutput(command, args, options = {}) {
 export async function sleep(milliseconds) {
   await new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
+
+// Diffusion text encoders have no concept of negation. "no readable text" and "do not generate
+// labels" put *text* and *labels* into the positive conditioning, which is the opposite of what
+// the words mean — it is a well-known way to summon the lettering you were trying to avoid.
+// These helpers move every negated phrase out of the positive prompt and onto the negative side,
+// where the sampler can actually act on it.
+const NEGATION_CLAUSE =
+  /\b(?:no|without|avoid|avoiding|never|free of|excluding|do not|don't|do no)\b[^.;]*/gi;
+
+// Leading words to drop once a clause has been pulled out, so "do not generate labels" is filed
+// under "labels" rather than under a sentence fragment the encoder cannot use.
+const NEGATION_LEAD =
+  /^(?:no|without|avoid|avoiding|never|free of|excluding|do not|don't|do no|generate|include|attempt to|use|add|show|contain|render)\s+/i;
+
+export const TEXT_NEGATIVES = [
+  "text",
+  "letters",
+  "lettering",
+  "words",
+  "writing",
+  "handwriting",
+  "typography",
+  "font",
+  "numbers",
+  "digits",
+  "caption",
+  "subtitle",
+  "title card",
+  "label",
+  "signage",
+  "sign",
+  "poster text",
+  "book title",
+  "embossed lettering",
+  "engraved title",
+  "printed page",
+  "newspaper",
+  "document",
+  "watermark",
+  "signature",
+  "logo",
+  "wordmark",
+  "emblem",
+  "badge",
+  "ui",
+  "interface",
+  "app screen",
+  "screen content",
+  "menu",
+  "button label",
+  "keyboard",
+  "chart",
+  "graph",
+  "diagram",
+  "infographic",
+];
+
+// Quoted strings read as "render these exact glyphs". Drop them outright.
+export function stripQuotedText(text) {
+  return String(text ?? "").replace(/[“”"]([^“”"]{1,160})[“”"]/g, " ");
+}
+
+export function splitNegations(text) {
+  const negatives = [];
+  const positive = String(text ?? "")
+    .replace(NEGATION_CLAUSE, (clause) => {
+      for (const part of clause.split(/,|\band\b|\bor\b/i)) {
+        // Trim before stripping (the lead pattern is anchored), and strip repeatedly so a
+        // stacked lead like "do not generate labels" reduces all the way to "labels".
+        let term = part.trim();
+        let previous;
+        do {
+          previous = term;
+          term = term.replace(NEGATION_LEAD, "").trim();
+        } while (term !== previous);
+        term = term.replace(/[.;:]+$/, "").trim();
+        if (term.length > 2) negatives.push(term.toLowerCase());
+      }
+      return "";
+    })
+    // Tidy the punctuation the removal leaves behind.
+    .replace(/\s*,\s*(?=[.,;])/g, "")
+    .replace(/\s+([.,;])/g, "$1")
+    .replace(/([.,;])\s*\1+/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return { positive, negatives };
+}
+
+export function dedupeTerms(terms) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of terms) {
+    for (const part of String(raw).split(",")) {
+      const term = part.trim().toLowerCase();
+      if (!term || seen.has(term)) continue;
+      seen.add(term);
+      out.push(term);
+    }
+  }
+  return out;
+}

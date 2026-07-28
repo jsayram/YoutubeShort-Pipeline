@@ -14,9 +14,18 @@
     "storyDescription": null
   },
   "imageGen": {
+    "provider": "comfyui",
+    "checkpoint": "RealVisXL_V5.0_fp16.safetensors",
+    "vae": "sdxl_vae_fp16_fix.safetensors",
+    "steps": 30,
+    "cfg": 6.5,
+    "sampler": "dpmpp_2m",
+    "scheduler": "karras",
+    "genWidth": 768,
+    "genHeight": 1344,
     "model": "gemini-3.1-flash-image",
     "aspectRatio": "9:16",
     "imageSize": "2K",
-    "styleSuffix": "Premium editorial visual for a vertical 9:16 technology explainer. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent, restrained cobalt only when a second data color is necessary. Strong silhouette, cinematic depth, crisp material detail, one dominant subject, uncluttered background, and deliberate negative space for large HTML typography. Separate foreground, subject, and background planes for parallax. Mobile-safe composition, 2K, no readable text, no numbers, no charts, no interface labels, no logo, no watermark."
+    "styleSuffix": "Premium editorial visual for a vertical 9:16 technology explainer. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent, restrained cobalt only when a second data color is necessary. Strong silhouette, cinematic depth, crisp material detail, one dominant subject, uncluttered background, and deliberate negative space for large HTML typography. Separate foreground, subject, and background planes for parallax. Mobile-safe composition, 2K. Every surface that could carry writing is blank and unmarked, and the frame keeps generous empty space where captions are added afterwards."
   }
 }
