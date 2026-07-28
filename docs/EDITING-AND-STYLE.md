@@ -45,6 +45,7 @@ ideas. Keep the last frame visible rather than fading to black.
 
 Provider prompt profiles live together in `templates/prompt.json`. The selected Studio dropdown
 option imports its scene template, shared style prompt, and negative prompt into the project. Refine
-provider behavior there; use `{{line}}` for the full narration beat and `{{keywords}}` for the
-extracted visual terms. The resulting per-scene prompts are written to `image-prompts.json`, while
-the selected shared and negative prompts are flattened into `video.json` for the generator.
+provider behavior there; use `{{line}}` for the full narration beat, `{{keywords}}` for the
+extracted visual terms, and `{{subjectType}}` for the inferred actor or object. The resulting
+per-scene prompts are written to `image-prompts.json`, while the selected shared and negative
+prompts are flattened into `video.json` for the generator.

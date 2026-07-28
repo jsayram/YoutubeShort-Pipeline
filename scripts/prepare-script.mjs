@@ -14,9 +14,11 @@ await loadEnv();
 // because the top-level code below calls promptFor(): the function hoists, a const does not.
 const STOPWORDS = new Set(
   ("a an the and or but if then than that this these those it its is are was were be been being " +
-    "of to in on at for with from by as into about over under your you i we they he she them my our " +
+    "of to in on at for with from by as into about over under your you i me we us they them he him she her my our " +
     "can will just also not no do does did have has had how what when where which who why").split(" "),
 );
+const PERSON_SIGNAL =
+  /\b(?:i|me|my|mine|you|your|yours|we|our|ours|he|him|his|she|her|hers|they|them|their|person|people|human|man|woman|boy|girl|child|ghost|thief|lover|friend)\b/i;
 
 const { flags } = parseArgs();
 if (!flags.project) throw new Error("Pass --project <slug>.");
@@ -128,15 +130,27 @@ function splitSentences(text) {
 }
 
 function promptFor(line, index, template) {
-  const words = line
+  // Resolve a small but destructive ambiguity before keyword extraction. "Leaves" is a visual
+  // noun in "autumn leaves" but a non-visual verb in "leaves me stranded"; tag-trained image
+  // models otherwise turn the latter into a plant.
+  const keywordSource = line.replace(
+    /\bleaves?\b(?=\s+(?:me|you|us|them|him|her|it)\b)/gi,
+    "",
+  );
+  const words = keywordSource
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
     .filter((word) => word && !STOPWORDS.has(word));
   const slug = words.slice(0, 3).join("-") || `beat-${index + 1}`;
+  const subjectType = PERSON_SIGNAL.test(line)
+    ? "one human figure, full body"
+    : "one clearly recognizable non-human subject";
+  const promptLine = line.replace(/[,.!?;:]+$/, "").trim();
   const prompt = template
-    .replaceAll("{{line}}", line)
-    .replaceAll("{{keywords}}", words.slice(0, 6).join(", "));
+    .replaceAll("{{line}}", promptLine)
+    .replaceAll("{{keywords}}", words.slice(0, 6).join(", "))
+    .replaceAll("{{subjectType}}", subjectType);
   const unresolved = prompt.match(/\{\{[^}]+\}\}/g);
   if (unresolved) {
     throw new Error(`Unknown prompt variable(s): ${[...new Set(unresolved)].join(", ")}.`);
