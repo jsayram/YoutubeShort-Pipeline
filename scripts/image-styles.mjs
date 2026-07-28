@@ -7,7 +7,32 @@ import { readJson, repoRoot } from "./lib.mjs";
 // that it needs a download, instead of failing at generation time with a missing-model error.
 
 export async function loadStyles() {
-  return readJson(path.join(repoRoot, "templates", "image-styles.json"));
+  const [styles, prompts] = await Promise.all([
+    readJson(path.join(repoRoot, "templates", "image-styles.json")),
+    readJson(path.join(repoRoot, "templates", "prompt.json")),
+  ]);
+  const profiles = prompts.providers ?? {};
+  return styles.map((style) => {
+    const profileId = style.promptProfile ?? style.id;
+    const profile = profiles[profileId];
+    if (!profile) {
+      throw new Error(
+        `Image style "${style.id}" references missing prompt profile "${profileId}".`,
+      );
+    }
+    return {
+      ...style,
+      promptProfile: profileId,
+      sceneTemplate: profile.sceneTemplate,
+      stylePrompt: profile.stylePrompt,
+      negativeExtra: profile.negativePrompt ?? "",
+    };
+  });
+}
+
+export async function loadPromptProfiles() {
+  const document = await readJson(path.join(repoRoot, "templates", "prompt.json"));
+  return document.providers ?? {};
 }
 
 export async function comfyModels(baseUrl) {
@@ -107,6 +132,9 @@ export function applyStyle(imageGen, style, { fast = false, speedLora = null } =
   Object.assign(next, style.framing ?? {});
   next.styleSuffix = style.stylePrompt;
   next.negativeExtra = style.negativeExtra ?? "";
+  // Deterministic finishing belongs to the preset too. Clear it when switching away from a
+  // treated style so a later photographic run does not inherit ink edge extraction.
+  next.postProcess = style.postProcess ?? null;
   next.loras = [...(style.loras ?? [])];
 
   if (fast && speedLora) {

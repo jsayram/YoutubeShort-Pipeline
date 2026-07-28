@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "variables": {
+    "{{line}}": "The complete narration beat.",
+    "{{keywords}}": "Up to six visual keywords extracted from the narration beat."
+  },
+  "providers": {
+    "photographic": {
+      "label": "Photographic",
+      "format": "natural-language",
+      "sceneTemplate": "A cinematic editorial photograph depicting {{keywords}}. Show one immediately recognizable subject and one supporting element that makes the action clear. Keep the full subject visible near the center, occupying about sixty percent of the frame height. Use separated foreground, subject, and background planes, generous margins, and an uncluttered lower third.",
+      "stylePrompt": "Cinematic editorial photograph. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent. Strong silhouette, cinematic depth, crisp material detail, one dominant subject, uncluttered background. Separate foreground, subject, and background planes for parallax. Wide empty margins and a calm, uncluttered lower third.",
+      "negativePrompt": "illustration, anime, cartoon, vector art, lineart, flat graphic, 3d render, plastic surface, busy background, collage, multiple competing subjects"
+    },
+    "anime": {
+      "label": "Anime",
+      "format": "ordered-tags",
+      "sceneTemplate": "safe, solo, {{keywords}}, one dominant recognizable subject, one supporting element, clear readable action, full subject visible, centered composition, subject occupies sixty percent of frame height, dramatic vertical composition, uncluttered lower third, anime illustration, clean cel shading, crisp confident lineart, masterpiece, high score, great score, absurdres",
+      "stylePrompt": "anime illustration, clean cel shading, crisp confident lineart, flat color fills, minimal rendering, charcoal-black environment, warm off-white highlights, acid-lime focal accent, one dominant subject, uncluttered background, dramatic vertical composition, wide empty margins, calm lower third",
+      "negativePrompt": "photograph, photorealistic, 3d render, realistic skin texture, bokeh, lowres, bad anatomy, bad hands, cropped, worst quality, low quality, blurry"
+    },
+    "storybook": {
+      "label": "Illustrated monologue (storybook)",
+      "format": "ordered-tags",
+      "sceneTemplate": "safe, solo, {{keywords}}, dark folklore storybook scene, one clear emotional action, one dominant recognizable subject, full subject visible, painterly environment, layered depth, melancholy atmosphere, balanced square composition, masterpiece, high score, great score, absurdres",
+      "stylePrompt": "hand-painted storybook illustration, dark folklore mood, muted ochre, dusty teal, faded olive, warm brown, charcoal, soft paper grain, visible imperfect brushwork, restrained low-key lighting, melancholy atmosphere, one dominant emotional action, strong readable silhouette, painterly environment with depth",
+      "negativePrompt": "photograph, photorealistic, 3d render, glossy, neon, oversaturated, harsh flash, cluttered composition, multiple competing subjects, lowres, cropped, worst quality, low quality, blurry"
+    },
+    "flat-vector": {
+      "label": "Flat vector",
+      "format": "style-tags",
+      "sceneTemplate": "flat vector illustration, {{keywords}}, one dominant recognizable subject, one supporting symbol, clear readable action, subject occupies sixty percent of frame height, centered vertical composition, bold geometric construction, hard clean edges, generous negative space, uncluttered lower third",
+      "stylePrompt": "flat vector illustration, bold geometric shapes, hard clean edges, solid color fills, charcoal-black ground, warm off-white shapes, acid-lime focal accent, one dominant subject, generous negative space, dramatic vertical composition, wide empty margins, calm lower third",
+      "negativePrompt": "photograph, photorealistic, 3d render, gradient, soft shading, texture, grain, bokeh, depth of field, painterly brushwork, sketch, cluttered composition"
+    },
+    "ink-line": {
+      "label": "Ink line art",
+      "format": "ordered-tags",
+      "sceneTemplate": "safe, solo, {{keywords}}, one dominant recognizable subject, one supporting element, clear readable action, accurate anatomy, full subject visible, centered composition, subject occupies sixty percent of frame height, dramatic vertical composition, contour lineart, clean lineart, detailed interior contour lines, masterpiece, high score, great score, absurdres",
+      "stylePrompt": "safe, monochrome, contour lineart, clean lineart, thin uniform lines, detailed interior contour lines, accurate anatomy, full subject visible, centered, subject fills the middle sixty percent of the vertical frame, warm off-white ink drawing on charcoal-black background, open uncoloured interiors, sparse acid-lime accent, dramatic vertical composition, masterpiece, high score, great score, absurdres",
+      "negativePrompt": "photograph, photorealistic, 3d render, silhouette, solid shape, filled shape, color fill, blob, abstract mark, empty frame, tiny subject, distant subject, cropped, extreme close-up, heavy shading, gradient, texture, grain, crosshatching, red, pink, purple, magenta, lowres, bad anatomy, bad hands, worst quality, low quality, blurry"
+    },
+    "gemini": {
+      "label": "Google Gemini (cloud)",
+      "format": "natural-language",
+      "sceneTemplate": "Create a polished vertical editorial image that communicates this narration beat: {{line}} Make the idea immediately understandable through one dominant subject and one supporting visual metaphor. Keep all important content inside the mobile-safe center, with depth for subtle parallax and a calm lower third for captions.",
+      "stylePrompt": "Premium editorial visual for a vertical 9:16 explainer. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent. Strong silhouette, cinematic depth, one dominant subject, uncluttered background. Wide empty margins and a calm, uncluttered lower third.",
+      "negativePrompt": "readable text, letters, captions, subtitles, logos, watermarks, interface screenshots, collage, multiple competing subjects, cluttered background"
+    }
+  }
+}

@@ -62,6 +62,12 @@ Write `narration.txt` with one spoken beat per line. Voicebox speaks each line s
 them out as a story, which keeps the delivery tight and gives you exact per-line timings to animate
 against.
 
+The Studio's Content provider dropdown loads a matching prompt profile from
+`templates/prompt.json`. Each profile keeps its scene template, shared style prompt, and negative
+prompt together. Edit that one file when refining Photographic, Anime, Storybook, Flat vector, Ink
+line art, or Gemini; the next run imports the selected profile automatically. Scene templates may
+use `{{line}}` for the complete narration beat and `{{keywords}}` for its extracted visual terms.
+
 Generate the media:
 
 ```sh

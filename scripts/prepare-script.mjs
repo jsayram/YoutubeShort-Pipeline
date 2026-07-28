@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadEnv, parseArgs, readJson, videoDir, writeJson } from "./lib.mjs";
-import { applyStyle, resolveStyles } from "./image-styles.mjs";
+import { applyStyle, loadPromptProfiles, resolveStyles } from "./image-styles.mjs";
 
 await loadEnv();
 
@@ -57,7 +57,17 @@ const keep = flags["keep-prompts"] === true || flags["keep-prompts"] === "true";
 if (keep && Array.isArray(existing) && existing.length >= lines.length) {
   console.log(`Kept ${existing.length} existing image prompt(s).`);
 } else {
-  await writeJson(promptsPath, lines.map((line, index) => promptFor(line, index)));
+  const profiles = await loadPromptProfiles();
+  const profileId = String(flags.style ?? config.imageGen?.style ?? "photographic");
+  const profile = profiles[profileId] ?? profiles.photographic;
+  if (!profile?.sceneTemplate) {
+    throw new Error(`Prompt profile "${profileId}" has no sceneTemplate in templates/prompt.json.`);
+  }
+  await writeJson(
+    promptsPath,
+    lines.map((line, index) => promptFor(line, index, profile.sceneTemplate)),
+  );
+  console.log(`Prompt profile: ${profileId} (templates/prompt.json).`);
   console.log(`Wrote ${lines.length} image prompt(s).`);
 }
 
@@ -117,27 +127,26 @@ function splitSentences(text) {
     .filter(Boolean);
 }
 
-function promptFor(line, index) {
+function promptFor(line, index, template) {
   const words = line
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
     .filter((word) => word && !STOPWORDS.has(word));
   const slug = words.slice(0, 3).join("-") || `beat-${index + 1}`;
+  const prompt = template
+    .replaceAll("{{line}}", line)
+    .replaceAll("{{keywords}}", words.slice(0, 6).join(", "));
+  const unresolved = prompt.match(/\{\{[^}]+\}\}/g);
+  if (unresolved) {
+    throw new Error(`Unknown prompt variable(s): ${[...new Set(unresolved)].join(", ")}.`);
+  }
 
   return {
     id: `${String(index + 1).padStart(2, "0")}-${slug}`,
-    // The beat itself is the subject. Framing and surface treatment are stated positively —
-    // the image generator routes anything phrased as a prohibition to the negative encoder,
-    // where it actually works, so prompts here never say "no text".
-    // The subject is the line's content words, not the sentence. Feeding narration verbatim
-    // gives the model a paragraph to illustrate, and it answers with collages and mocked-up
-    // pages. Nothing here names lettering in any form, however it is framed.
-    prompt:
-      `A cinematic editorial photograph. Subject: ${words.slice(0, 6).join(", ")}. ` +
-      "One dominant subject and one supporting element, strong silhouette, cinematic depth, " +
-      "clear separation between foreground, subject, and background. Smooth bare surfaces. " +
-      "Wide empty margins and a calm, uncluttered lower third.",
+    // Each dropdown option owns its complete prompt strategy in templates/prompt.json. Local
+    // diffusion profiles use concise tags; natural-language providers can use the full beat.
+    prompt,
   };
 }
 

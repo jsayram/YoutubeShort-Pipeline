@@ -3,6 +3,7 @@
     "id": "photographic",
     "label": "Photographic",
     "provider": "comfyui",
+    "promptProfile": "photographic",
     "summary": "Cinematic editorial stills. The pipeline default.",
     "match": [
       "realvis",
@@ -16,13 +17,13 @@
       "cfg": 6.5,
       "sampler": "dpmpp_2m",
       "scheduler": "karras"
-    },
-    "stylePrompt": "Cinematic editorial photograph. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent. Strong silhouette, cinematic depth, crisp material detail, one dominant subject, uncluttered background. Separate foreground, subject, and background planes for parallax. Wide empty margins and a calm, uncluttered lower third."
+    }
   },
   {
     "id": "anime",
     "label": "Anime",
     "provider": "comfyui",
+    "promptProfile": "anime",
     "summary": "Cel-shaded anime illustration with clean linework.",
     "match": [
       "animagine",
@@ -38,14 +39,13 @@
       "cfg": 5.5,
       "sampler": "euler_ancestral",
       "scheduler": "normal"
-    },
-    "stylePrompt": "Anime illustration, clean cel shading, crisp confident lineart, flat color fills with minimal rendering. Charcoal-black environment, warm off-white highlights, acid-lime focal accent. One dominant subject, uncluttered background, dramatic vertical composition. Wide empty margins and a calm, uncluttered lower third.",
-    "negativeExtra": "photograph, photorealistic, 3d render, realistic skin texture, bokeh"
+    }
   },
   {
     "id": "storybook",
     "label": "Illustrated monologue (storybook)",
     "provider": "comfyui",
+    "promptProfile": "storybook",
     "summary": "Hand-painted dark-folklore storybook art. Square 1:1 for blurred-fill framing. Supports recurring characters via reference images.",
     "match": [
       "animagine",
@@ -69,14 +69,13 @@
       "genHeight": 1024,
       "outWidth": 1024,
       "outHeight": 1024
-    },
-    "stylePrompt": "Hand-painted storybook illustration, dark folklore mood. Muted ochre, dusty teal, faded olive, warm brown and charcoal. Soft paper grain, visible imperfect brushwork, restrained low-key lighting, melancholy atmosphere. One dominant emotional action, strong readable silhouette, painterly environment with depth.",
-    "negativeExtra": "photograph, photorealistic, 3d render, glossy, neon, oversaturated, harsh flash, cluttered composition, multiple competing subjects"
+    }
   },
   {
     "id": "flat-vector",
     "label": "Flat vector",
     "provider": "comfyui",
+    "promptProfile": "flat-vector",
     "summary": "Bold geometric shapes and hard edges. Closest to motion-graphics art.",
     "match": [
       "realvis",
@@ -97,8 +96,6 @@
       "sampler": "dpmpp_2m",
       "scheduler": "karras"
     },
-    "stylePrompt": "Flat vector illustration. Bold geometric shapes, hard clean edges, solid color fills, no gradients, no texture, no shading. Charcoal-black ground, warm off-white shapes, acid-lime focal accent. One dominant subject, generous negative space, dramatic vertical composition. Wide empty margins and a calm, uncluttered lower third.",
-    "negativeExtra": "photograph, photorealistic, 3d render, gradient, soft shading, texture, grain, bokeh, depth of field",
     "prefersCheckpoint": [
       "animagine",
       "illustrious",
@@ -109,6 +106,7 @@
     "id": "ink-line",
     "label": "Ink line art",
     "provider": "comfyui",
+    "promptProfile": "ink-line",
     "summary": "Single-weight monoline strokes on dark ground. Matches the drawn-stroke motion style.",
     "match": [
       "realvis",
@@ -119,13 +117,12 @@
     ],
     "download": "Tested on RealVisXL and it still returns photographs. Needs an illustration checkpoint (Illustrious XL, Animagine XL, DreamShaper XL) or a lineart LoRA to actually draw.",
     "sampling": {
-      "steps": 24,
-      "cfg": 6,
-      "sampler": "dpmpp_2m",
-      "scheduler": "karras"
+      "steps": 28,
+      "cfg": 5,
+      "sampler": "euler_ancestral",
+      "scheduler": "normal"
     },
-    "stylePrompt": "Monoline ink illustration. Single-weight continuous strokes, rounded stroke caps, open uncoloured interiors, drawn on a charcoal-black ground in warm off-white with one acid-lime accent stroke. One dominant subject, generous negative space, dramatic vertical composition. Wide empty margins and a calm, uncluttered lower third.",
-    "negativeExtra": "photograph, photorealistic, 3d render, solid fills, heavy shading, texture, grain, crosshatching",
+    "postProcess": "ink-lines",
     "prefersCheckpoint": [
       "animagine",
       "illustrious",
@@ -136,9 +133,9 @@
     "id": "gemini",
     "label": "Google Gemini (cloud)",
     "provider": "gemini",
+    "promptProfile": "gemini",
     "summary": "Cloud generation. Needs GEMINI_API_KEY and billing. No local GPU time.",
     "download": "No download. Set GEMINI_API_KEY in .env with image-generation quota enabled.",
-    "sampling": {},
-    "stylePrompt": "Premium editorial visual for a vertical 9:16 explainer. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent. Strong silhouette, cinematic depth, one dominant subject, uncluttered background. Wide empty margins and a calm, uncluttered lower third."
+    "sampling": {}
   }
 ]

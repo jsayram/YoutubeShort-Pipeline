@@ -38,6 +38,22 @@ const MIME = {
 let current = null;
 const listeners = new Set();
 
+function stopStageChild(signal = "SIGTERM") {
+  const child = current?.child;
+  if (!child || child.exitCode !== null || child.signalCode !== null) return false;
+  try {
+    // Every stage gets its own process group. Stopping the dispatcher therefore also stops the
+    // ComfyUI worker it launched, instead of orphaning that worker and starting a duplicate on
+    // the next Studio run.
+    if (process.platform !== "win32") process.kill(-child.pid, signal);
+    else child.kill(signal);
+    return true;
+  } catch (error) {
+    if (error.code === "ESRCH") return false;
+    throw error;
+  }
+}
+
 function emit(event) {
   if (!current) return;
   const payload = { ...event, at: Date.now() };
@@ -64,6 +80,7 @@ function runStage(id, command, args, options = {}) {
       cwd: options.cwd ?? repoRoot,
       env: { ...process.env, ...options.env, FORCE_COLOR: "0" },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
     if (current) current.child = child;
 
@@ -84,7 +101,7 @@ function runStage(id, command, args, options = {}) {
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (buffered.trim()) emit({ type: "log", stage: id, line: buffered.trim() });
-      if (current) current.child = null;
+      if (current?.child === child) current.child = null;
       if (code === 0) {
         setStage(id, "done");
         resolve();
@@ -405,7 +422,10 @@ async function serviceSnapshot() {
               .join(" · ")
           : `Not reachable at ${voiceboxUrl}`,
         url: null,
-        action: voiceRunning ? "Open Voicebox" : null,
+        // The action is most useful when the app is *not* running, so it is always offered.
+        // `open -a` launches a closed app and foregrounds an already-running one, which covers
+        // both the "it is not started" and "I closed the window" cases.
+        action: voiceRunning ? "Open Voicebox" : "Launch Voicebox",
       },
       {
         id: "hyperframes",
@@ -429,6 +449,56 @@ function sendJson(response, status, body) {
     "Content-Length": Buffer.byteLength(text),
   });
   response.end(text);
+}
+
+// The spoken script of a project. content/narration.txt is what the pipeline writes and what
+// Voicebox reads, so it is the authoritative copy; the studio's own scratch file is ignored.
+async function readNarration(projectPath) {
+  const text = await fs
+    .readFile(path.join(projectPath, "content", "narration.txt"), "utf8")
+    .catch(() => "");
+  return text.trim();
+}
+
+// A browser cannot hand back an absolute directory path — file inputs deliberately hide it. The
+// studio server runs on the same machine as the browser, so it can open the real macOS folder
+// chooser instead and return a genuine POSIX path.
+function pickFolder(startAt) {
+  return new Promise((resolve) => {
+    const script = [
+      'set startFolder to POSIX file "' + String(startAt ?? process.env.HOME ?? "/").replace(/"/g, "") + '"',
+      'set chosen to choose folder with prompt "Select a video project folder" default location startFolder',
+      "POSIX path of chosen",
+    ];
+    const child = spawn("osascript", script.flatMap((line) => ["-e", line]), {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => (stdout += chunk));
+    child.stderr.on("data", (chunk) => (stderr += chunk));
+
+    // The dialog is modal on the user's desktop; if it is never answered the request would hang
+    // forever without this.
+    const timer = setTimeout(() => child.kill("SIGTERM"), 120000);
+
+    child.once("error", () => {
+      clearTimeout(timer);
+      resolve({ error: "Could not open the folder chooser on this system." });
+    });
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      if (code === 0 && stdout.trim()) {
+        // choose folder returns a trailing slash; the import path comparison wants it bare.
+        resolve({ path: stdout.trim().replace(/\/$/, "") });
+      } else if (/user canceled/i.test(stderr)) {
+        resolve({ cancelled: true });
+      } else {
+        resolve({ error: stderr.trim() || "The folder chooser was closed." });
+      }
+    });
+  });
 }
 
 // Walks a directory adding up file sizes, giving up as soon as it passes the budget so a huge
@@ -529,6 +599,13 @@ const server = http.createServer(async (request, response) => {
     // Bring an existing project directory under videos/ so the studio can drive it. Copies
     // rather than symlinks: the HyperFrames CLI, npx and the media server all resolve real
     // paths, and a symlink pointing outside the tree would also defeat the /media path guard.
+    if (route === "/api/pick-folder" && request.method === "POST") {
+      const body = await readBody(request).catch(() => ({}));
+      const result = await pickFolder(body.startAt || videosRoot);
+      sendJson(response, result.error ? 500 : 200, result);
+      return;
+    }
+
     if (route === "/api/import" && request.method === "POST") {
       const body = await readBody(request);
       const source = path.resolve(String(body.path ?? "").replace(/^~/, process.env.HOME ?? "~"));
@@ -583,6 +660,7 @@ const server = http.createServer(async (request, response) => {
           alreadyHere: true,
           title: config?.title ?? slug,
           hasComposition,
+          script: await readNarration(source),
         });
         return;
       }
@@ -613,6 +691,9 @@ const server = http.createServer(async (request, response) => {
         title: imported?.title ?? slug,
         hasComposition,
         from: source,
+        // Hand the project's narration back so the script box shows what this video actually
+        // says, rather than leaving the previous project's text sitting there.
+        script: await readNarration(destination),
       });
       return;
     }
@@ -646,6 +727,7 @@ const server = http.createServer(async (request, response) => {
           reason: style.reason ?? null,
           note: style.note ?? null,
           checkpoint: style.checkpoint ?? null,
+          promptProfile: style.promptProfile,
           loras: (style.loras ?? []).map((lora) => lora.name),
           download: style.download ?? null,
         })),
@@ -662,8 +744,25 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (route === "/api/services/voicebox/open" && request.method === "POST") {
-      await run("open", ["-a", "Voicebox"]);
-      sendJson(response, 200, { opened: true });
+      try {
+        await run("open", ["-a", "Voicebox"], { stdio: "ignore" });
+      } catch {
+        sendJson(response, 500, {
+          error: "Could not launch Voicebox. Is it installed in /Applications?",
+        });
+        return;
+      }
+
+      // Launching is not the same as being ready: the server takes a few seconds to bind and
+      // load its model. Poll briefly so the UI can report the real state instead of flipping to
+      // "running" the instant the app icon appears.
+      let ready = false;
+      for (let attempt = 0; attempt < 20 && !ready; attempt += 1) {
+        const health = await fetchJson(`${voiceboxUrl}/health`);
+        ready = health?.status === "healthy";
+        if (!ready) await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      sendJson(response, 200, { opened: true, ready });
       return;
     }
 
@@ -748,8 +847,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (route === "/api/cancel" && request.method === "POST") {
-      current?.child?.kill("SIGTERM");
-      sendJson(response, 200, { cancelled: true });
+      sendJson(response, 200, { cancelled: stopStageChild() });
       return;
     }
 
@@ -796,6 +894,22 @@ const server = http.createServer(async (request, response) => {
     sendJson(response, 500, { error: String(error.message ?? error) });
   }
 });
+
+let shuttingDown = false;
+function shutDownStudio() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  stopStageChild();
+  for (const response of listeners) response.end();
+  server.close(() => process.exit(0));
+  setTimeout(() => {
+    stopStageChild("SIGKILL");
+    process.exit(0);
+  }, 2000);
+}
+
+process.once("SIGINT", shutDownStudio);
+process.once("SIGTERM", shutDownStudio);
 
 server.listen(port, "127.0.0.1", () => {
   console.log(`\n  YouTube Short studio\n  http://localhost:${port}\n`);

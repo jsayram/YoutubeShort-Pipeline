@@ -43,5 +43,8 @@ ideas. Keep the last frame visible rather than fading to black.
 - Review six scene snapshots side by side. The Short should feel varied but obviously belong to one
   visual system.
 
-The style prompt in `video.json` is appended to every image request. Make it specific enough to hold
-the series together, but keep scene actions and subjects in `image-prompts.json`.
+Provider prompt profiles live together in `templates/prompt.json`. The selected Studio dropdown
+option imports its scene template, shared style prompt, and negative prompt into the project. Refine
+provider behavior there; use `{{line}}` for the full narration beat and `{{keywords}}` for the
+extracted visual terms. The resulting per-scene prompts are written to `image-prompts.json`, while
+the selected shared and negative prompts are flattened into `video.json` for the generator.

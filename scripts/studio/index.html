@@ -499,6 +499,7 @@
                 autocomplete="off"
                 spellcheck="false"
               />
+              <button id="browsebtn" class="ghost compact" type="button">Browse…</button>
               <button id="importbtn" class="ghost compact" type="button">Import</button>
             </div>
             <div class="hint" id="importhint">
@@ -558,6 +559,7 @@ Start a recording and talk about your day."></textarea>
       const stageNodes = new Map();
       let started = new Map();
       let assetRefreshTimer = null;
+      let activeRunSlug = null;
 
       const LABELS = {
         doctor: "Environment check",
@@ -620,7 +622,9 @@ Start a recording and talk about your day."></textarea>
 
       function handle(event) {
         if (event.type === "run") {
+          activeRunSlug = event.slug;
           buildStages(event.stages);
+          $("project-assets").classList.add("hidden");
           $("final").classList.add("hidden");
           setRunning(true);
           return;
@@ -680,7 +684,12 @@ Start a recording and talk about your day."></textarea>
         }
 
         if (event.type === "image") {
-          const cell = document.querySelector(`.shot[data-id="${CSS.escape(event.id)}"]`);
+          // Scope this lookup to the live grid. A hidden saved-project gallery can contain the
+          // same IDs; the old page-wide selector updated those hidden cards and left the visible
+          // live cards blank until the browser was reloaded.
+          const cell = document.querySelector(
+            `#shots .shot[data-id="${CSS.escape(event.id)}"]`,
+          );
           const markup = `<img src="${event.url}" alt="" /><span>${escapeHtml(event.id)}</span>`;
           if (cell) {
             cell.classList.remove("waiting");
@@ -787,6 +796,10 @@ Start a recording and talk about your day."></textarea>
           body: JSON.stringify(body),
         });
         if (!response.ok) $("err").textContent = (await response.json()).error;
+        else {
+          activeRunSlug = body.slug;
+          $("project-assets").classList.add("hidden");
+        }
       });
 
       $("cancel").addEventListener("click", () => {
@@ -816,7 +829,12 @@ Start a recording and talk about your day."></textarea>
 
       // ------------------------------------------------------------------ local services
 
+      // Set while a launch is in flight so the 5-second poll does not re-render over the
+      // button's progress text.
+      let launchingVoicebox = false;
+
       async function refreshServices() {
+        if (launchingVoicebox) return;
         const host = $("services");
         const response = await fetch("/api/services").catch(() => null);
         if (!response?.ok) {
@@ -857,8 +875,29 @@ Start a recording and talk about your day."></textarea>
           .join("");
         $("services-updated").textContent = `Updated ${new Date(data.checkedAt).toLocaleTimeString()}`;
 
-        host.querySelector('[data-open-service="voicebox"]')?.addEventListener("click", async () => {
-          await fetch("/api/services/voicebox/open", { method: "POST" });
+        host.querySelector('[data-open-service="voicebox"]')?.addEventListener("click", async (event) => {
+          const button = event.currentTarget;
+          // The server waits for the app's API to answer, which can take several seconds while
+          // the model loads. Hold the polling refresh off so this feedback is not wiped out
+          // mid-launch by a re-render.
+          launchingVoicebox = true;
+          button.disabled = true;
+          button.textContent = "Launching…";
+
+          try {
+            const response = await fetch("/api/services/voicebox/open", { method: "POST" });
+            const data = await response.json();
+            if (!response.ok) {
+              button.textContent = data.error ?? "Could not launch";
+            } else if (!data.ready) {
+              button.textContent = "Opened, still starting…";
+            }
+          } catch {
+            button.textContent = "Could not launch";
+          } finally {
+            launchingVoicebox = false;
+            refreshServices();
+          }
         });
       }
 
@@ -871,6 +910,13 @@ Start a recording and talk about your day."></textarea>
       async function refreshProjectAssets() {
         const slug = $("slug").value.trim();
         const panel = $("project-assets");
+        // During a run the Images stage is the one live gallery. The disk-backed gallery is
+        // still useful before a run or after selecting another project, but showing both for
+        // the active slug made every shot look duplicated.
+        if (slug === activeRunSlug && stageNodes.has("images")) {
+          panel.classList.add("hidden");
+          return;
+        }
         if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
           panel.classList.add("hidden");
           return;
@@ -971,12 +1017,53 @@ Start a recording and talk about your day."></textarea>
         $("slug").value = data.slug;
         $("slug").dataset.touched = "1";
         if (data.title) $("title").value = data.title;
-        hint.textContent = data.alreadyHere
-          ? `Already under videos/ as ${data.slug}.`
-          : `Imported as videos/${data.slug}${data.hasComposition ? " (has a composition)" : ""}.`;
+        activeRunSlug = null;
+        stageNodes.clear();
+        stagesEl.innerHTML = "";
+
+        // Bring the project's own narration across so the script box matches the project that
+        // was just selected. Without this the previous project's text stays put and a re-run
+        // would quietly overwrite the imported script with the wrong words.
+        const lines = data.script ? data.script.split(/\r?\n/).filter(Boolean).length : 0;
+        if (data.script) $("script").value = data.script;
+
+        const parts = [
+          data.alreadyHere
+            ? `Already under videos/ as ${data.slug}.`
+            : `Imported as videos/${data.slug}.`,
+        ];
+        if (data.hasComposition) parts.push("Has a composition.");
+        parts.push(lines ? `Loaded its script (${lines} lines).` : "No narration.txt found.");
+        hint.textContent = parts.join(" ");
         $("importpath").value = "";
         await loadProjects();
       }
+
+      // The native chooser runs server-side and returns a real absolute path, which a file
+      // input cannot give us. Importing straight afterwards saves a second click.
+      $("browsebtn").addEventListener("click", async () => {
+        const hint = $("importhint");
+        const button = $("browsebtn");
+        button.disabled = true;
+        hint.classList.remove("bad");
+        hint.textContent = "Waiting for the folder chooser…";
+
+        const response = await fetch("/api/pick-folder", { method: "POST" });
+        const data = await response.json();
+        button.disabled = false;
+
+        if (data.cancelled) {
+          hint.textContent = "Cancelled.";
+          return;
+        }
+        if (!response.ok || !data.path) {
+          hint.textContent = data.error ?? "Could not open the folder chooser.";
+          hint.classList.add("bad");
+          return;
+        }
+        $("importpath").value = data.path;
+        importProject(false);
+      });
 
       $("importbtn").addEventListener("click", () => importProject(false));
       $("importpath").addEventListener("keydown", (event) => {
@@ -1055,6 +1142,9 @@ Start a recording and talk about your day."></textarea>
         const bits = [style.summary];
         if (style.checkpoint) bits.push(style.checkpoint);
         if (style.loras.length) bits.push(`lora: ${style.loras.join(", ")}`);
+        if (style.promptProfile) {
+          bits.push(`prompt: ${style.promptProfile} in templates/prompt.json`);
+        }
         hint.textContent = bits.join(" · ");
       }
 
