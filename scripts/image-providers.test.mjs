@@ -47,8 +47,16 @@ assert.match(livingStorybook.stylePrompt, /motion-ready staging/i);
 
 const animagine = styles.find((style) => style.id === "animagine-dark-storybook");
 assert.equal(animagine.provider, "comfyui");
-assert.match(animagine.sceneTemplate, /face completely obscured/i);
-assert.match(animagine.negativeExtra, /visible face/i);
+assert.match(animagine.sceneTemplate, /Illustrate this exact narration: \{\{line\}\}/i);
+assert.match(animagine.sceneTemplate, /\{\{visualAction\}\}/i);
+assert.match(animagine.sceneTemplate, /\{\{castBrief\}\}/i);
+assert.doesNotMatch(animagine.sceneTemplate, /\{\{keywords\}\}/i);
+assert.doesNotMatch(animagine.sceneTemplate, /hooded traveler|full body|centered subject/i);
+assert.match(animagine.negativeExtra, /repeated hooded traveler/i);
+assert.equal(animagine.referencePrompts.length, 1);
+assert.equal(animagine.referencePrompts[0].role, "style");
+assert.match(animagine.referencePrompts[0].prompt, /no person/i);
+assert.equal(animagine.sampling.referenceWeight, 0.35);
 
 const { references, scenes } = splitImageItems(
   [{ id: "01-scene", prompt: "A traveler waits." }],
@@ -77,4 +85,31 @@ assert.match(anime.sceneTemplate, /\{\{sentiment\}\}/i);
 assert.match(anime.sceneTemplate, /\{\{castPlan\}\}/i);
 assert.match(anime.stylePrompt, /paper watercolor/i);
 
-console.log("FLUX, Cloudflare, Animagine, Gemini, and reference routing passed.");
+const photographic = styles.find((style) => style.id === "photographic");
+const flatVector = styles.find((style) => style.id === "flat-vector");
+const inkLine = styles.find((style) => style.id === "ink-line");
+for (const style of [photographic, flatVector, inkLine]) {
+  assert.match(style.sceneTemplate, /\{\{line\}\}/i);
+  assert.match(style.sceneTemplate, /\{\{sentiment\}\}/i);
+  assert.match(style.sceneTemplate, /\{\{storyBeat\}\}/i);
+  assert.match(style.sceneTemplate, /\{\{visualAction\}\}/i);
+  assert.match(style.sceneTemplate, /\{\{shotPlan\}\}/i);
+  assert.match(style.sceneTemplate, /\{\{castPlan\}\}/i);
+  assert.match(style.sceneTemplate, /\{\{continuity\}\}/i);
+  assert.match(style.negativeExtra, /static matched couple/i);
+}
+assert.match(photographic.stylePrompt, /cinematic editorial photography/i);
+assert.match(photographic.negativeExtra, /two adult women together/i);
+assert.match(photographic.negativeExtra, /two adult men together/i);
+assert.match(photographic.negativeExtra, /same-sex couple/i);
+assert.match(flatVector.stylePrompt, /flat-vector relationship storybook/i);
+assert.match(inkLine.stylePrompt, /cold-press ivory paper grain/i);
+
+for (const style of styles) {
+  assert.match(style.sceneTemplate, /\{\{cast(?:Plan|Brief)\}\}/i);
+  assert.match(style.negativeExtra, /two adult women together/i);
+  assert.match(style.negativeExtra, /two adult men together/i);
+  assert.match(style.negativeExtra, /same-sex couple/i);
+}
+
+console.log("Story-aware photographic, vector, ink, anime, storybook, FLUX, and reference routing passed.");

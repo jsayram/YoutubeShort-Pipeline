@@ -250,7 +250,8 @@
       "steps": 30,
       "cfg": 5.5,
       "sampler": "euler_ancestral",
-      "scheduler": "normal"
+      "scheduler": "normal",
+      "referenceWeight": 0.35
     },
     "framing": {
       "genWidth": 1024,
@@ -260,14 +261,9 @@
     },
     "referencePrompts": [
       {
-        "id": "character-reference",
-        "role": "character",
-        "prompt": "safe, solo, one adult human figure, full body, anonymous faceless traveler, face completely hidden in shadow beneath a charcoal hood, no visible eyes, no visible mouth, simple dark coat, muted dusty-teal scarf, three-quarter back view, natural proportions, clean readable silhouette, neutral standing pose, plain paper background, dark hand-painted storybook character reference, gouache, charcoal edges, masterpiece, high score, great score, absurdres"
-      },
-      {
-        "id": "style-reference",
+        "id": "animagine-paper-material-v2",
         "role": "style",
-        "prompt": "safe, solo, anonymous faceless traveler beneath one dim streetlamp, full body, face hidden in deep shadow, mature dark storybook illustration, hand-painted gouache, charcoal edges, rough paper grain, muted ochre light, dusty teal accent, faded olive, warm brown, deep charcoal shadows, melancholy night, broad imperfect brushwork, layered depth, negative space, masterpiece, high score, great score, absurdres"
+        "prompt": "safe, wordless material study, rough ivory paper, translucent watercolor blooms, dry oil brush marks, graphite and charcoal contour samples, matte pigment swatches in muted ochre, rust, dusty teal, faded olive, deep navy, warm brown and charcoal, handmade dark storybook texture, no person, no character, no face, no pose, no streetlamp, no room, no landscape, no object, no composition to copy, no text, masterpiece, high score, great score, absurdres"
       }
     ]
   },

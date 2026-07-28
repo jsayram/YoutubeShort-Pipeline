@@ -174,7 +174,7 @@ function castPlanFor(index, total) {
     return {
       castMode: "pair",
       castPlan:
-        "Two-person turning-point scene: show the recurring adult woman and adult man together in one shared action, with natural distance or contact dictated by the narration; never pose them as a static matched pair.",
+        "Two-person turning-point scene: show exactly two complete adults—one recurring adult woman and one recurring adult man, clearly distinguishable as a woman and a man—sharing the action described by the narration.",
     };
   }
   const womanSolo = index % 2 === 1;
@@ -190,6 +190,70 @@ function sceneDirectionFor(line, index, castMode) {
   const value = line.toLowerCase();
   const featured = castMode === "solo-a" ? "woman" : "man";
 
+  if (/\bstopped asking\b.*\bmade it home\b|\bmade it home\b/.test(value)) {
+    return {
+      visualAction:
+        "A lone adult arrives at a dark home doorway with keys still in hand and checks a silent phone that never received the familiar check-in.",
+      shotPlan:
+        "Wide night interior with the doorway, keys, and unlit phone clearly separated.",
+    };
+  }
+  if (/\bjob\b.*\bexhausted her\b|\bexhausted her\b/.test(value)) {
+    return {
+      visualAction:
+        "An exhausted woman sits alone beneath a late workplace light, shoulders collapsed beside unfinished work and a clock.",
+      shotPlan:
+        "Side view at a desk with one figure, the clock, and long work shadows.",
+    };
+  }
+  if (/\brepl(?:y|ies)\b.*\bhours\b|\bentire days\b/.test(value)) {
+    return {
+      visualAction:
+        "A lone adult waits beside a silent phone while daylight, darkness, and calendar pages imply hours becoming entire days.",
+      shotPlan:
+        "High-angle table scene built around the phone, calendar, and changing window light.",
+    };
+  }
+  if (/\bkept shrinking\b|\bnotice me again\b/.test(value)) {
+    return {
+      visualAction:
+        "One adult curls inward on a small chair in an oversized room, surrounded by empty space and a distant turned-away shadow.",
+      shotPlan:
+        "Very wide composition that makes the figure visually small without changing their anatomy.",
+    };
+  }
+  if (/\bstopped reaching\b/.test(value)) {
+    return {
+      visualAction:
+        "A hand withdraws from a face-down phone as the lone adult turns away from an empty chair.",
+      shotPlan:
+        "Close side composition focused on the retreating hand, phone, and empty chair.",
+    };
+  }
+  if (/\btexted instantly\b|\bseemed distant\b/.test(value)) {
+    return {
+      visualAction:
+        "The phone suddenly lights after the adult has turned away; the notification is unreadable, but the startled pause is clear.",
+      shotPlan:
+        "Over-the-shoulder night view with the glowing phone low in frame and no readable screen text.",
+    };
+  }
+  if (/\bunderstood\b.*\bbecome\b|\bwhat we had become\b/.test(value)) {
+    return {
+      visualAction:
+        "A lone adult studies a reflection split by a doorway, with two empty chairs revealing the relationship's distance.",
+      shotPlan:
+        "Still symmetrical interior broken by the doorway and reflection, with the person off-center.",
+    };
+  }
+  if (/\bmissed me\b.*\bleaving\b|\bstarted leaving\b/.test(value)) {
+    return {
+      visualAction:
+        "One adult crosses a doorway carrying a small bag while an outstretched hand appears only after distance has opened between them.",
+      shotPlan:
+        "Deep hallway view with the leaving figure moving away and the late-reaching hand in foreground.",
+    };
+  }
   if (/\bmet\b|\bfirst encounter\b/.test(value)) {
     return {
       visualAction:
@@ -313,6 +377,12 @@ export function buildScenePrompt(line, index, template, context = {}) {
   const promptLine = line.replace(/[,.!?;:]+$/, "").trim();
   const total = Number(context.total ?? context.lines?.length ?? index + 1);
   const { castMode, castPlan } = castPlanFor(index, total);
+  const castBrief =
+    castMode === "pair"
+      ? "Exactly one adult woman and one adult man."
+      : castMode === "solo-a"
+        ? "One adult woman only."
+        : "One adult man only.";
   const { visualAction, shotPlan } = sceneDirectionFor(promptLine, index, castMode);
   const continuity =
     `Scene ${index + 1} of ${total}. Preserve recurring character identity and clothing, ` +
@@ -326,6 +396,7 @@ export function buildScenePrompt(line, index, template, context = {}) {
     .replaceAll("{{visualAction}}", visualAction)
     .replaceAll("{{shotPlan}}", shotPlan)
     .replaceAll("{{castPlan}}", castPlan)
+    .replaceAll("{{castBrief}}", castBrief)
     .replaceAll("{{continuity}}", continuity);
   const unresolved = prompt.match(/\{\{[^}]+\}\}/g);
   if (unresolved) {

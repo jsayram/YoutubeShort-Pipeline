@@ -419,6 +419,16 @@ const startedAt = Date.now();
 // Reference art is generated before the scenes that depend on it, and without references of its
 // own — the character sheet is what defines the character, so it cannot be steered by itself.
 const ordered = [...referencePrompts, ...scenePrompts];
+const referencePosition = new Map(
+  referencePrompts.map((item, index) => [item.id, index + 1]),
+);
+const scenePosition = new Map(scenePrompts.map((item, index) => [item.id, index + 1]));
+
+function progressLabel(item, isReference) {
+  return isReference
+    ? `[ref ${referencePosition.get(item.id)}/${referencePrompts.length}]`
+    : `[${scenePosition.get(item.id)}/${scenePrompts.length}]`;
+}
 
 for (const [index, item] of ordered.entries()) {
   if (!item.id || !item.prompt) throw new Error("Every image prompt needs an id and prompt.");
@@ -439,7 +449,7 @@ for (const [index, item] of ordered.entries()) {
       () => false,
     );
     if (existing) {
-      console.log(`[${index + 1}/${ordered.length}] ${item.id} — already generated, skipping`);
+      console.log(`${progressLabel(item, isReference)} ${item.id} — already generated, skipping`);
       if (!isReference) manifest.push({ id: item.id, file: relativeFile, skipped: true });
       continue;
     }
@@ -511,7 +521,7 @@ for (const [index, item] of ordered.entries()) {
   await fs.rm(rawPath, { force: true });
 
   const seconds = ((Date.now() - itemStart) / 1000).toFixed(1);
-  console.log(`[${index + 1}/${ordered.length}] ${item.id} — ${seconds}s`);
+  console.log(`${progressLabel(item, isReference)} ${item.id} — ${seconds}s`);
   if (isReference) continue;
   manifest.push({
     id: item.id,

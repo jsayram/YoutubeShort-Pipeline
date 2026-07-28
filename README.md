@@ -104,11 +104,15 @@ for the complete narration beat, `{{keywords}}` for its extracted visual terms, 
 shared cast decision, and a varied camera plan instead of passing a loose bag of words to the
 image model.
 
-`Anime` and `Illustrated monologue (storybook)` now use story-aware prompts and a vintage
-oil-and-paper-watercolor relationship look: old novel illustration, cold-press paper texture,
-warm hand-painted Japanese animated-film atmosphere without copying a specific film, expressive
-adult faces, and script-led scenes of love, sadness, separation, or solitude. Illustrated
-monologue keeps the original still-image slideshow treatment.
+Every content provider uses the same story-aware scene interpretation and solo/shared cast
+rhythm. Across the pipeline, a two-person relationship scene is constrained to exactly one adult
+man and one adult woman; solo scenes still alternate between a woman and a man. Each provider
+keeps its own medium:
+nostalgic 35mm editorial photography, paper-cut screen-printed vector shapes, graphite/sepia ink
+with restrained watercolor accents, or vintage oil-and-paper-watercolor illustration. The
+illustrated choices use warm hand-painted Japanese animated-film atmosphere without copying a
+specific film, expressive adult faces, and script-led scenes of love, sadness, separation, or
+solitude.
 
 `Illustrated monologue (living storybook)` uses the same oil-painted look but also selects its
 matching automatic composition: localized character breathing and sway, a single moving light
@@ -132,9 +136,13 @@ chosen character reference plus the materials reference. The absent person may b
 an off-frame hand, shadow, reflection, empty chair, second cup, keepsake, or negative space.
 
 `Animagine dark faceless storybook` is separate from the existing Animagine-backed providers. Its
-ordered-tag prompt asks for literal physical actions, a full-body anonymous protagonist, a face
-hidden in shadow, and mature dark storybook brushwork. Selecting it does not change the Anime,
-Illustrated monologue, Living storybook, or Gemini providers.
+simplified prompt begins with the complete narration line, adds one short literal action and one
+camera direction, then applies a dark oil-and-watercolor paper treatment. It no longer forces a
+hooded full-body character, centered pose, or repeated streetlamp. Faces stay turned away or
+softly shadowed while actions, props, settings, and framing carry the story. Its only automatic
+reference is a subject-free paper/material palette, weighted lightly so it cannot dictate the
+scene. Selecting it does not change the Anime, Illustrated monologue, Living storybook, or Gemini
+providers.
 
 Generate the media:
 

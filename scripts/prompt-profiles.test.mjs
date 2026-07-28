@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   buildScenePrompts,
   imagePromptsPath,
+  loadPromptDocument,
   promoteProviderDefault,
   regenerateProjectScenePrompts,
   resetProjectPromptOverride,
@@ -13,6 +14,39 @@ import {
   saveProjectPromptOverride,
   saveScenePrompts,
 } from "./prompt-profiles.mjs";
+
+const breakupLines = [
+  "She stopped asking if I made it home.",
+  "I blamed the job that always exhausted her.",
+  "Then her replies became hours, then entire days.",
+  "I kept shrinking, hoping she would notice me again.",
+  "One night, I finally stopped reaching for her.",
+  "She texted instantly, asking why I seemed distant.",
+  "That was when I understood what we had become.",
+  "She only missed me when I started leaving.",
+];
+const livePromptDocument = await loadPromptDocument();
+const animagineScenes = buildScenePrompts(
+  breakupLines,
+  livePromptDocument.providers["animagine-dark-storybook"].sceneTemplate,
+);
+for (const [index, scene] of animagineScenes.entries()) {
+  assert.ok(scene.prompt.includes(breakupLines[index].replace(/[,.!?;:]+$/, "")));
+  assert.ok(scene.prompt.length < 800, "Animagine prompts should stay concise.");
+  assert.doesNotMatch(scene.prompt, /hooded traveler|charcoal hooded coat/i);
+}
+assert.match(
+  animagineScenes[0].prompt,
+  /exactly one adult woman and one adult man/i,
+);
+assert.match(animagineScenes[0].prompt, /dark home doorway/i);
+assert.match(animagineScenes[1].prompt, /late workplace light/i);
+assert.match(animagineScenes[2].prompt, /calendar pages/i);
+assert.match(animagineScenes[3].prompt, /oversized room/i);
+assert.match(animagineScenes[4].prompt, /face-down phone/i);
+assert.match(animagineScenes[5].prompt, /phone suddenly lights/i);
+assert.match(animagineScenes[6].prompt, /reflection split by a doorway/i);
+assert.match(animagineScenes[7].prompt, /crosses a doorway carrying a small bag/i);
 
 const relationshipLines = [
   "We met on an ordinary Tuesday, and nothing about it felt special.",
@@ -53,6 +87,12 @@ assert.deepEqual(
 );
 assert.match(interpreted[1].prompt, /Solo-woman scene/i);
 assert.match(interpreted[2].prompt, /Solo-man scene/i);
+for (const scene of interpreted.filter((item) => item.castMode === "pair")) {
+  assert.match(
+    scene.prompt,
+    /exactly two complete adults.+one recurring adult woman.+one recurring adult man/i,
+  );
+}
 for (const [index, line] of relationshipLines.entries()) {
   assert.ok(interpreted[index].prompt.includes(line.replace(/[,.!?;:]+$/, "")));
 }

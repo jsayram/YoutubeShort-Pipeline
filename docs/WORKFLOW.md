@@ -59,8 +59,17 @@ oil-and-paper-watercolor romance treatment. Because those references contain no 
 location, the scene prompt remains responsible for the action and composition. Most scenes select
 only the woman or man reference plus the materials reference; only shared turning points use both
 characters. Animagine retains its faceless dark-storybook character. A normal scene reroll
-preserves the anchors, keeping the cast and palette stable. Pass `--force-references` only when
-you want to redesign them.
+preserves the anchors, keeping the cast and palette stable. Animagine uses one subject-free
+paper/material anchor at low weight and puts the exact narration line first in a concise scene
+prompt. Pass `--force-references` only when you want to redesign the applicable references.
+
+Reference generation is reported separately from scene progress. An eight-line script therefore
+shows **Images 1/8 … 8/8** even when a provider also creates reference assets.
+
+Photographic, Flat Vector, Ink Line Art, Anime, Illustrated Monologue, Living Storybook, and
+FLUX.2 all translate each narration line into sentiment, story position, a concrete action, a
+shot plan, and a cast plan. Their visual media differ, but the default eight-scene rhythm is five
+alternating solo woman/man scenes and three shared turning points.
 
 Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
 generated once more, then stops with its line number rather than entering the final mix. Run

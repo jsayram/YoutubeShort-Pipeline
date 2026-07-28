@@ -60,11 +60,15 @@ provider. Prompt settings have three layers:
 | Video override | `content/prompt-overrides.json` | only the selected video |
 | Scene edit | `content/image-prompts.json` plus `content/prompt-state.json` | only that scene in that video |
 
-**Anime** and the two **Illustrated monologue** providers share story-aware direction and a vintage
-oil-and-paper-watercolor relationship language: cold-press paper, old novel illustration, warm
-hand-painted animated-film atmosphere without copying a specific film, expressive adult faces,
-and narration-led connection, grief, or solitude scenes. The living variant adds motion-ready
-hair, fabric, grass, water, smoke, and dust without changing the still provider.
+**Photographic**, **Flat vector**, **Ink line art**, **Anime**, and the two **Illustrated
+monologue** providers share story-aware direction and the same solo/shared cast rhythm while
+retaining their medium. Every content provider constrains a two-person relationship scene to one
+adult man and one adult woman while solo scenes can feature either one. Photographic uses
+nostalgic 35mm editorial warmth; Flat vector uses
+paper-cut, screen-printed geometry; Ink uses graphite and sepia contour work with restrained
+watercolor accents; and Anime/Illustrated Monologue use vintage oil-and-paper-watercolor
+relationship art with hand-painted animated-film warmth without copying a specific film. The
+living variant adds motion-ready hair, fabric, grass, water, smoke, and dust.
 
 The FLUX.2 local-first and Animagine dark-storybook choices also own automatic reference prompts.
 FLUX.2 generates two separate neutral contemporary character anchors plus a nostalgic
@@ -72,7 +76,9 @@ ink-and-matte-color materials anchor. None contains an interaction or location, 
 preserve identity and medium without making every generated frame copy one couple pose or coastal
 setting. Animagine keeps its separate faceless-character treatment. Regenerating scenes does not
 regenerate those anchors, so a weak scene can be rerolled without changing its cast or visual
-language. Studio shows the references above the scene gallery once they exist.
+language. Animagine now uses only a lightly weighted, subject-free paper/material reference; its
+character and composition come from the actual narration line instead of a repeated hooded pose.
+Studio shows the references above the scene gallery once they exist.
 
 Use **Save for this video** while experimenting. A badge shows when a field is video-specific.
 **Reset video to provider default** removes only the current video's override.
@@ -103,8 +109,8 @@ terms, and `{{subjectType}}` for the inferred actor or object. Story-aware templ
 - `{{castPlan}}`: a solo woman, solo man, or rare shared two-person turning point.
 - `{{continuity}}`: preserve identity while changing pose, setting, lighting, and framing.
 
-Anime, both Illustrated Monologue profiles, and FLUX.2 use the story-aware variables. Their common
-relationship beats have explicit visual
+Photographic, Flat Vector, Ink Line Art, Anime, both Illustrated Monologue profiles, and FLUX.2
+use the story-aware variables. Their common relationship beats have explicit visual
 interpretations—for example, a coffee-order close detail, post-argument distance across a room,
 or one partner awake beside the sleeping other—and a fallback still requires a physical action
 and varied shot. Most scenes alternate a solo recurring woman and man, while the opening, a
