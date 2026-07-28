@@ -52,10 +52,12 @@ The voice step writes:
 - `public/audio/narration.timing.json`: clip, speech, pause, image, and transition timings.
 - `content/story.json`: the story and generation ids, used by `--resume`.
 
-The FLUX.2 and Animagine dark-storybook providers generate a character reference and a style
-reference before their first scene. They live in `assets/references/` and are shown separately in
-Studio. A normal scene reroll preserves them, keeping the protagonist and palette stable. Pass
-`--force-references` only when you want to redesign those anchors.
+The FLUX.2 and Animagine dark-storybook providers generate cast/character and style references
+before their first scene. They live in `assets/references/` and are shown separately in Studio.
+FLUX.2 uses a contemporary two-person cast and nostalgic hand-drawn romance treatment; Animagine
+retains its faceless dark-storybook character. A normal scene reroll preserves the anchors,
+keeping the cast and palette stable. Pass `--force-references` only when you want to redesign
+them.
 
 Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
 generated once more, then stops with its line number rather than entering the final mix. Run

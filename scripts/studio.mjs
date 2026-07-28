@@ -4,7 +4,16 @@ import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { loadEnv, parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
+import {
+  loadEnv,
+  parseArgs,
+  readJson,
+  repoRoot,
+  resolveHyperframesVersion,
+  run,
+  videoDir,
+  writeJson,
+} from "./lib.mjs";
 import { loadStyles, resolveStyles } from "./image-styles.mjs";
 import {
   listPromptBackups,
@@ -237,11 +246,22 @@ async function startRun({ slug, title, scriptText, options }) {
     if (options.forceCompose) composeArgs.push("--force");
     await runStage("compose", node, composeArgs);
 
-    const config = await readJson(path.join(projectDir, "video.json"));
+    const configPath = path.join(projectDir, "video.json");
+    const config = await readJson(configPath);
+    const hyperframesVersion = await resolveHyperframesVersion(config);
+    if (config.hyperframesVersion !== hyperframesVersion) {
+      config.hyperframesVersion = hyperframesVersion;
+      await writeJson(configPath, config);
+      emit({
+        type: "log",
+        stage: "check",
+        line: `Repaired missing HyperFrames version: ${hyperframesVersion}.`,
+      });
+    }
     await runStage(
       "check",
       "npx",
-      ["--yes", `hyperframes@${config.hyperframesVersion}`, "check"],
+      ["--yes", `hyperframes@${hyperframesVersion}`, "check"],
       { cwd: projectDir },
     );
 

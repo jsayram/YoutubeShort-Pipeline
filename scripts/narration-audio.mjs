@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { commandOutput } from "./lib.mjs";
+import { commandOutput, resolveHyperframesVersion } from "./lib.mjs";
 
 const DEFAULT_THRESHOLD_DB = -42;
 
@@ -106,7 +106,9 @@ export async function transcribeVoiceClip(filePath, options) {
 
   try {
     await fs.copyFile(filePath, tempAudio);
-    const version = options.hyperframesVersion;
+    const version = await resolveHyperframesVersion({
+      hyperframesVersion: options.hyperframesVersion,
+    });
     const args = [
       "--yes",
       `hyperframes@${version}`,

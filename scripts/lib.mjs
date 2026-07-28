@@ -81,6 +81,24 @@ export async function writeJson(filePath, value) {
   await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+export async function resolveHyperframesVersion(config = {}) {
+  const configured = String(config.hyperframesVersion ?? "").trim();
+  if (validPackageVersion(configured)) return configured;
+
+  const template = await readJson(path.join(repoRoot, "templates", "video.json"));
+  const fallback = String(template.hyperframesVersion ?? "").trim();
+  if (!validPackageVersion(fallback)) {
+    throw new Error(
+      "No valid HyperFrames version is configured in this project or templates/video.json.",
+    );
+  }
+  return fallback;
+}
+
+function validPackageVersion(value) {
+  return /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(value);
+}
+
 export function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {

@@ -100,19 +100,25 @@ their scenes are saved or regenerated through the new editor. Scene templates ma
 for the complete narration beat, `{{keywords}}` for its extracted visual terms, and
 `{{subjectType}}` for the inferred actor or object.
 
-`Illustrated monologue (storybook)` keeps the original still-image slideshow treatment.
-`Illustrated monologue (living storybook)` uses the same painted look but also selects its matching
-automatic composition: localized character breathing and sway, a single moving light pass,
-drifting haze and motes, and a restrained camera push. Its prompt intentionally places the subject
-near the lower centre with loose fabric, hair, smoke, foliage, or particles that support those
-motion cues.
+`Illustrated monologue (storybook)` uses a vintage oil-painted relationship-story look: old novel
+illustration, worn canvas and paper texture, warm Japanese animated-film atmosphere, expressive
+adult faces, and script-led scenes of love, sadness, separation, or solitude. It keeps the original
+still-image slideshow treatment.
 
-`FLUX.2 dark storybook (local first)` is the recommended story provider. It renders with the
+`Illustrated monologue (living storybook)` uses the same oil-painted look but also selects its
+matching automatic composition: localized character breathing and sway, a single moving light
+pass, drifting haze and motes, and a restrained camera push. Its prompt stages faces and hands
+clearly while adding loose hair, fabric, grass, water, smoke, or dust that can carry subtle motion.
+
+`FLUX.2 nostalgic storybook (local first)` is the recommended story provider. It renders with the
 local four-step FLUX.2 Klein model and falls back to Cloudflare only when both Cloudflare values
-are configured. It automatically creates two stable files under `assets/references/`: a faceless
-recurring-character guide and a dark gouache/charcoal style guide. Scene regeneration reuses
-those references; use `--force-references` only when you intentionally want a new character and
-art direction.
+are configured. Its look is a nostalgic hand-drawn romance frame: bold ink contours, matte retro
+color, paper and film grain, expressive contemporary people, and large poetic landscapes. It
+automatically creates two stable files under `assets/references/`: a recurring two-person cast
+guide and a wordless nostalgic style guide. Their versioned names prevent old dark-fantasy
+references from being reused after this style change. Scene regeneration reuses the new
+references; use `--force-references` only when you intentionally want a new cast and art
+direction.
 
 `Animagine dark faceless storybook` is separate from the existing Animagine-backed providers. Its
 ordered-tag prompt asks for literal physical actions, a full-body anonymous protagonist, a face

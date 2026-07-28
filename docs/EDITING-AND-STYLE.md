@@ -60,9 +60,15 @@ provider. Prompt settings have three layers:
 | Video override | `content/prompt-overrides.json` | only the selected video |
 | Scene edit | `content/image-prompts.json` plus `content/prompt-state.json` | only that scene in that video |
 
+The two **Illustrated monologue** providers share a vintage oil-painted relationship-story
+language: worn canvas, old novel illustration, warm hand-painted animated-film atmosphere,
+expressive adult faces, and narration-led couple, grief, or solitude scenes. The living variant
+adds motion-ready hair, fabric, grass, water, smoke, and dust without changing the still provider.
+
 The FLUX.2 local-first and Animagine dark-storybook choices also own automatic reference prompts.
-They generate a stable faceless character and a style anchor once per project. Regenerating scenes
-does not regenerate those anchors, so a weak scene can be rerolled without changing the character.
+FLUX.2 generates a recurring contemporary cast plus a nostalgic ink-and-matte-color style anchor.
+Animagine keeps its separate faceless-character treatment. Regenerating scenes does not regenerate
+those anchors, so a weak scene can be rerolled without changing its cast or visual language.
 Studio shows the references above the scene gallery once they exist.
 
 Use **Save for this video** while experimenting. A badge shows when a field is video-specific.

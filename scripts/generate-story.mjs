@@ -5,6 +5,7 @@ import {
   parseArgs,
   readJson,
   repoRoot,
+  resolveHyperframesVersion,
   run,
   sleep,
   videoDir,
@@ -28,6 +29,11 @@ if (!flags.project) throw new Error("Pass --project <slug>.");
 const projectDir = videoDir(flags.project);
 const configPath = path.join(projectDir, "video.json");
 const config = await readJson(configPath);
+const hyperframesVersion = await resolveHyperframesVersion(config);
+if (config.hyperframesVersion !== hyperframesVersion) {
+  config.hyperframesVersion = hyperframesVersion;
+  console.log(`Repaired missing HyperFrames version: ${hyperframesVersion}.`);
+}
 const voice = config.voicebox ?? {};
 
 const baseUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
@@ -430,7 +436,7 @@ async function inspectLine(file, text, index, attempt) {
   if (qaTranscribe) {
     try {
       transcript = await transcribeVoiceClip(file, {
-        hyperframesVersion: config.hyperframesVersion,
+        hyperframesVersion,
         model: qaModel,
         language,
       });

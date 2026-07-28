@@ -1,6 +1,14 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
+import {
+  parseArgs,
+  readJson,
+  repoRoot,
+  resolveHyperframesVersion,
+  run,
+  videoDir,
+  writeJson,
+} from "./lib.mjs";
 
 const { flags } = parseArgs();
 if (!flags.approved) {
@@ -10,17 +18,24 @@ if (!flags.approved) {
 }
 const slug = flags.project;
 const projectDir = videoDir(slug);
-const config = await readJson(path.join(projectDir, "video.json"));
+const configPath = path.join(projectDir, "video.json");
+const config = await readJson(configPath);
+const hyperframesVersion = await resolveHyperframesVersion(config);
+if (config.hyperframesVersion !== hyperframesVersion) {
+  config.hyperframesVersion = hyperframesVersion;
+  await writeJson(configPath, config);
+  console.log(`Repaired missing HyperFrames version: ${hyperframesVersion}.`);
+}
 const output = path.join(projectDir, "renders", `${slug}.mp4`);
 const rawOutput = path.join(projectDir, "renders", `.${slug}.hyperframes-${process.pid}.mp4`);
 await fs.mkdir(path.dirname(output), { recursive: true });
 
-await run("npx", ["--yes", `hyperframes@${config.hyperframesVersion}`, "check"], {
+await run("npx", ["--yes", `hyperframes@${hyperframesVersion}`, "check"], {
   cwd: projectDir,
 });
 const renderArgs = [
   "--yes",
-  `hyperframes@${config.hyperframesVersion}`,
+  `hyperframes@${hyperframesVersion}`,
   "render",
   "--quality",
   flags.quality ?? "high",

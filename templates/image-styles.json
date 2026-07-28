@@ -46,7 +46,7 @@
     "label": "Illustrated monologue (storybook)",
     "provider": "comfyui",
     "promptProfile": "storybook",
-    "summary": "Hand-painted dark-folklore storybook art. Square 1:1 for blurred-fill framing. Supports recurring characters via reference images.",
+    "summary": "Vintage oil-painted relationship storybook art with aged canvas texture, warm animated-film atmosphere, and visible loving, grieving, or solitary faces. Square 1:1 for blurred-fill framing.",
     "match": [
       "animagine",
       "illustrious",
@@ -77,7 +77,7 @@
     "provider": "comfyui",
     "promptProfile": "living-storybook",
     "compositionPreset": "living-storybook",
-    "summary": "The storybook look with subtle character breathing, drifting atmosphere, moving light, and a restrained camera push.",
+    "summary": "The vintage oil-painted relationship look with expressive faces, plus subtle character breathing, drifting atmosphere, moving light, and a restrained camera push.",
     "match": [
       "animagine",
       "illustrious",
@@ -162,11 +162,11 @@
   },
   {
     "id": "flux2-storybook",
-    "label": "FLUX.2 dark storybook (local first)",
+    "label": "FLUX.2 nostalgic storybook (local first)",
     "provider": "flux2-local",
     "fallbackProvider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "Dark faceless storybook illustration with automatic character and style references. Uses local FLUX.2 Klein first and Cloudflare only as a configured fallback.",
+    "summary": "Nostalgic hand-drawn romance panels with ink contours, matte retro color, paper grain, expressive people, and automatic cast/style references. Uses local FLUX.2 Klein first and Cloudflare only as a configured fallback.",
     "requiredModels": {
       "diffusionModel": "flux-2-klein-4b.safetensors",
       "textEncoder": "qwen_3_4b.safetensors",
@@ -184,23 +184,23 @@
     },
     "referencePrompts": [
       {
-        "id": "character-reference",
-        "role": "character",
-        "prompt": "A clean wordless character reference for one recurring anonymous traveler in a mature dark storybook. Show one full-body figure in a charcoal hooded coat with a single muted dusty-teal scarf, simple boots, slim natural proportions, and an entirely featureless face hidden in deep shadow. Three-quarter rear view, quiet human posture, readable silhouette, plain warm-grey paper ground, hand-painted gouache and charcoal, restrained brush texture. Every paper margin and corner stays clean, plain, and completely unmarked."
+        "id": "cast-reference",
+        "role": "cast",
+        "prompt": "A clean wordless cast reference for a nostalgic hand-drawn relationship story. Show two contemporary adults as separate full-body figures with distinct silhouettes: one with shoulder-length dark hair in a simple rust or cream coat, the other with loose shorter dark hair in a deep navy or brown coat. Keep their presentation adaptable so the narration can determine gender and relationship. Natural average proportions, ordinary timeless clothing, quiet expressive posture, relaxed hands, three-quarter and side views, minimal softly drawn facial features, bold dark ink contours, loose pencil hatching, matte flat colors, subtle paper grain, plain warm-cream background. No scene, no props, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "style-reference",
+        "id": "nostalgic-style-reference",
         "role": "style",
-        "prompt": "A representative wordless illustration from a mature dark storybook: an anonymous faceless traveler beneath one dim streetlamp at night, hand-painted gouache, dry charcoal edges, rough paper grain, broad imperfect brushwork, deep charcoal shadows, muted ochre light, dusty teal accent, faded olive and warm brown, cinematic negative space, restrained melancholy, layered foreground and background. Every paper margin and corner stays clean, plain, and completely unmarked."
+        "prompt": "A representative wordless frame from a nostalgic hand-drawn romance animation: two small contemporary adults seen from behind at the edge of a quiet sea beneath an enormous deep-teal evening sky, burnt-orange grass in the foreground, simple dark horizon, bold ink contours, loose pencil hatching, matte flat color blocks, restrained cel shading, visible paper tooth, subtle halftone and aged film speckles, slightly imperfect screen-printed finish, warm melancholy, large poetic negative space. No lettering, no watermark, no logo, no border."
       }
     ]
   },
   {
     "id": "cloudflare-flux2-storybook",
-    "label": "FLUX.2 dark storybook (Cloudflare)",
+    "label": "FLUX.2 nostalgic storybook (Cloudflare)",
     "provider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "The same referenced dark-storybook treatment through Cloudflare Workers AI's recurring free allocation.",
+    "summary": "The same referenced nostalgic hand-drawn romance treatment through Cloudflare Workers AI's recurring free allocation.",
     "download": "No model download. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in .env.",
     "sampling": {
       "steps": 4,
@@ -212,14 +212,14 @@
     },
     "referencePrompts": [
       {
-        "id": "character-reference",
-        "role": "character",
-        "prompt": "A clean wordless character reference for one recurring anonymous traveler in a mature dark storybook. Show one full-body figure in a charcoal hooded coat with a single muted dusty-teal scarf, simple boots, slim natural proportions, and an entirely featureless face hidden in deep shadow. Three-quarter rear view, quiet human posture, readable silhouette, plain warm-grey paper ground, hand-painted gouache and charcoal, restrained brush texture. Every paper margin and corner stays clean, plain, and completely unmarked."
+        "id": "cast-reference",
+        "role": "cast",
+        "prompt": "A clean wordless cast reference for a nostalgic hand-drawn relationship story. Show two contemporary adults as separate full-body figures with distinct silhouettes: one with shoulder-length dark hair in a simple rust or cream coat, the other with loose shorter dark hair in a deep navy or brown coat. Keep their presentation adaptable so the narration can determine gender and relationship. Natural average proportions, ordinary timeless clothing, quiet expressive posture, relaxed hands, three-quarter and side views, minimal softly drawn facial features, bold dark ink contours, loose pencil hatching, matte flat colors, subtle paper grain, plain warm-cream background. No scene, no props, no lettering, no labels, no symbols, no border."
       },
       {
-        "id": "style-reference",
+        "id": "nostalgic-style-reference",
         "role": "style",
-        "prompt": "A representative wordless illustration from a mature dark storybook: an anonymous faceless traveler beneath one dim streetlamp at night, hand-painted gouache, dry charcoal edges, rough paper grain, broad imperfect brushwork, deep charcoal shadows, muted ochre light, dusty teal accent, faded olive and warm brown, cinematic negative space, restrained melancholy, layered foreground and background. Every paper margin and corner stays clean, plain, and completely unmarked."
+        "prompt": "A representative wordless frame from a nostalgic hand-drawn romance animation: two small contemporary adults seen from behind at the edge of a quiet sea beneath an enormous deep-teal evening sky, burnt-orange grass in the foreground, simple dark horizon, bold ink contours, loose pencil hatching, matte flat color blocks, restrained cel shading, visible paper tooth, subtle halftone and aged film speckles, slightly imperfect screen-printed finish, warm melancholy, large poetic negative space. No lettering, no watermark, no logo, no border."
       }
     ]
   },

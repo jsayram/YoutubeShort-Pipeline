@@ -1,7 +1,15 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { commandOutput, parseArgs, readJson, run, videoDir, writeJson } from "./lib.mjs";
+import {
+  commandOutput,
+  parseArgs,
+  readJson,
+  resolveHyperframesVersion,
+  run,
+  videoDir,
+  writeJson,
+} from "./lib.mjs";
 import {
   assertAlignedLine,
   collectTranscriptWords,
@@ -24,7 +32,14 @@ if (!flags.project) throw new Error("Pass --project <slug>.");
 
 const slug = flags.project;
 const projectDir = videoDir(slug);
-const config = await readJson(path.join(projectDir, "video.json"));
+const configPath = path.join(projectDir, "video.json");
+const config = await readJson(configPath);
+const hyperframesVersion = await resolveHyperframesVersion(config);
+if (config.hyperframesVersion !== hyperframesVersion) {
+  config.hyperframesVersion = hyperframesVersion;
+  await writeJson(configPath, config);
+  console.log(`Repaired missing HyperFrames version: ${hyperframesVersion}.`);
+}
 const audioPath = path.join(projectDir, "public", "audio", "narration.wav");
 const timingPath = path.join(projectDir, "public", "audio", "narration.timing.json");
 const timing = await readJson(timingPath).catch(() => null);
@@ -73,7 +88,7 @@ try {
     await fs.copyFile(sourcePath, path.join(lineDir, inputName));
     const args = [
       "--yes",
-      `hyperframes@${config.hyperframesVersion}`,
+      `hyperframes@${hyperframesVersion}`,
       "transcribe",
       inputName,
       "--engine",
