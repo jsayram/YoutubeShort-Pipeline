@@ -63,24 +63,43 @@ if (!files.length) {
 const lines = timing.lines ?? [];
 if (!lines.length) throw new Error("The timing file has no lines.");
 
-const tail = Number(flags.tail ?? 2.5);
-const spoken = Number(timing.spokenDuration ?? lines.at(-1).end);
-const duration = Number((spoken + tail).toFixed(2));
+const tail = Number(flags.tail ?? (timing.finalHoldMs ?? config.voicebox?.finalHoldMs ?? 3000) / 1000);
+const narrationDuration = Number(
+  timing.narrationDuration ?? timing.spokenDuration ?? lines.at(-1).end,
+);
+const duration = Number((narrationDuration + tail).toFixed(3));
 const width = Number(config.width ?? 1080);
 const height = Number(config.height ?? 1920);
-const FADE = 0.45;
+const FADE = 0.5;
 
 const scenes = lines.map((line, index) => {
-  const start = index === 0 ? 0 : Number(line.start);
-  const nextStart = index === lines.length - 1 ? duration : Number(lines[index + 1].start);
-  const end = index === lines.length - 1 ? duration : nextStart + FADE;
+  const paced = Number.isFinite(Number(line.imageStart)) && Number.isFinite(Number(line.imageEnd));
+  const start = paced ? Number(line.imageStart) : index === 0 ? 0 : Number(line.start);
+  const nextStart =
+    index === lines.length - 1
+      ? duration
+      : Number(lines[index + 1].speechStart ?? lines[index + 1].start);
+  const end = paced
+    ? index === lines.length - 1
+      ? duration
+      : Number(line.imageEnd)
+    : index === lines.length - 1
+      ? duration
+      : nextStart + FADE;
   const sceneDuration = round(end - start);
+  const fadeDuration =
+    index === 0
+      ? 0
+      : paced
+        ? Math.max(0, Number(line.transitionEnd) - Number(line.transitionStart))
+        : FADE;
   return {
     index,
     id: `scene-${index + 1}`,
     file: files[index % files.length],
     start: round(start),
     duration: sceneDuration,
+    fadeDuration: round(fadeDuration),
     driftX: index % 2 === 0 ? 1 : -1,
     driftY: index % 3 === 0 ? -1 : 1,
     lifeCycles: Math.max(1, round(sceneDuration / (2.8 + (index % 3) * 0.25))),
@@ -114,11 +133,15 @@ await writeJson(path.join(projectDir, "index.motion.json"), {
 config.duration = duration;
 await writeJson(configPath, config);
 timing.videoDuration = duration;
+if (timing.lines?.at(-1)?.imageEnd !== undefined) {
+  timing.lines.at(-1).imageEnd = duration;
+  timing.lines.at(-1).pauseEnd = duration;
+}
 await writeJson(timingPath, timing);
 
 console.log(`Wrote ${path.relative(projectDir, compositionPath)}`);
 console.log(
-  `${scenes.length} living scene(s) over ${duration}s (${spoken.toFixed(2)}s spoken + ` +
+  `${scenes.length} living scene(s) over ${duration}s (${narrationDuration.toFixed(2)}s narration + ` +
     `${tail}s hold), ${files.length} image(s)${vendored ? ", local GSAP" : ""}.`,
 );
 console.log("Motion: localized character life · moving light · haze · deterministic motes.");
@@ -185,7 +208,8 @@ ${moteMarkup(scene)}
     .map(
       (scene) =>
         `        { id: "${scene.id}", start: ${scene.start}, duration: ${scene.duration}, ` +
-        `driftX: ${scene.driftX}, driftY: ${scene.driftY}, lifeCycles: ${scene.lifeCycles}, ` +
+        `fadeDuration: ${scene.fadeDuration}, driftX: ${scene.driftX}, ` +
+        `driftY: ${scene.driftY}, lifeCycles: ${scene.lifeCycles}, ` +
         `lifeAmp: ${scene.lifeAmp}, swayAmp: ${scene.swayAmp} }`,
     )
     .join(",\n");
@@ -405,7 +429,7 @@ ${sceneMarkup}
         id="vo"
         src="public/audio/narration.wav"
         data-start="0"
-        data-duration="${round(Math.min(spoken, duration))}"
+        data-duration="${round(Math.min(narrationDuration, duration))}"
         data-track-index="${scenes.length + 2}"
         data-volume="1"
       ></audio>
@@ -444,12 +468,19 @@ ${sceneData}
           },
           scene.start,
         );
-        tl.fromTo(
-          inner,
-          { opacity: 0 },
-          { opacity: 1, duration: FADE, ease: "none", immediateRender: false },
-          scene.start,
-        );
+        if (scene.fadeDuration > 0) {
+          tl.fromTo(
+            inner,
+            { opacity: 0 },
+            {
+              opacity: 1,
+              duration: scene.fadeDuration,
+              ease: "none",
+              immediateRender: false,
+            },
+            scene.start,
+          );
+        }
 
         // Localized character life. Every value is a pure function of phase, starts at rest,
         // and settles during the last fifth of the scene so the transition does not catch it

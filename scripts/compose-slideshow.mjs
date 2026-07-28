@@ -77,28 +77,42 @@ if (!files.length) {
 const lines = timing.lines ?? [];
 if (!lines.length) throw new Error("The timing file has no lines.");
 
-// The narration ends when the last line ends; hold past it so the final frame is readable
-// rather than cutting on the last syllable.
-const tail = Number(flags.tail ?? 2.5);
-const spoken = Number(timing.spokenDuration ?? lines.at(-1).end);
-const duration = Number((spoken + tail).toFixed(2));
-
 const FADE = 0.5;
+const tail = Number(flags.tail ?? (timing.finalHoldMs ?? config.voicebox?.finalHoldMs ?? 3000) / 1000);
+const narrationDuration = Number(
+  timing.narrationDuration ?? timing.spokenDuration ?? lines.at(-1).end,
+);
+const duration = Number((narrationDuration + tail).toFixed(3));
 const width = Number(config.width ?? 1080);
 const height = Number(config.height ?? 1920);
 
 const scenes = lines.map((line, index) => {
-  const start = index === 0 ? 0 : Number(line.start);
-  const nextStart = index === lines.length - 1 ? duration : Number(lines[index + 1].start);
-  // Every clip except the last runs into its successor by one fade length, so the cross-fade
-  // has two live layers to work with.
-  const end = index === lines.length - 1 ? duration : nextStart + FADE;
+  const paced = Number.isFinite(Number(line.imageStart)) && Number.isFinite(Number(line.imageEnd));
+  const start = paced ? Number(line.imageStart) : index === 0 ? 0 : Number(line.start);
+  const nextStart =
+    index === lines.length - 1
+      ? duration
+      : Number(lines[index + 1].speechStart ?? lines[index + 1].start);
+  const end = paced
+    ? index === lines.length - 1
+      ? duration
+      : Number(line.imageEnd)
+    : index === lines.length - 1
+      ? duration
+      : nextStart + FADE;
+  const fadeDuration =
+    index === 0
+      ? 0
+      : paced
+        ? Math.max(0, Number(line.transitionEnd) - Number(line.transitionStart))
+        : FADE;
   return {
     index,
     id: `scene-${index + 1}`,
     file: files[index % files.length],
     start: round(start),
     duration: round(end - start),
+    fadeDuration: round(fadeDuration),
     // Alternate the push direction so consecutive stills do not drift the same way.
     zoomIn: index % 2 === 0,
     driftX: index % 4 < 2 ? 1 : -1,
@@ -122,11 +136,16 @@ await fs.rm(path.join(projectDir, "index.motion.json"), { force: true });
 config.duration = duration;
 await writeJson(configPath, config);
 timing.videoDuration = duration;
+if (timing.lines?.at(-1)?.imageEnd !== undefined) {
+  timing.lines.at(-1).imageEnd = duration;
+  timing.lines.at(-1).pauseEnd = duration;
+}
 await writeJson(timingPath, timing);
 
 console.log(`Wrote ${path.relative(projectDir, compositionPath)}`);
 console.log(
-  `${scenes.length} scene(s) over ${duration}s (${spoken.toFixed(2)}s spoken + ${tail}s hold), ` +
+  `${scenes.length} scene(s) over ${duration}s (${narrationDuration.toFixed(2)}s narration + ` +
+    `${tail}s final hold), ` +
     `${files.length} image(s)${vendored ? ", local GSAP" : ""}.`,
 );
 if (missing.length) {
@@ -165,7 +184,8 @@ function renderHtml() {
     .map(
       (scene) =>
         `        { id: "${scene.id}", start: ${scene.start}, duration: ${scene.duration}, ` +
-        `zoomIn: ${scene.zoomIn}, driftX: ${scene.driftX}, driftY: ${scene.driftY} }`,
+        `fadeDuration: ${scene.fadeDuration}, zoomIn: ${scene.zoomIn}, ` +
+        `driftX: ${scene.driftX}, driftY: ${scene.driftY} }`,
     )
     .join(",\n");
 
@@ -241,7 +261,7 @@ ${sceneMarkup}
         id="vo"
         src="public/audio/narration.wav"
         data-start="0"
-        data-duration="${round(Math.min(spoken, duration))}"
+        data-duration="${round(Math.min(narrationDuration, duration))}"
         data-track-index="${scenes.length + 1}"
         data-volume="1"
       ></audio>
@@ -284,14 +304,21 @@ ${sceneData}
           scene.start,
         );
 
-        // Cross-fade on the wrapper. The outgoing scene keeps running underneath for one fade
-        // length, which is why its clip was extended.
-        tl.fromTo(
-          inner,
-          { opacity: 0 },
-          { opacity: 1, duration: FADE, ease: "none", immediateRender: false },
-          scene.start,
-        );
+        // The image is already fully visible when its voice begins. Its entrance occupies the
+        // final part of the preceding silent pause while the outgoing image keeps animating.
+        if (scene.fadeDuration > 0) {
+          tl.fromTo(
+            inner,
+            { opacity: 0 },
+            {
+              opacity: 1,
+              duration: scene.fadeDuration,
+              ease: "none",
+              immediateRender: false,
+            },
+            scene.start,
+          );
+        }
       }
 
       window.__timelines["main"] = tl;

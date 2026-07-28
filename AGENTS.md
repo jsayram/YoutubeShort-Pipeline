@@ -26,8 +26,10 @@ and the list of seek-safe properties live in the project's `design.md`.
    - `videos/<slug>/content/narration.txt`
    - `videos/<slug>/content/image-prompts.json`
    - `videos/<slug>/video.json`
-4. Keep a 60-second script near 125 to 145 spoken words. Use six scenes by default. Write
-   `narration.txt` with one spoken beat per line — the line breaks become the clip boundaries.
+4. Keep a 60-second script near 125 to 145 spoken words only when its scene count and configured
+   pauses still fit that runtime. The default three-second pause adds three seconds between every
+   pair of lines, so use about six scenes by default. Write `narration.txt` with one spoken beat per
+   line — the line breaks become the clip boundaries.
 5. Run `npm run images -- --project <slug>`.
 6. Run `npm run story -- --project <slug> --dry-run` to confirm the line split, then
    `npm run story -- --project <slug>`.
@@ -42,6 +44,9 @@ and the list of seek-safe properties live in the project's `design.md`.
 10. Run HyperFrames `check` and capture midpoint snapshots for every scene.
 11. Open the final preview. Render only after the user approves it.
 12. After approval, run `npm run render -- --project <slug> --approved`.
+13. The render command removes descriptive and authoring metadata, verifies the clean MP4, and
+    delivers it to `iCloud Drive/YoutubeShortPipeline/ready`. After publishing, the user moves it
+    to the sibling `published` folder.
 
 ## Editing rules
 

@@ -34,9 +34,10 @@ npm run assets -- --project topic-name
 ```
 
 This calls the Google GenAI API, then builds a Voicebox story from the narration. Each line becomes
-its own generation and its own item on the story timeline, spaced by 200 ms. The story is saved in
-Voicebox under the `title` from `video.json`, so you can open the app to re-roll a weak line, nudge
-an item, or export the mix yourself.
+its own generation and its own item on the story timeline. The default target is three seconds of
+audible silence from the end of one spoken phrase to the beginning of the next. The story is saved
+in Voicebox under the `title` from `video.json`, so you can open the app to re-roll a weak line or
+review the story.
 
 Check the line split before spending time on generation:
 
@@ -44,11 +45,16 @@ Check the line split before spending time on generation:
 npm run story -- --project topic-name --dry-run
 ```
 
-Three files come out of the voice step:
+The voice step writes:
 
-- `public/audio/narration.wav`: the normalized mix, padded to the configured duration.
-- `public/audio/narration.timing.json`: the start and duration of every spoken line.
+- `public/audio/lines/*.wav`: the complete, accepted Voicebox line files.
+- `public/audio/narration.wav`: the normalized local assembly with exact audible pauses.
+- `public/audio/narration.timing.json`: clip, speech, pause, image, and transition timings.
 - `content/story.json`: the story and generation ids, used by `--resume`.
+
+Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
+generated once more, then stops with its line number rather than entering the final mix. Run
+`npm run validate:narration -- --project topic-name` to repeat the audio and timing checks.
 
 If generation stops partway, `npm run story -- --project topic-name --resume` continues from the
 first line that never made it onto the timeline.
@@ -61,15 +67,16 @@ In `videos/topic-name/index.html`:
 - Give every scene `class="clip"`, `data-start`, and `data-duration`.
 - Add the narration as framework-owned audio.
 - Use a paused, seekable GSAP timeline for deterministic animation.
-- Take `data-start` and `data-duration` from `public/audio/narration.timing.json` so every scene,
-  caption, and reveal lands on the line it belongs to.
+- Take `imageStart` and `imageEnd` from `public/audio/narration.timing.json`. The outgoing image
+  remains animated throughout the silent pause; the incoming image transitions during the last
+  0.5 seconds and is fully visible at `speechStart`.
 
 ## 5. Inspect before rendering
 
 ```sh
 cd "videos/topic-name"
-npx --yes hyperframes@0.7.76 check
-npx --yes hyperframes@0.7.76 snapshot --at 5,15,25,35,45,55
+npx --yes hyperframes@0.7.78 check
+npx --yes hyperframes@0.7.78 snapshot --at 5,15,25,35,45,55
 npm run dev
 ```
 
@@ -83,8 +90,17 @@ cd ../..
 npm run render -- --project topic-name --approved
 ```
 
-The render command runs a final HyperFrames check and verifies exact duration, 1080×1920 output,
-and the presence of audio.
+The render command runs a final HyperFrames check, removes descriptive and authoring metadata
+without re-encoding, verifies exact duration, 1080×1920 output, and audio, then copies the clean
+MP4 to `iCloud Drive/YoutubeShortPipeline/ready`. The local clean copy remains under the project's
+`renders/` folder so Studio can play it. After the Short is uploaded, move its iCloud copy from
+`ready` to `published`.
+
+To run only the cleanup and delivery step for an existing render:
+
+```sh
+npm run deliver -- --project topic-name
+```
 
 ## What belongs in Git
 

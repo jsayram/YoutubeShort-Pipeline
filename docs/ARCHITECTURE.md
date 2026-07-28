@@ -21,11 +21,13 @@ Install and run the released Voicebox app. The pipeline talks to the documented 
 
 1. `POST /stories` opens a story named after the video.
 2. `POST /generate` speaks one script line, then the run polls `GET /history/{id}` until it lands.
-3. `POST /stories/{id}/items` places that clip on the timeline at an explicit start time.
-4. `GET /stories/{id}/export-audio` downloads the finished mix.
+3. `GET /history/{id}/export-audio` downloads the complete line for final-word and tail checks.
+4. `POST /stories/{id}/items` places the accepted clip on the review timeline.
+5. `PUT /stories/{id}/items/times` mirrors the pipeline's measured audible pauses in Voicebox.
 
-Placing each line explicitly, rather than appending and hoping, is what makes the timing manifest
-trustworthy. The run reads the placements back from `GET /stories/{id}` before writing it.
+The final narration is assembled locally from the accepted line WAVs. That preserves every source
+sample and inserts only enough digital silence to make the measured speech-to-speech pause exact.
+The timing manifest records clip, speech, pause, transition, and image boundaries separately.
 
 This keeps Voicebox independent: no copied code, no internal imports, no repository patches, and no
 virtual environment inside a clone.
@@ -46,7 +48,7 @@ The pipeline itself uses REST because it is stable, scriptable, and works with e
 HyperFrames is invoked as a pinned npm package, for example:
 
 ```sh
-npx --yes hyperframes@0.7.76 check
+npx --yes hyperframes@0.7.78 check
 ```
 
 The pinned version is stored in each `video.json`, so an older video remains reproducible when the

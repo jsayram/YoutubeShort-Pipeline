@@ -1,15 +1,24 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
-  commandOutput,
   loadEnv,
   parseArgs,
   readJson,
+  repoRoot,
   run,
   sleep,
   videoDir,
   writeJson,
 } from "./lib.mjs";
+import {
+  analyzeVoiceClip,
+  assembleVoiceClips,
+  expectedLastWord,
+  normalizeVoiceClip,
+  probeAudioDuration,
+  transcribeVoiceClip,
+  transcriptEndsWith,
+} from "./narration-audio.mjs";
 import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
 
 await loadEnv();
@@ -29,7 +38,12 @@ const profileName = flags.profile ?? voice.profile ?? "MyOwn";
 const requestedEngine = flags.engine ?? voice.engine ?? "qwen";
 const modelSize = flags.model ?? voice.modelSize ?? "1.7B";
 const language = flags.language ?? voice.language ?? "en";
-const gapMs = Math.max(0, Math.round(Number(flags.gap ?? voice.gapMs ?? 200)));
+const gapMs = Math.max(0, Math.round(Number(flags.gap ?? voice.gapMs ?? 3000)));
+const finalHoldMs = Math.max(0, Math.round(Number(voice.finalHoldMs ?? gapMs)));
+const transitionMs = Math.max(0, Math.round(Number(voice.transitionMs ?? 500)));
+const minTailQuietMs = Math.max(0, Math.round(Number(voice.minTailQuietMs ?? 20)));
+const qaTranscribe = flags["skip-voice-qa"] !== true && voice.qaTranscribe !== false;
+const qaModel = String(flags["qa-model"] ?? voice.qaModel ?? "tiny.en");
 const personality = flags.personality === true || voice.personality === true;
 const storyName = flags.name ?? config.title ?? flags.project;
 const storyDescription = flags.description ?? voice.storyDescription ?? null;
@@ -38,6 +52,8 @@ const manifestPath = path.join(projectDir, "content", "story.json");
 const rawPath = path.join(projectDir, "public", "audio", "narration-raw.wav");
 const finalPath = path.join(projectDir, "public", "audio", "narration.wav");
 const timingPath = path.join(projectDir, "public", "audio", "narration.timing.json");
+const lineDir = path.join(projectDir, "public", "audio", "lines");
+const sourceLineDir = path.join(lineDir, "source");
 
 // One spoken line per non-empty line of the script. Voicebox reads each one as its own
 // generation, which keeps the phrasing tight and gives every line its own timeline item.
@@ -62,9 +78,17 @@ if (flags["dry-run"]) {
     console.log(`${String(index + 1).padStart(2)}. (${line.split(/\s+/).length}w) ${line}`);
   }
   console.log(
-    `\nWould build story "${storyName}" as ${profileName} / ${requestedEngine} ${modelSize}.`,
+    `\nWould build story "${storyName}" as ${profileName} / ${requestedEngine} ${modelSize}, ` +
+      `${(gapMs / 1000).toFixed(2)}s between audible lines.`,
   );
   process.exit(0);
+}
+
+if (flags.fit) {
+  throw new Error(
+    "--fit is disabled for paced stories because time-stretching would shorten the exact " +
+      "silence between lines. Shorten the script or lower voicebox.gapMs instead.",
+  );
 }
 
 async function api(endpoint, options = {}) {
@@ -103,10 +127,20 @@ if (!profile) {
 const resolvedEngine = resolveVoiceboxEngine(profile, requestedEngine);
 const engine = resolvedEngine.engine;
 if (resolvedEngine.changed) {
-  config.voicebox = { ...voice, profile: profile.name, engine };
-  await writeJson(configPath, config);
   console.log(`Voice engine corrected: ${requestedEngine} → ${engine} (${resolvedEngine.reason}).`);
 }
+config.voicebox = {
+  ...voice,
+  profile: profile.name,
+  engine,
+  gapMs,
+  finalHoldMs,
+  transitionMs,
+  minTailQuietMs,
+  qaTranscribe,
+  qaModel,
+};
+await writeJson(configPath, config);
 
 // --resume picks up a run that stopped partway. It only continues a story whose finished
 // lines still match the script, so a rewritten line always forces a clean rebuild.
@@ -155,10 +189,8 @@ if (!story) {
 // Persist the story before the first generation. If Voicebox rejects line one or the process
 // stops, --resume can recover the empty story instead of creating an orphan.
 await writeStoryManifest(story, completed);
-
-let cursorMs = completed.length
-  ? completed.at(-1).startMs + completed.at(-1).durationMs + gapMs
-  : 0;
+await fs.mkdir(lineDir, { recursive: true });
+await fs.mkdir(sourceLineDir, { recursive: true });
 
 async function speak(text) {
   let generation = await api("/generate", {
@@ -186,139 +218,351 @@ async function speak(text) {
   return generation;
 }
 
-for (const [index, text] of lines.entries()) {
-  if (index < completed.length) continue;
+const accepted = [];
 
-  const generation = await speak(text);
-  const durationMs = Math.round(Number(generation.duration ?? 0) * 1000);
-  if (!durationMs) throw new Error(`Voicebox returned no audio for line ${index + 1}.`);
+// A resumed story may contain manually re-rolled lines. Always export the active Voicebox
+// version again and re-run the checks rather than trusting a stale local WAV.
+for (const existing of completed) {
+  const clip = await inspectExistingLine(existing);
+  accepted.push(clip);
+}
+
+for (const [index, text] of lines.entries()) {
+  if (index < accepted.length) continue;
+
+  const clip = await generateAcceptedLine(text, index);
+  const provisional = layoutClips([...accepted, clip]).at(-1);
 
   await api(`/stories/${story.id}/items`, {
     method: "POST",
-    body: { generation_id: generation.id, start_time_ms: cursorMs, track: 0 },
+    body: { generation_id: clip.generationId, start_time_ms: provisional.clipStartMs, track: 0 },
   });
 
-  completed.push({
-    index,
-    text,
-    generationId: generation.id,
-    startMs: cursorMs,
-    durationMs,
-  });
-  await writeStoryManifest(story, completed);
-
-  const seconds = (cursorMs / 1000).toFixed(1);
-  console.log(
-    `[${index + 1}/${lines.length}] ${seconds}s +${(durationMs / 1000).toFixed(2)}s  ${text.slice(0, 60)}`,
-  );
-  cursorMs += durationMs + gapMs;
+  accepted.push(clip);
+  await writeStoryManifest(story, layoutClips(accepted));
 }
 
-// The server owns the final placement, so read the timings back rather than trusting the cursor.
+const placed = layoutClips(accepted);
+await api(`/stories/${story.id}/items/times`, {
+  method: "PUT",
+  body: {
+    updates: placed.map((line) => ({
+      generation_id: line.generationId,
+      start_time_ms: line.clipStartMs,
+    })),
+  },
+});
+
 const detail = await api(`/stories/${story.id}`);
-const placed = [...detail.items].sort((a, b) => a.start_time_ms - b.start_time_ms);
+const timedLines = buildTimingLines(placed);
+const assembled = placed.map((line, index) => ({
+  ...line,
+  gapAfterMs:
+    index === placed.length - 1
+      ? 0
+      : Math.max(0, placed[index + 1].clipStartMs - line.clipEndMs),
+}));
+await assembleVoiceClips(assembled, rawPath);
+const rawDuration = await probeAudioDuration(rawPath);
 
-// Rewrite the manifest from the server's own view. The in-loop writes above only cover lines
-// this run generated, so a resume that had nothing left to do would otherwise leave stale
-// metadata here — a profile name, engine, or gap that no longer reflects reality.
-await writeStoryManifest(
-  story,
-  placed.map((item, index) => ({
-    index,
-    text: item.text.trim(),
-    generationId: item.generation_id,
-    startMs: item.start_time_ms,
-    durationMs: Math.round(item.duration * 1000),
-  })),
+// Each complete line was normalized before it was measured. Copying the assembled PCM master
+// preserves those exact analyzed boundaries; normalizing after assembly would raise quiet word
+// decay and make the promised pauses shorter than their timing metadata.
+await fs.copyFile(rawPath, finalPath);
+const finalDuration = await probeAudioDuration(finalPath);
+const videoDuration = Number((finalDuration + finalHoldMs / 1000).toFixed(3));
+const speechDuration = timedLines.reduce(
+  (sum, line) => sum + (line.speechEnd - line.speechStart),
+  0,
 );
 
-const audio = await fetch(`${baseUrl}/stories/${story.id}/export-audio`);
-if (!audio.ok) throw new Error(`Voicebox story export failed: ${await audio.text()}`);
-await fs.mkdir(path.dirname(rawPath), { recursive: true });
-await fs.writeFile(rawPath, Buffer.from(await audio.arrayBuffer()));
-
-const rawDuration = Number(
-  await commandOutput("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    rawPath,
-  ]),
-);
-
-const target = Number(config.duration);
-let tempo = 1;
-if (flags.fit && rawDuration > target) {
-  tempo = rawDuration / target;
-  if (tempo > 1.25) {
-    throw new Error(
-      `Narration is ${rawDuration.toFixed(1)}s against a ${target}s video. Shorten the script instead of speeding it up by ${tempo.toFixed(2)}x.`,
-    );
-  }
-}
-
-const spokenDuration = rawDuration / tempo;
-const filters = [];
-if (tempo > 1.001) filters.push(`atempo=${tempo.toFixed(6)}`);
-filters.push("loudnorm=I=-16:TP=-1.5:LRA=11");
-
-const ffmpegArgs = ["-y", "-i", rawPath];
-if (spokenDuration <= target + 0.001) {
-  filters.push(`apad=pad_dur=${target}`);
-  ffmpegArgs.push("-af", filters.join(","), "-ar", "48000", "-t", String(target), finalPath);
-} else {
-  ffmpegArgs.push("-af", filters.join(","), "-ar", "48000", finalPath);
-}
-await run("ffmpeg", ffmpegArgs);
-
-await writeJson(timingPath, {
+const timing = {
   story: { id: story.id, name: story.name, description: detail.description ?? null },
   audio: "audio/narration.wav",
+  lineAudioDirectory: "audio/lines",
   profile: profile.name,
   engine,
   modelSize,
   gapMs,
-  tempo: Number(tempo.toFixed(6)),
-  spokenDuration: Number(spokenDuration.toFixed(3)),
-  videoDuration: target,
-  lines: placed.map((item, index) => {
-    const start = item.start_time_ms / 1000 / tempo;
-    const duration = item.duration / tempo;
+  pauseMs: gapMs,
+  finalHoldMs,
+  transitionMs,
+  minTailQuietMs,
+  qaTranscribe,
+  qaModel: qaTranscribe ? qaModel : null,
+  tempo: 1,
+  speechDuration: roundSeconds(speechDuration),
+  narrationDuration: roundSeconds(finalDuration),
+  spokenDuration: roundSeconds(finalDuration),
+  videoDuration,
+  lines: timedLines.map((line, index) => {
+    const next = timedLines[index + 1];
+    const pauseEnd = next ? next.speechStart : videoDuration;
+    const imageStart =
+      index === 0
+        ? 0
+        : Math.max(timedLines[index - 1].speechEnd, line.speechStart - transitionMs / 1000);
+    const imageEnd = next ? next.speechStart : videoDuration;
     return {
-      index,
-      text: item.text.trim(),
-      start: Number(start.toFixed(3)),
-      duration: Number(duration.toFixed(3)),
-      end: Number((start + duration).toFixed(3)),
+      ...line,
+      pauseStart: line.speechEnd,
+      pauseEnd: roundSeconds(pauseEnd),
+      imageStart: roundSeconds(imageStart),
+      imageEnd: roundSeconds(imageEnd),
+      transitionStart: roundSeconds(imageStart),
+      transitionEnd: index === 0 ? 0 : line.speechStart,
     };
   }),
-});
+};
 
-const finalDuration = Number(
-  await commandOutput("ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration",
-    "-of",
-    "default=noprint_wrappers=1:nokey=1",
-    finalPath,
-  ]),
+await writeJson(timingPath, timing);
+config.duration = videoDuration;
+await writeJson(configPath, config);
+await writeStoryManifest(story, placed);
+validateTimingPlan(timing, rawDuration);
+await run(process.execPath, [
+  path.join(repoRoot, "scripts", "validate-narration.mjs"),
+  "--project",
+  flags.project,
+]);
+
+console.log(
+  `\nStory "${story.name}" has ${placed.length} verified lines, ` +
+    `${(gapMs / 1000).toFixed(2)}s of audible silence between them, and runs ` +
+    `${finalDuration.toFixed(2)}s.`,
 );
-
-console.log(`\nStory "${story.name}" has ${placed.length} lines and runs ${spokenDuration.toFixed(2)}s.`);
 console.log(`Saved ${finalPath} (${finalDuration.toFixed(3)}s)`);
 console.log(`Saved ${timingPath}`);
-console.log("Open Voicebox to review, re-roll a line, or export the story yourself.");
+console.log("Every image hold can now animate through its narration and following silent pause.");
+console.log("Open Voicebox to review or re-roll a line; --resume re-checks the active versions.");
 
-if (spokenDuration > target + 0.001) {
-  console.warn(
-    `\nNarration runs ${spokenDuration.toFixed(1)}s but video.json asks for ${target}s. ` +
-      "Shorten the script, raise duration, or re-run with --fit.",
+async function inspectExistingLine(existing) {
+  const file = linePath(existing.index);
+  const sourceFile = sourceLinePath(existing.index);
+  await exportGeneration(existing.generationId, sourceFile);
+  await normalizeVoiceClip(sourceFile, file);
+  const qa = await inspectLine(file, existing.text, existing.index, 0);
+  if (!qa.passed) {
+    throw new Error(
+      `Voicebox line ${existing.index + 1} did not pass after resume: ${qa.reason}. ` +
+        "Re-roll that line in Voicebox and run with --resume again.",
+    );
+  }
+  logAccepted(existing.index, existing.text, qa, true);
+  return {
+    index: existing.index,
+    text: existing.text,
+    generationId: existing.generationId,
+    file,
+    sourceFile,
+    ...qa.analysis,
+    qa,
+  };
+}
+
+async function generateAcceptedLine(text, index) {
+  const file = linePath(index);
+  let lastQa = null;
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const generation = await speak(text);
+    const sourceFile = sourceLinePath(index);
+    const sourceCandidate = path.join(
+      sourceLineDir,
+      `.${String(index + 1).padStart(2, "0")}-candidate.wav`,
+    );
+    const candidate = path.join(
+      lineDir,
+      `.${String(index + 1).padStart(2, "0")}-candidate.wav`,
+    );
+    await exportGeneration(generation.id, sourceCandidate);
+    await normalizeVoiceClip(sourceCandidate, candidate);
+    const qa = await inspectLine(candidate, text, index, attempt);
+    lastQa = qa;
+
+    if (qa.passed) {
+      await fs.rm(file, { force: true });
+      await fs.rename(candidate, file);
+      await fs.rm(sourceFile, { force: true });
+      await fs.rename(sourceCandidate, sourceFile);
+      logAccepted(index, text, qa, false);
+      return {
+        index,
+        text,
+        generationId: generation.id,
+        file,
+        sourceFile,
+        ...qa.analysis,
+        qa,
+      };
+    }
+
+    await fs.rm(candidate, { force: true });
+    await fs.rm(sourceCandidate, { force: true });
+    if (attempt === 1) {
+      console.warn(`Line ${index + 1} sounded unsafe (${qa.reason}); re-generating once.`);
+    }
+  }
+
+  throw new Error(
+    `Voicebox line ${index + 1} failed twice: ${lastQa?.reason ?? "unknown quality failure"}. ` +
+      "Review or re-roll that line in Voicebox before continuing.",
   );
+}
+
+async function exportGeneration(generationId, file) {
+  const response = await fetch(`${baseUrl}/history/${generationId}/export-audio`, {
+    headers: { "X-Voicebox-Client-Id": "youtube-short-pipeline" },
+  });
+  if (!response.ok) {
+    throw new Error(`Voicebox audio export failed for ${generationId}: ${await response.text()}`);
+  }
+  await fs.writeFile(file, Buffer.from(await response.arrayBuffer()));
+}
+
+async function inspectLine(file, text, index, attempt) {
+  const analysis = await analyzeVoiceClip(file);
+  const boundaryPassed = analysis.trailingQuietMs >= minTailQuietMs;
+  let lexicalPassed = true;
+  let transcript = null;
+  const expected = expectedLastWord(text);
+
+  if (qaTranscribe) {
+    try {
+      transcript = await transcribeVoiceClip(file, {
+        hyperframesVersion: config.hyperframesVersion,
+        model: qaModel,
+        language,
+      });
+      lexicalPassed = transcriptEndsWith(transcript, expected);
+    } catch (error) {
+      throw new Error(
+        `Could not verify Voicebox line ${index + 1}'s final word: ${error.message}. ` +
+          "Install whisper-cpp or run with --skip-voice-qa only for a deliberate bypass.",
+      );
+    }
+  }
+
+  const reasons = [];
+  if (!boundaryPassed) {
+    reasons.push(
+      `only ${analysis.trailingQuietMs.toFixed(1)}ms of quiet audio at the file boundary`,
+    );
+  }
+  if (!lexicalPassed) {
+    reasons.push(
+      `expected final word "${expected}", transcription ended with "${transcript?.lastWord ?? "nothing"}"`,
+    );
+  }
+  return {
+    passed: boundaryPassed && lexicalPassed,
+    reason: reasons.join("; "),
+    expectedLastWord: expected,
+    transcribedLastWord: transcript?.lastWord ?? null,
+    transcript: transcript?.text ?? null,
+    attempts: attempt,
+    analysis,
+  };
+}
+
+function layoutClips(clips) {
+  const result = [];
+  for (const [index, clip] of clips.entries()) {
+    const previous = result.at(-1);
+    const clipStartMs =
+      index === 0
+        ? 0
+        : Math.max(
+            previous.clipEndMs,
+            Math.round(previous.speechEndMs + gapMs - clip.leadingQuietMs),
+          );
+    const clipEndMs = clipStartMs + clip.durationMs;
+    const speechStartMs = clipStartMs + clip.leadingQuietMs;
+    const speechEndMs = clipEndMs - clip.trailingQuietMs;
+    result.push({
+      ...clip,
+      startMs: clipStartMs,
+      clipStartMs,
+      clipEndMs,
+      speechStartMs,
+      speechEndMs,
+    });
+  }
+  return result;
+}
+
+function buildTimingLines(records) {
+  return records.map((line) => ({
+    index: line.index,
+    text: line.text,
+    generationId: line.generationId,
+    audio: `audio/lines/${path.basename(line.file)}`,
+    sourceAudio: line.sourceFile
+      ? `audio/lines/source/${path.basename(line.sourceFile)}`
+      : undefined,
+    start: roundSeconds(line.clipStartMs / 1000),
+    duration: roundSeconds(line.durationMs / 1000),
+    end: roundSeconds(line.clipEndMs / 1000),
+    clipStart: roundSeconds(line.clipStartMs / 1000),
+    clipEnd: roundSeconds(line.clipEndMs / 1000),
+    speechStart: roundSeconds(line.speechStartMs / 1000),
+    speechEnd: roundSeconds(line.speechEndMs / 1000),
+    leadingQuietMs: line.leadingQuietMs,
+    trailingQuietMs: line.trailingQuietMs,
+    boundaryPeakDb: line.boundaryPeakDb,
+    qa: {
+      passed: line.qa.passed,
+      expectedLastWord: line.qa.expectedLastWord,
+      transcribedLastWord: line.qa.transcribedLastWord,
+      attempts: line.qa.attempts,
+    },
+  }));
+}
+
+function validateTimingPlan(timingData, assembledDuration) {
+  const errors = [];
+  const tolerance = 0.06;
+  for (const [index, line] of timingData.lines.entries()) {
+    if (!line.qa.passed) errors.push(`line ${index + 1} did not pass voice QA`);
+    if (line.trailingQuietMs < minTailQuietMs) {
+      errors.push(`line ${index + 1} has only ${line.trailingQuietMs}ms of quiet tail`);
+    }
+    const next = timingData.lines[index + 1];
+    if (next) {
+      const pause = next.speechStart - line.speechEnd;
+      if (Math.abs(pause - gapMs / 1000) > tolerance) {
+        errors.push(`line ${index + 1} pause is ${pause.toFixed(3)}s`);
+      }
+      if (next.imageStart < line.speechEnd - tolerance) {
+        errors.push(`image ${index + 2} begins before line ${index + 1} finishes`);
+      }
+    }
+  }
+  if (Math.abs(Number(timingData.narrationDuration) - assembledDuration) > tolerance) {
+    errors.push("timing narrationDuration does not match the assembled WAV");
+  }
+  if (errors.length) throw new Error(`Narration validation failed: ${errors.join("; ")}.`);
+}
+
+function logAccepted(index, text, qa, resumed) {
+  const label = resumed ? "checked" : qa.attempts > 1 ? "accepted after retry" : "accepted";
+  console.log(
+    `[${index + 1}/${lines.length}] ${label} · ` +
+      `${(qa.analysis.durationMs / 1000).toFixed(2)}s · ` +
+      `${qa.analysis.trailingQuietMs.toFixed(0)}ms safe tail · ${text.slice(0, 60)}`,
+  );
+}
+
+function linePath(index) {
+  return path.join(lineDir, `${String(index + 1).padStart(2, "0")}.wav`);
+}
+
+function sourceLinePath(index) {
+  return path.join(sourceLineDir, `${String(index + 1).padStart(2, "0")}.wav`);
+}
+
+function roundSeconds(value) {
+  return Number(Number(value).toFixed(3));
 }
 
 function adoptStory(existing) {
@@ -353,6 +597,25 @@ async function writeStoryManifest(targetStory, storyLines) {
     modelSize,
     language,
     gapMs,
-    lines: storyLines,
+    finalHoldMs,
+    lines: storyLines.map((line) => ({
+      index: line.index,
+      text: line.text,
+      generationId: line.generationId,
+      startMs: Math.round(line.clipStartMs ?? line.startMs ?? 0),
+      durationMs: Math.round(line.durationMs ?? 0),
+      leadingQuietMs:
+        line.leadingQuietMs === undefined ? undefined : Number(line.leadingQuietMs.toFixed(3)),
+      trailingQuietMs:
+        line.trailingQuietMs === undefined ? undefined : Number(line.trailingQuietMs.toFixed(3)),
+      qa: line.qa
+        ? {
+            passed: Boolean(line.qa.passed),
+            expectedLastWord: line.qa.expectedLastWord,
+            transcribedLastWord: line.qa.transcribedLastWord,
+            attempts: line.qa.attempts,
+          }
+        : undefined,
+    })),
   });
 }

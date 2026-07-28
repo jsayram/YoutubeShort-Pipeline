@@ -137,6 +137,7 @@ function stageList(options) {
 async function startRun({ slug, title, scriptText, options }) {
   const projectDir = videoDir(slug);
   const exists = await fs.access(projectDir).then(() => true, () => false);
+  const gapMs = Math.max(0, Math.min(10000, Math.round(Number(options.gapMs ?? 3000))));
 
   current = {
     id: String(Date.now()),
@@ -167,6 +168,7 @@ async function startRun({ slug, title, scriptText, options }) {
     const prepareArgs = [script("prepare-script.mjs"), "--project", slug, "--script", scriptFile];
     if (title) prepareArgs.push("--title", title);
     if (options.keepPrompts) prepareArgs.push("--keep-prompts");
+    prepareArgs.push("--gap", String(gapMs));
     // Persist the chosen voice into video.json so the project keeps it, and so a later CLI run
     // speaks in the same voice as the one started from here.
     if (options.profile) {
@@ -199,7 +201,13 @@ async function startRun({ slug, title, scriptText, options }) {
 
     if (options.skipVoice) setStage("voice", "skipped");
     else {
-      const voiceArgs = [script("generate-story.mjs"), "--project", slug];
+      const voiceArgs = [
+        script("generate-story.mjs"),
+        "--project",
+        slug,
+        "--gap",
+        String(gapMs),
+      ];
       if (options.resume) voiceArgs.push("--resume");
       await runStage("voice", node, voiceArgs);
       await emitTiming(slug);
@@ -317,6 +325,7 @@ async function emitTiming(slug) {
     type: "audio",
     url: `/media/${slug}/public/audio/narration.wav?v=${Date.now()}`,
     spokenDuration: timing.spokenDuration,
+    pauseMs: timing.pauseMs ?? timing.gapMs ?? 0,
     lines: timing.lines ?? [],
   });
 }
@@ -325,10 +334,14 @@ async function emitVideo(slug) {
   const file = path.join(videoDir(slug), "renders", `${slug}.mp4`);
   const stat = await fs.stat(file).catch(() => null);
   if (!stat) return;
+  const delivery = await readJson(
+    path.join(videoDir(slug), "renders", `${slug}.delivery.json`),
+  ).catch(() => null);
   emit({
     type: "video",
     url: `/media/${slug}/renders/${slug}.mp4?v=${Date.now()}`,
     bytes: stat.size,
+    deliveryPath: delivery?.deliveredFile ?? null,
   });
 }
 

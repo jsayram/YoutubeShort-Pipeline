@@ -4,13 +4,18 @@
   "width": 1080,
   "height": 1920,
   "fps": 30,
-  "hyperframesVersion": "0.7.77",
+  "hyperframesVersion": "0.7.78",
   "voicebox": {
     "profile": "MyOwn",
     "engine": "qwen",
     "modelSize": "1.7B",
     "language": "en",
-    "gapMs": 200,
+    "gapMs": 3000,
+    "finalHoldMs": 3000,
+    "transitionMs": 500,
+    "minTailQuietMs": 20,
+    "qaTranscribe": true,
+    "qaModel": "tiny.en",
     "storyDescription": null
   },
   "imageGen": {

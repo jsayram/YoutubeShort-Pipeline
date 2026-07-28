@@ -42,10 +42,14 @@ const lines = source
 if (!lines.length) throw new Error("The script is empty.");
 
 const WORDS_PER_SECOND = 2.6;
-const GAP_SECONDS = (config.voicebox?.gapMs ?? 200) / 1000;
+const gapMs = Math.max(
+  0,
+  Math.round(Number(flags.gap ?? config.voicebox?.gapMs ?? 3000)),
+);
+const GAP_SECONDS = gapMs / 1000;
 const totalWords = lines.reduce((sum, line) => sum + line.split(/\s+/).length, 0);
 const estimated = totalWords / WORDS_PER_SECOND + GAP_SECONDS * (lines.length - 1);
-const tail = Number(flags.tail ?? 2.5);
+const tail = Number(flags.tail ?? (config.voicebox?.finalHoldMs ?? gapMs) / 1000);
 
 await fs.mkdir(path.join(projectDir, "content"), { recursive: true });
 await fs.writeFile(path.join(projectDir, "content", "narration.txt"), `${lines.join("\n")}\n`);
@@ -84,6 +88,11 @@ if (flags.profile) {
     `Voice: ${config.voicebox.profile}${flags.engine ? ` on ${config.voicebox.engine}` : ""}.`,
   );
 }
+config.voicebox = {
+  ...config.voicebox,
+  gapMs,
+  finalHoldMs: Number(config.voicebox?.finalHoldMs ?? gapMs),
+};
 
 // Same idea for the visual style: resolve the preset against the models that are actually
 // installed and flatten it into imageGen, so the generator keeps reading one plain config.

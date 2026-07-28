@@ -16,6 +16,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
     "personality",
     "resume",
     "skip-images",
+    "skip-voice-qa",
     "skip-voice",
   ]);
 

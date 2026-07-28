@@ -12,6 +12,7 @@ const slug = flags.project;
 const projectDir = videoDir(slug);
 const config = await readJson(path.join(projectDir, "video.json"));
 const output = path.join(projectDir, "renders", `${slug}.mp4`);
+const rawOutput = path.join(projectDir, "renders", `.${slug}.hyperframes-${process.pid}.mp4`);
 await fs.mkdir(path.dirname(output), { recursive: true });
 
 await run("npx", ["--yes", `hyperframes@${config.hyperframesVersion}`, "check"], {
@@ -29,17 +30,23 @@ const renderArgs = [
   "portrait",
   "--strict",
   "--output",
-  output,
+  rawOutput,
 ];
 // Docker mode pins the Chrome version and font set, so a re-render months from now matches the
 // original. Slower, and it needs Docker running — worth it for a final master, not for iteration.
 if (flags.docker) renderArgs.push("--docker");
 
-await run("npx", renderArgs, { cwd: projectDir });
-await run(process.execPath, [
-  path.join(repoRoot, "scripts", "verify-video.mjs"),
-  "--project",
-  slug,
-  "--file",
-  output,
-]);
+try {
+  await run("npx", renderArgs, { cwd: projectDir });
+  await run(process.execPath, [
+    path.join(repoRoot, "scripts", "deliver-video.mjs"),
+    "--project",
+    slug,
+    "--file",
+    rawOutput,
+    "--output",
+    output,
+  ]);
+} finally {
+  await fs.rm(rawOutput, { force: true }).catch(() => {});
+}

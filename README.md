@@ -60,7 +60,9 @@ is already where `hyperframes.json` points its asset path.
 
 Write `narration.txt` with one spoken beat per line. Voicebox speaks each line separately and lays
 them out as a story, which keeps the delivery tight and gives you exact per-line timings to animate
-against.
+against. The default is three seconds of audible silence between beats. The current image keeps
+animating through that pause, and the next image finishes its 0.5-second entrance before its voice
+begins. Change the pause in Studio or with `voicebox.gapMs` in `video.json`.
 
 The Studio's Content provider dropdown loads a matching prompt profile from
 `templates/prompt.json`. Each profile keeps its scene template, shared style prompt, and negative
@@ -94,14 +96,22 @@ npm run story -- --project my-video-name
 
 The story lands in the Voicebox app under the title from `video.json`, alongside
 `public/audio/narration.wav` and `public/audio/narration.timing.json`. Use those timings for
-`data-start` and `data-duration` when you compose.
+`data-start` and `data-duration` when you compose. The pipeline exports every accepted Voicebox
+line under `public/audio/lines/`, checks its final word and quiet tail, and assembles the master
+locally so no clip is trimmed at a story boundary.
+
+Re-run the timing and audio safety gate at any time:
+
+```sh
+npm run validate:narration -- --project my-video-name
+```
 
 Build the HyperFrames composition in `videos/my-video-name/index.html`, then validate and preview:
 
 ```sh
 cd "videos/my-video-name"
-npx --yes hyperframes@0.7.76 check
-npx --yes hyperframes@0.7.76 snapshot --at 5,15,25,35,45,55
+npx --yes hyperframes@0.7.78 check
+npx --yes hyperframes@0.7.78 snapshot --at 5,15,25,35,45,55
 npm run dev
 ```
 
@@ -113,7 +123,18 @@ npm run render -- --project my-video-name --approved
 ```
 
 The finished file is saved as
-`videos/my-video-name/renders/my-video-name.mp4` and verified for 60 seconds, 1080×1920, and audio.
+`videos/my-video-name/renders/my-video-name.mp4` and verified for duration, 1080×1920, and audio.
+Before delivery, the pipeline removes descriptive, authoring, location, and chapter metadata
+without re-encoding the picture or sound. It then copies the clean MP4 to
+`iCloud Drive/YoutubeShortPipeline/ready`. After uploading it, move it manually from `ready` to
+`published`. Existing names are never overwritten; a second render is delivered with a numbered
+filename.
+
+To clean and deliver an already-rendered project:
+
+```sh
+npm run deliver -- --project my-video-name
+```
 
 ## Use with ChatGPT Codex or Claude Code
 
