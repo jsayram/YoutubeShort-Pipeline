@@ -791,6 +791,11 @@ const server = http.createServer(async (request, response) => {
           reason: style.reason ?? null,
           note: style.note ?? null,
           checkpoint: style.checkpoint ?? null,
+          diffusionModel: style.diffusionModel ?? null,
+          textEncoder: style.textEncoder ?? null,
+          vae: style.vae ?? null,
+          fallbackProvider: style.fallbackProvider ?? null,
+          referenceCount: style.referencePrompts?.length ?? 0,
           promptProfile: style.promptProfile,
           compositionPreset: style.compositionPreset ?? null,
           loras: (style.loras ?? []).map((lora) => lora.name),
@@ -798,7 +803,7 @@ const server = http.createServer(async (request, response) => {
         })),
         speedLora,
         speedSampling,
-        default: "photographic",
+        default: "flux2-storybook",
       });
       return;
     }
@@ -1005,6 +1010,9 @@ const server = http.createServer(async (request, response) => {
       const prompts = await readJson(
         path.join(videoDir(slug), "content", "image-prompts.json"),
       ).catch(() => []);
+      const projectConfig = await readJson(
+        path.join(videoDir(slug), "video.json"),
+      ).catch(() => ({}));
       const images = [];
       for (const prompt of Array.isArray(prompts) ? prompts : []) {
         const file = await findGenerated(slug, prompt.id);
@@ -1014,11 +1022,26 @@ const server = http.createServer(async (request, response) => {
           url: file ? `/media/${slug}/public/generated/${file}?v=${Date.now()}` : null,
         });
       }
+      const references = [];
+      for (const reference of projectConfig.imageGen?.referencePrompts ?? []) {
+        const id = String(reference.id ?? "").trim();
+        if (!id) continue;
+        const relative = `assets/references/${id}.png`;
+        const absolute = path.join(videoDir(slug), relative);
+        const ready = await fs.access(absolute).then(() => true, () => false);
+        references.push({
+          id,
+          role: reference.role ?? "reference",
+          ready,
+          url: ready ? `/media/${slug}/${relative}?v=${Date.now()}` : null,
+        });
+      }
       sendJson(response, 200, {
         slug,
         total: images.length,
         generated: images.filter((image) => image.ready).length,
         images,
+        references,
       });
       return;
     }

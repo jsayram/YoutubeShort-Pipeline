@@ -2,7 +2,7 @@
 
 A reusable local pipeline for making 60-second, 9:16 YouTube Shorts with:
 
-- Google GenAI for visual assets
+- ComfyUI, FLUX.2 Klein, Animagine, Google GenAI, or Cloudflare for visual assets
 - Voicebox for a local male voice-over
 - HyperFrames for composition, animation, preview, and rendering
 - ChatGPT Codex or Claude Code as the directing agent
@@ -32,6 +32,8 @@ You need macOS, Node.js 22 or newer, FFmpeg, and the Voicebox app.
    ```
 
 4. Put the Google AI Studio key after `GEMINI_API_KEY=` in `.env`.
+   Gemini remains optional. For the recurring-free FLUX fallback, also set
+   `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; local FLUX does not need either value.
 5. Check the setup:
 
    ```sh
@@ -73,6 +75,10 @@ lives at `captions.enabled` in `video.json`; command-line projects can prepare t
 npm run align -- --project my-video-name
 ```
 
+Alignment runs against each Voicebox line separately, then fits those words into that line's
+measured `speechStart`–`speechEnd` window. This preserves the exact three-second gaps instead of
+letting a speech engine compress the silence and make later captions progressively early.
+
 The Studio's Content provider dropdown loads a matching prompt profile from
 `templates/prompt.json`. Open **Edit image prompts** beneath the dropdown to work at three safe
 levels:
@@ -101,10 +107,28 @@ drifting haze and motes, and a restrained camera push. Its prompt intentionally 
 near the lower centre with loose fabric, hair, smoke, foliage, or particles that support those
 motion cues.
 
+`FLUX.2 dark storybook (local first)` is the recommended story provider. It renders with the
+local four-step FLUX.2 Klein model and falls back to Cloudflare only when both Cloudflare values
+are configured. It automatically creates two stable files under `assets/references/`: a faceless
+recurring-character guide and a dark gouache/charcoal style guide. Scene regeneration reuses
+those references; use `--force-references` only when you intentionally want a new character and
+art direction.
+
+`Animagine dark faceless storybook` is separate from the existing Animagine-backed providers. Its
+ordered-tag prompt asks for literal physical actions, a full-body anonymous protagonist, a face
+hidden in shadow, and mature dark storybook brushwork. Selecting it does not change the Anime,
+Illustrated monologue, Living storybook, or Gemini providers.
+
 Generate the media:
 
 ```sh
 npm run assets -- --project my-video-name
+```
+
+To render only the new FLUX provider:
+
+```sh
+npm run images:flux2 -- --project my-video-name
 ```
 
 Or build just the voice, checking the line split first:

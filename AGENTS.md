@@ -3,7 +3,8 @@
 This repository turns a script or topic into a vertical YouTube Short. It coordinates three
 external tools:
 
-- Google GenAI creates still visual assets.
+- The selected provider creates still visual assets: local ComfyUI, local-first FLUX.2 Klein with
+  optional Cloudflare fallback, Google GenAI, or another registered provider.
 - Voicebox creates narration through its local REST API, one clip per script line, assembled into a
   Voicebox story.
 - HyperFrames builds, previews, validates, and renders the video.

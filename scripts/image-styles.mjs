@@ -47,14 +47,27 @@ export async function comfyModels(baseUrl) {
 
   const checkpoints = await fetchList("CheckpointLoaderSimple", "ckpt_name");
   if (checkpoints === null) return null;
-  const loras = (await fetchList("LoraLoader", "lora_name")) ?? [];
-  return { checkpoints, loras };
+  const [loras, diffusionModels, textEncoders, vaes] = await Promise.all([
+    fetchList("LoraLoader", "lora_name"),
+    fetchList("UNETLoader", "unet_name"),
+    fetchList("CLIPLoader", "clip_name"),
+    fetchList("VAELoader", "vae_name"),
+  ]);
+  return {
+    checkpoints,
+    loras: loras ?? [],
+    diffusionModels: diffusionModels ?? [],
+    textEncoders: textEncoders ?? [],
+    vaes: vaes ?? [],
+  };
 }
 
 function firstMatch(files, fragments) {
-  if (!fragments?.length) return null;
+  const wanted = (fragments ?? []).filter(Boolean);
+  if (!wanted.length) return null;
   return (
-    files.find((file) => fragments.some((piece) => file.toLowerCase().includes(piece))) ?? null
+    files.find((file) => wanted.some((piece) => file.toLowerCase().includes(piece.toLowerCase()))) ??
+    null
   );
 }
 
@@ -69,6 +82,69 @@ export async function resolveStyles(baseUrl) {
   const speedLora = models ? firstMatch(models.loras, SPEED_FRAGMENTS) : null;
 
   const resolved = styles.map((style) => {
+    if (style.provider === "cloudflare-flux2") {
+      const configured = Boolean(
+        process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN,
+      );
+      return {
+        ...style,
+        available: configured,
+        reason: configured
+          ? null
+          : "Cloudflare credentials are not configured in .env.",
+        checkpoint: null,
+        loras: [],
+      };
+    }
+
+    if (style.provider === "flux2-local") {
+      const required = style.requiredModels ?? {};
+      const fallbackReady = Boolean(
+        style.fallbackProvider === "cloudflare-flux2" &&
+          process.env.CLOUDFLARE_ACCOUNT_ID &&
+          process.env.CLOUDFLARE_API_TOKEN,
+      );
+      if (!models) {
+        return {
+          ...style,
+          available: fallbackReady,
+          degraded: fallbackReady,
+          reason: fallbackReady ? null : "ComfyUI is not reachable.",
+          note: fallbackReady
+            ? "ComfyUI is offline; this run will use the configured Cloudflare fallback."
+            : null,
+          checkpoint: null,
+          loras: [],
+        };
+      }
+      const diffusionModel = firstMatch(models.diffusionModels, [required.diffusionModel]);
+      const textEncoder = firstMatch(models.textEncoders, [required.textEncoder]);
+      const vae = firstMatch(models.vaes, [required.vae]);
+      const missing = [
+        !diffusionModel && required.diffusionModel,
+        !textEncoder && required.textEncoder,
+        !vae && required.vae,
+      ].filter(Boolean);
+      return {
+        ...style,
+        available: missing.length === 0 || fallbackReady,
+        degraded: missing.length > 0 && fallbackReady,
+        reason:
+          missing.length > 0 && !fallbackReady
+            ? `Missing local FLUX model file(s): ${missing.join(", ")}.`
+            : null,
+        note:
+          missing.length > 0 && fallbackReady
+            ? `Local FLUX is missing ${missing.join(", ")}; Cloudflare will be used.`
+            : null,
+        diffusionModel,
+        textEncoder,
+        vae,
+        checkpoint: null,
+        loras: [],
+      };
+    }
+
     if (style.provider !== "comfyui") {
       // Cloud providers do not depend on local models, so availability is about credentials,
       // which the generator checks when it runs.
@@ -130,6 +206,10 @@ export function applyStyle(imageGen, style, { fast = false, speedLora = null } =
   // the ordinary slideshow instead of inheriting the living treatment.
   next.compositionPreset = style.compositionPreset ?? null;
   if (style.checkpoint) next.checkpoint = style.checkpoint;
+  if (style.diffusionModel) next.diffusionModel = style.diffusionModel;
+  if (style.textEncoder) next.textEncoder = style.textEncoder;
+  if (style.vae) next.vae = style.vae;
+  next.fallbackProvider = style.fallbackProvider ?? null;
   Object.assign(next, style.sampling ?? {});
   // Some looks are not 9:16. The storybook preset paints square art that the composition
   // centres over a blurred enlargement of itself, so it must not be cropped to the frame.
@@ -140,6 +220,9 @@ export function applyStyle(imageGen, style, { fast = false, speedLora = null } =
   // treated style so a later photographic run does not inherit ink edge extraction.
   next.postProcess = style.postProcess ?? null;
   next.loras = [...(style.loras ?? [])];
+  next.referencePrompts = (style.referencePrompts ?? []).map((reference) => ({
+    ...reference,
+  }));
 
   if (fast && speedLora) {
     next.loras.push({ name: speedLora, strength: 1 });

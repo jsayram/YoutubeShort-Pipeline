@@ -148,7 +148,16 @@ await fs.mkdir(referenceDir, { recursive: true });
 // written to assets/references/, and then attached to every scene that follows so a recurring
 // character or palette stays put across the whole video. Scenes opt out with
 // `"references": []`.
-const referencePrompts = prompts.filter((item) => item.kind === "reference");
+const referencePrompts = [];
+const referenceIds = new Set();
+for (const item of [
+  ...(Array.isArray(gen.referencePrompts) ? gen.referencePrompts : []),
+  ...prompts.filter((item) => item.kind === "reference"),
+]) {
+  if (!item?.id || !item?.prompt || referenceIds.has(item.id)) continue;
+  referenceIds.add(item.id);
+  referencePrompts.push({ ...item, kind: "reference", role: item.role ?? "style" });
+}
 const scenePrompts = prompts.filter((item) => item.kind !== "reference");
 const sharedReferences = referencePrompts.map(
   (item) => `assets/references/${item.id}.png`,
@@ -421,7 +430,10 @@ for (const [index, item] of ordered.entries()) {
     ? `assets/references/${item.id}.png`
     : `public/generated/${item.id}.png`;
 
-  if (!flags.force) {
+  // Regenerating scenes should not silently redesign the recurring character. Reference art is
+  // stable until the user explicitly asks for --force-references.
+  const forceItem = isReference ? flags["force-references"] : flags.force;
+  if (!forceItem) {
     const existing = await fs.access(finalPath).then(
       () => true,
       () => false,

@@ -33,8 +33,8 @@ Start the Voicebox app, then run:
 npm run assets -- --project topic-name
 ```
 
-This calls the Google GenAI API, then builds a Voicebox story from the narration. Each line becomes
-its own generation and its own item on the story timeline. The default target is three seconds of
+This calls the project's selected image provider, then builds a Voicebox story from the narration.
+Each line becomes its own generation and its own item on the story timeline. The default target is three seconds of
 audible silence from the end of one spoken phrase to the beginning of the next. The story is saved
 in Voicebox under the `title` from `video.json`, so you can open the app to re-roll a weak line or
 review the story.
@@ -52,6 +52,11 @@ The voice step writes:
 - `public/audio/narration.timing.json`: clip, speech, pause, image, and transition timings.
 - `content/story.json`: the story and generation ids, used by `--resume`.
 
+The FLUX.2 and Animagine dark-storybook providers generate a character reference and a style
+reference before their first scene. They live in `assets/references/` and are shown separately in
+Studio. A normal scene reroll preserves them, keeping the protagonist and palette stable. Pass
+`--force-references` only when you want to redesign those anchors.
+
 Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
 generated once more, then stops with its line number rather than entering the final mix. Run
 `npm run validate:narration -- --project topic-name` to repeat the audio and timing checks.
@@ -68,7 +73,10 @@ npm run align -- --project topic-name
 ```
 
 The automatic composers use those timings to render short phrase groups in HyperFrames, highlight
-the currently spoken word, and hide the caption card during silent pauses.
+the currently spoken word, and hide the caption card during silent pauses. The aligner transcribes
+each saved Voicebox line independently and restores it to the line's measured global speech
+window. Do not replace this with one full-track transcription: speech engines can compress the
+three-second gaps and shift every later caption early.
 
 ## 4. Compose the video
 

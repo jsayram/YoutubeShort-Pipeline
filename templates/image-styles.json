@@ -161,6 +161,107 @@
     ]
   },
   {
+    "id": "flux2-storybook",
+    "label": "FLUX.2 dark storybook (local first)",
+    "provider": "flux2-local",
+    "fallbackProvider": "cloudflare-flux2",
+    "promptProfile": "flux2-storybook",
+    "summary": "Dark faceless storybook illustration with automatic character and style references. Uses local FLUX.2 Klein first and Cloudflare only as a configured fallback.",
+    "requiredModels": {
+      "diffusionModel": "flux-2-klein-4b.safetensors",
+      "textEncoder": "qwen_3_4b.safetensors",
+      "vae": "flux2-vae.safetensors"
+    },
+    "download": "Install the official FLUX.2 Klein 4B BF16 diffusion model, Qwen 3 4B text encoder, and FLUX.2 VAE. BF16 is required on Apple Silicon because MPS cannot execute FP8 weights.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 1,
+      "sampler": "euler",
+      "genWidth": 768,
+      "genHeight": 1344,
+      "outWidth": 1080,
+      "outHeight": 1920
+    },
+    "referencePrompts": [
+      {
+        "id": "character-reference",
+        "role": "character",
+        "prompt": "A clean wordless character reference for one recurring anonymous traveler in a mature dark storybook. Show one full-body figure in a charcoal hooded coat with a single muted dusty-teal scarf, simple boots, slim natural proportions, and an entirely featureless face hidden in deep shadow. Three-quarter rear view, quiet human posture, readable silhouette, plain warm-grey paper ground, hand-painted gouache and charcoal, restrained brush texture. Every paper margin and corner stays clean, plain, and completely unmarked."
+      },
+      {
+        "id": "style-reference",
+        "role": "style",
+        "prompt": "A representative wordless illustration from a mature dark storybook: an anonymous faceless traveler beneath one dim streetlamp at night, hand-painted gouache, dry charcoal edges, rough paper grain, broad imperfect brushwork, deep charcoal shadows, muted ochre light, dusty teal accent, faded olive and warm brown, cinematic negative space, restrained melancholy, layered foreground and background. Every paper margin and corner stays clean, plain, and completely unmarked."
+      }
+    ]
+  },
+  {
+    "id": "cloudflare-flux2-storybook",
+    "label": "FLUX.2 dark storybook (Cloudflare)",
+    "provider": "cloudflare-flux2",
+    "promptProfile": "flux2-storybook",
+    "summary": "The same referenced dark-storybook treatment through Cloudflare Workers AI's recurring free allocation.",
+    "download": "No model download. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in .env.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 1,
+      "genWidth": 768,
+      "genHeight": 1344,
+      "outWidth": 1080,
+      "outHeight": 1920
+    },
+    "referencePrompts": [
+      {
+        "id": "character-reference",
+        "role": "character",
+        "prompt": "A clean wordless character reference for one recurring anonymous traveler in a mature dark storybook. Show one full-body figure in a charcoal hooded coat with a single muted dusty-teal scarf, simple boots, slim natural proportions, and an entirely featureless face hidden in deep shadow. Three-quarter rear view, quiet human posture, readable silhouette, plain warm-grey paper ground, hand-painted gouache and charcoal, restrained brush texture. Every paper margin and corner stays clean, plain, and completely unmarked."
+      },
+      {
+        "id": "style-reference",
+        "role": "style",
+        "prompt": "A representative wordless illustration from a mature dark storybook: an anonymous faceless traveler beneath one dim streetlamp at night, hand-painted gouache, dry charcoal edges, rough paper grain, broad imperfect brushwork, deep charcoal shadows, muted ochre light, dusty teal accent, faded olive and warm brown, cinematic negative space, restrained melancholy, layered foreground and background. Every paper margin and corner stays clean, plain, and completely unmarked."
+      }
+    ]
+  },
+  {
+    "id": "animagine-dark-storybook",
+    "label": "Animagine dark faceless storybook",
+    "provider": "comfyui",
+    "promptProfile": "animagine-dark-storybook",
+    "summary": "A separate Animagine preset for literal, dark, faceless story scenes instead of abstract shapes or visible anime portraits.",
+    "match": [
+      "animagine"
+    ],
+    "prefersCheckpoint": [
+      "animagine"
+    ],
+    "download": "Animagine XL is already installed.",
+    "sampling": {
+      "steps": 30,
+      "cfg": 5.5,
+      "sampler": "euler_ancestral",
+      "scheduler": "normal"
+    },
+    "framing": {
+      "genWidth": 1024,
+      "genHeight": 1024,
+      "outWidth": 1024,
+      "outHeight": 1024
+    },
+    "referencePrompts": [
+      {
+        "id": "character-reference",
+        "role": "character",
+        "prompt": "safe, solo, one adult human figure, full body, anonymous faceless traveler, face completely hidden in shadow beneath a charcoal hood, no visible eyes, no visible mouth, simple dark coat, muted dusty-teal scarf, three-quarter back view, natural proportions, clean readable silhouette, neutral standing pose, plain paper background, dark hand-painted storybook character reference, gouache, charcoal edges, masterpiece, high score, great score, absurdres"
+      },
+      {
+        "id": "style-reference",
+        "role": "style",
+        "prompt": "safe, solo, anonymous faceless traveler beneath one dim streetlamp, full body, face hidden in deep shadow, mature dark storybook illustration, hand-painted gouache, charcoal edges, rough paper grain, muted ochre light, dusty teal accent, faded olive, warm brown, deep charcoal shadows, melancholy night, broad imperfect brushwork, layered depth, negative space, masterpiece, high score, great score, absurdres"
+      }
+    ]
+  },
+  {
     "id": "gemini",
     "label": "Google Gemini (cloud)",
     "provider": "gemini",

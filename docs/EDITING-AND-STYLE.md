@@ -9,12 +9,16 @@
 | Pause between verses | `voicebox.gapMs` or Studio's Pause field | regenerate voice and compose |
 | Active-word captions | Studio's Highlight spoken words toggle or `captions.enabled` | align words and compose |
 | One visual | Studio's Final scene prompts or its entry in `content/image-prompts.json` | delete only that generated image, then run the image command |
+| Recurring character or palette | `assets/references/` | remove the chosen reference and rerun, or use `--force-references` to redesign all references |
 | Overall look | `content/STYLE.md`, prompts, and composition CSS | image generation, snapshots, and preview |
 | Scene timing | `video.json`, clip data attributes, and GSAP positions | check, snapshots, and preview |
 | On-screen text | `index.html` | check and preview |
 | Duration | narration, scene plan, clip timing, and `video.json` | regenerate voice, then check and preview |
 
 Use `--force` with the image command only when you intentionally want every visual regenerated.
+When narration changes, regenerate the voice before aligning captions. The caption command reads
+the individual files in `public/audio/lines/` and places their words inside the measured
+`speechStart`–`speechEnd` window recorded in `narration.timing.json`.
 
 ## Improve the animations
 
@@ -55,6 +59,11 @@ provider. Prompt settings have three layers:
 | Provider default | `templates/prompt.json` | new videos that use that provider |
 | Video override | `content/prompt-overrides.json` | only the selected video |
 | Scene edit | `content/image-prompts.json` plus `content/prompt-state.json` | only that scene in that video |
+
+The FLUX.2 local-first and Animagine dark-storybook choices also own automatic reference prompts.
+They generate a stable faceless character and a style anchor once per project. Regenerating scenes
+does not regenerate those anchors, so a weak scene can be rerolled without changing the character.
+Studio shows the references above the scene gallery once they exist.
 
 Use **Save for this video** while experimenting. A badge shows when a field is video-specific.
 **Reset video to provider default** removes only the current video's override.

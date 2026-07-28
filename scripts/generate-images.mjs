@@ -5,6 +5,8 @@ import { parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
 //   "comfyui" — local ComfyUI over HTTP. Offline, no key, no quota. The default.
 //   "gemini"  — Google GenAI. Needs GEMINI_API_KEY and a billed project; image generation
 //               has a zero free-tier allowance, so an unbilled key fails with 429 limit:0.
+//   "flux2-local" — FLUX.2 Klein through ComfyUI, with optional Cloudflare fallback.
+//   "cloudflare-flux2" — FLUX.2 Klein through Cloudflare Workers AI.
 
 const { flags } = parseArgs();
 if (!flags.project) throw new Error("Pass --project <slug>.");
@@ -17,6 +19,9 @@ const backends = {
   local: "generate-images-local.mjs",
   gemini: "generate-images-gemini.mjs",
   google: "generate-images-gemini.mjs",
+  "flux2-local": "generate-images-flux2.mjs",
+  flux2: "generate-images-flux2.mjs",
+  "cloudflare-flux2": "generate-images-cloudflare.mjs",
 };
 
 const script = backends[provider];

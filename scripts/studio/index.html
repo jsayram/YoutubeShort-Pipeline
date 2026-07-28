@@ -731,6 +731,14 @@ Start a recording and talk about your day."></textarea>
           </div>
           <button id="refresh-assets" class="ghost compact">Refresh</button>
         </div>
+        <div class="hidden" id="reference-assets">
+          <label>Character and style references</label>
+          <div class="sub" style="margin-bottom: 10px">
+            These stay stable when scenes are regenerated. They change only when references are
+            explicitly regenerated.
+          </div>
+          <div class="grid" id="saved-references"></div>
+        </div>
         <div class="grid" id="saved-shots"></div>
       </section>
 
@@ -1399,6 +1407,16 @@ Start a recording and talk about your day."></textarea>
         $("project-assets-count").textContent =
           `${data.generated}/${data.total} images saved locally` +
           (data.generated < data.total ? " · unfinished images remain outlined" : "");
+        const referencePanel = $("reference-assets");
+        referencePanel.classList.toggle("hidden", !data.references?.length);
+        $("saved-references").innerHTML = (data.references ?? [])
+          .map(
+            (image) =>
+              `<div class="shot ${image.ready ? "" : "waiting"}" data-id="${escapeHtml(image.id)}">` +
+              (image.ready ? `<img src="${escapeHtml(image.url)}" alt="" />` : "") +
+              `<span>${escapeHtml(image.id)} · ${escapeHtml(image.role)}</span></div>`,
+          )
+          .join("");
         $("saved-shots").innerHTML = data.images
           .map(
             (image) =>
@@ -1615,6 +1633,11 @@ Start a recording and talk about your day."></textarea>
         }
         const bits = [style.summary];
         if (style.checkpoint) bits.push(style.checkpoint);
+        if (style.diffusionModel) bits.push(style.diffusionModel);
+        if (style.referenceCount) {
+          bits.push(`${style.referenceCount} automatic reference images`);
+        }
+        if (style.fallbackProvider) bits.push("Cloudflare fallback");
         if (style.loras.length) bits.push(`lora: ${style.loras.join(", ")}`);
         if (style.promptProfile) {
           bits.push(`prompt: ${style.promptProfile} in templates/prompt.json`);

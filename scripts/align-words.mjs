@@ -1,16 +1,23 @@
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { commandOutput, parseArgs, readJson, run, videoDir, writeJson } from "./lib.mjs";
+import {
+  assertAlignedLine,
+  collectTranscriptWords,
+  fitWordsToLine,
+} from "./word-alignment.mjs";
 
 // Word-level timings for the narration Voicebox already produced.
 //
-// Voicebox gives one timing per spoken line, which is right for scene boundaries and useless for
-// one-word-at-a-time captions. Rather than adding a second ASR stack, this wraps the transcriber
-// HyperFrames already ships: it writes transcript.json in the project, which is exactly the file
-// a composition reads for word timing.
+// Voicebox gives one timing per spoken line, which is right for scene boundaries and insufficient
+// for one-word-at-a-time captions. Rather than adding a second ASR stack, this wraps the
+// transcriber HyperFrames already ships.
 //
-// The narration is transcribed as complete sentences and aligned afterwards. Generating words
-// separately in Voicebox would destroy the phrasing and the natural pauses.
+// Do not transcribe the assembled narration as one file. Parakeet and Whisper can remove long
+// silence from their timestamp clock, which made every later line appear progressively early.
+// Transcribe each already-generated line, fit its internal word rhythm to the measured speech
+// window, then restore its exact position in the assembled narration.
 
 const { flags } = parseArgs();
 if (!flags.project) throw new Error("Pass --project <slug>.");
@@ -19,11 +26,18 @@ const slug = flags.project;
 const projectDir = videoDir(slug);
 const config = await readJson(path.join(projectDir, "video.json"));
 const audioPath = path.join(projectDir, "public", "audio", "narration.wav");
+const timingPath = path.join(projectDir, "public", "audio", "narration.timing.json");
+const timing = await readJson(timingPath).catch(() => null);
 
 if (!(await fs.access(audioPath).then(() => true, () => false))) {
   throw new Error(
     `${path.relative(projectDir, audioPath)} is missing. Build the voice first: ` +
       `npm run story -- --project ${slug}`,
+  );
+}
+if (!Array.isArray(timing?.lines) || !timing.lines.length) {
+  throw new Error(
+    "narration.timing.json has no Voicebox line timings. Rebuild the narration before captions.",
   );
 }
 
@@ -38,56 +52,78 @@ if (!engine) {
   );
 }
 
-const args = [
-  "--yes",
-  `hyperframes@${config.hyperframesVersion}`,
-  "transcribe",
-  path.relative(projectDir, audioPath),
-  "--engine",
-  engine,
-  "--language",
-  config.voicebox?.language ?? "en",
-];
-if (flags.model) args.push("--model", flags.model);
+const language = config.voicebox?.language ?? "en";
+const model = flags.model ?? (language === "en" ? "small.en" : "small");
+const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "youtube-short-caption-align-"));
+const words = [];
 
-console.log(`Aligning ${path.basename(audioPath)} with ${engine}…`);
-await run("npx", args, { cwd: projectDir });
+console.log(`Aligning ${timing.lines.length} Voicebox line(s) with ${engine}…`);
+try {
+  for (const [index, line] of timing.lines.entries()) {
+    const sourcePath = path.join(projectDir, "public", String(line.audio ?? ""));
+    if (!(await fs.access(sourcePath).then(() => true, () => false))) {
+      throw new Error(
+        `Missing line audio for caption alignment: ${path.relative(projectDir, sourcePath)}`,
+      );
+    }
 
-// The transcriber writes its sidecar next to the audio it was given, not at the project root.
-// Check both so this keeps working if that changes.
-const candidates = [
-  path.join(path.dirname(audioPath), "transcript.json"),
-  path.join(projectDir, "transcript.json"),
-];
-let transcript = null;
-let transcriptPath = null;
-for (const candidate of candidates) {
-  transcript = await readJson(candidate).catch(() => null);
-  if (transcript) {
-    transcriptPath = candidate;
-    break;
+    const lineDir = path.join(temporaryRoot, String(index + 1).padStart(2, "0"));
+    await fs.mkdir(lineDir, { recursive: true });
+    const inputName = `line${path.extname(sourcePath) || ".wav"}`;
+    await fs.copyFile(sourcePath, path.join(lineDir, inputName));
+    const args = [
+      "--yes",
+      `hyperframes@${config.hyperframesVersion}`,
+      "transcribe",
+      inputName,
+      "--engine",
+      engine,
+      "--model",
+      model,
+      "--language",
+      language,
+      "--json",
+    ];
+    await run("npx", args, { cwd: lineDir });
+
+    const transcriptPath = path.join(lineDir, "transcript.json");
+    const transcript = await readJson(transcriptPath).catch(() => null);
+    if (!transcript) {
+      throw new Error(`The speech aligner produced no transcript for line ${index + 1}.`);
+    }
+    const relativeWords = collectTranscriptWords(transcript);
+    const fitted = fitWordsToLine(relativeWords, line, index);
+    assertAlignedLine(fitted, line, index);
+    words.push(...fitted);
+    console.log(
+      `[${index + 1}/${timing.lines.length}] ${fitted.length} words · ` +
+        `${fitted[0].start.toFixed(2)}s–${fitted.at(-1).end.toFixed(2)}s`,
+    );
   }
+} finally {
+  await fs.rm(temporaryRoot, { recursive: true, force: true });
 }
-if (!transcript) {
-  throw new Error(
-    `No transcript found. Looked in: ${candidates.map((c) => path.relative(projectDir, c)).join(", ")}`,
-  );
-}
-console.log(`Read ${path.relative(projectDir, transcriptPath)}`);
 
-// Normalise to a flat word list next to the line timings, so a composition can drive captions
-// without knowing which transcriber produced them.
-const words = collectWords(transcript);
-if (!words.length) throw new Error("The transcript contains no word-level timings.");
+if (!words.length) throw new Error("The transcripts contain no word-level timings.");
 
-const timingPath = path.join(projectDir, "public", "audio", "narration.timing.json");
-const timing = await readJson(timingPath).catch(() => ({}));
+// Keep one consolidated sidecar for inspection and for tools that consume the standard
+// HyperFrames transcript shape.
+const transcriptPath = path.join(projectDir, "public", "audio", "transcript.json");
+await writeJson(transcriptPath, words);
 timing.words = words;
+timing.wordAlignment = {
+  strategy: "per-line-speech-window",
+  engine,
+  model,
+  language,
+  lineCount: timing.lines.length,
+};
 await writeJson(timingPath, timing);
 
-const spoken = Number(timing.spokenDuration ?? words.at(-1).end);
-console.log(`${words.length} words aligned across ${spoken.toFixed(2)}s.`);
+const narrationDuration = Number(timing.narrationDuration ?? words.at(-1).end);
+console.log(`${words.length} words aligned across ${narrationDuration.toFixed(2)}s.`);
 console.log(`Updated ${path.relative(projectDir, timingPath)}`);
+console.log(`Updated ${path.relative(projectDir, transcriptPath)}`);
 console.log(
   `First words: ${words
     .slice(0, 6)
@@ -109,26 +145,4 @@ async function detectEngine() {
     if (found) return "whisper";
   }
   return null;
-}
-
-// Transcript shapes differ between engines and versions, so accept the common ones rather than
-// assuming a single layout.
-function collectWords(transcript) {
-  const out = [];
-  const push = (word) => {
-    const text = String(word.text ?? word.word ?? "").trim();
-    const start = Number(word.start ?? word.startTime);
-    const end = Number(word.end ?? word.endTime);
-    if (!text || !Number.isFinite(start) || !Number.isFinite(end)) return;
-    out.push({ text, start: Number(start.toFixed(3)), end: Number(end.toFixed(3)) });
-  };
-
-  // HyperFrames writes a bare array of {text,start,end}. Other engines nest words under
-  // segments or under a words key, so all three are accepted.
-  if (Array.isArray(transcript)) transcript.forEach(push);
-  if (Array.isArray(transcript.words)) transcript.words.forEach(push);
-  for (const segment of transcript.segments ?? transcript.cues ?? []) {
-    (segment.words ?? []).forEach(push);
-  }
-  return out.sort((a, b) => a.start - b.start);
 }

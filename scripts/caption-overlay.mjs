@@ -208,6 +208,7 @@ function reconcileWords(timing) {
       text: String(word.text ?? "").trim(),
       start: Number(word.start),
       end: Number(word.end),
+      line: Number.isInteger(Number(word.line)) ? Number(word.line) : null,
     }))
     .filter(
       (word) =>
@@ -238,9 +239,14 @@ function reconcileWords(timing) {
     return timedWords.map((word) => ({ ...word, line: 0 }));
   }
 
-  // Assign every recognized word to the nearest known narration line. This remains stable with
-  // both the old 200 ms story spacing and the current three-second pauses.
+  // New alignments carry their line explicitly. The nearest-range fallback keeps older projects
+  // readable until their captions are regenerated.
   for (const word of timedWords) {
+    const declared = word.line === null ? null : lines.find((line) => line.index === word.line);
+    if (declared) {
+      declared.timedWords.push(word);
+      continue;
+    }
     const midpoint = (word.start + word.end) / 2;
     let nearest = lines[0];
     let nearestDistance = distanceToRange(midpoint, nearest.start, nearest.end);
