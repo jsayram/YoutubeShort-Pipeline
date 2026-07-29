@@ -37,6 +37,7 @@ const ai = new GoogleGenAI({ apiKey });
 const outputDir = path.join(projectDir, "public", "generated");
 await fs.mkdir(outputDir, { recursive: true });
 const manifest = [];
+let cloudRequestCount = 0;
 const generatedExtensions = ["png", "jpg", "jpeg", "webp"];
 
 function finalPromptFor(item) {
@@ -138,6 +139,7 @@ for (const item of prompts) {
   });
   let interaction;
   try {
+    cloudRequestCount += 1;
     interaction = await ai.interactions.create({
       model: config.imageGen.model,
       input: fullPrompt,
@@ -182,6 +184,11 @@ for (const item of prompts) {
     providerResponse: {
       mimeType: image.mimeType,
       interactionId: interaction.id ?? null,
+      usageMetadata:
+        interaction.usageMetadata ??
+        interaction.usage_metadata ??
+        interaction.usage ??
+        null,
     },
   });
   console.log(`Saved ${outputPath}`);
@@ -195,6 +202,13 @@ await audit.finish("completed", {
   manifest: "public/generated/manifest.json",
   generated: manifest.filter((entry) => !entry.skipped).length,
   reused: manifest.filter((entry) => entry.skipped).length,
+  usage: {
+    requests: cloudRequestCount,
+    creditsUsed: null,
+    quotaRemaining: null,
+    quotaNote:
+      "Google did not report account credit balance or remaining image quota in the generation response.",
+  },
 });
 } catch (error) {
   if (audit.document.status !== "failed") await audit.fail(error);

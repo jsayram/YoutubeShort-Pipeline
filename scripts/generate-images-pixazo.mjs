@@ -37,17 +37,18 @@ const gen = config.imageGen ?? {};
 const releaseLock = await installGenerationLock(projectDir, flags.project);
 
 // Pixazo documents SDXL Base 1.0 as free during preview. The free tier supports images up to
-// 1024px, so render a near-vertical source and deterministically fit it to the project's exact
-// 9:16 output. These can still be overridden in video.json for a future paid tier.
+// 1024px, so render a near-horizontal source and deterministically fit it to the project's exact
+// 16:9 output. These can still be overridden in video.json for a future paid tier.
 const endpoint = "https://gateway.pixazo.ai/getImage/v1/getSDXLImage";
 const model = "Stable Diffusion XL Base 1.0";
-const sceneWidth = Number(gen.genWidth ?? 576);
-const sceneHeight = Number(gen.genHeight ?? 1024);
-const outWidth = Number(gen.outWidth ?? config.width ?? 1080);
-const outHeight = Number(gen.outHeight ?? config.height ?? 1920);
+const sceneWidth = Number(gen.genWidth ?? 1024);
+const sceneHeight = Number(gen.genHeight ?? 576);
+const outWidth = Number(gen.outWidth ?? config.width ?? 1920);
+const outHeight = Number(gen.outHeight ?? config.height ?? 1080);
 const steps = Number(flags.steps ?? gen.numSteps ?? gen.steps ?? 20);
 const guidance = Number(flags.guidance ?? gen.guidanceScale ?? gen.guidance ?? 5);
 const outputDir = path.join(projectDir, "public", "generated");
+let cloudRequestCount = 0;
 await fs.mkdir(outputDir, { recursive: true });
 
 function finalPromptFor(item) {
@@ -78,6 +79,7 @@ function safeMediaDescriptor(url) {
 }
 
 async function pixazoImage({ prompt, negativePrompt, seed }) {
+  cloudRequestCount += 1;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -259,6 +261,14 @@ try {
     manifest: "public/generated/manifest.json",
     generated: manifest.filter((entry) => !entry.skipped).length,
     reused: manifest.filter((entry) => entry.skipped).length,
+    usage: {
+      requests: cloudRequestCount,
+      creditsUsed: 0,
+      estimatedCost: 0,
+      quotaRemaining: null,
+      quotaNote:
+        "Pixazo marks this model as free preview; it did not report a remaining fair-use quota.",
+    },
   });
   console.log(
     `Pixazo SDXL finished in ${((Date.now() - startedAt) / 1000).toFixed(0)}s.`,

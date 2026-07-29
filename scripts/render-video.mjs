@@ -42,7 +42,7 @@ const renderArgs = [
   "--fps",
   String(config.fps ?? 30),
   "--resolution",
-  "portrait",
+  "landscape",
   "--strict",
   "--output",
   rawOutput,

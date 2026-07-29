@@ -37,6 +37,15 @@ import {
   selectNarrationTake,
   validateReview,
 } from "./narration-review.mjs";
+import {
+  approveImage,
+  approveImageReview,
+  loadImageReview,
+  prepareImageReview,
+  regenerateImageTake,
+  selectImageTake,
+  validateImageReview,
+} from "./image-review.mjs";
 
 await loadEnv();
 
@@ -73,6 +82,7 @@ const MIME = {
 let current = null;
 const listeners = new Set();
 let persistStateChain = Promise.resolve();
+let imageReviewActions = 0;
 
 function savedRunState() {
   if (!current) return null;
@@ -219,11 +229,12 @@ function stageList(options) {
     { id: "voice", label: "Narration", status: "pending" },
     { id: "review", label: "Narration review", status: "pending" },
     { id: "images", label: "Images", status: "pending" },
+    { id: "image-review", label: "Image review", status: "pending" },
     { id: "compose", label: "Composition", status: "pending" },
     { id: "check", label: "Validation", status: "pending" },
   ];
   if (options.captions) {
-    stages.splice(6, 0, { id: "captions", label: "Caption timing", status: "pending" });
+    stages.splice(7, 0, { id: "captions", label: "Caption timing", status: "pending" });
   }
   if (options.render) stages.push({ id: "render", label: "Render", status: "pending" });
   return stages;
@@ -284,6 +295,7 @@ async function startRun({ slug, title, scriptText, options }) {
     const preparedConfig = await readJson(preparedConfigPath);
     preparedConfig.imageGen ??= {};
     preparedConfig.imageGen.enrichWithLLM = options.enrichWithLLM !== false;
+    preparedConfig.imageGen.reviewBeforeComposition = true;
     preparedConfig.voicebox ??= {};
     preparedConfig.voicebox.reviewBeforeImages = options.reviewNarration !== false;
     await writeJson(preparedConfigPath, preparedConfig);
@@ -310,8 +322,8 @@ async function startRun({ slug, title, scriptText, options }) {
       await emitTiming(slug);
     }
 
-    await finishPipeline(slug, options);
-    emit({ type: "done", slug });
+    const paused = await finishPipeline(slug, options);
+    if (!paused) emit({ type: "done", slug });
   } catch (error) {
     if (!current?.resetting) {
       emit({ type: "error", message: String(error.message ?? error) });
@@ -326,7 +338,10 @@ async function startRun({ slug, title, scriptText, options }) {
 
 async function finishPipeline(slug, options) {
     const projectDir = videoDir(slug);
-    if (options.skipImages) setStage("images", "skipped");
+    if (options.skipImages) {
+      setStage("images", "skipped");
+      setStage("image-review", "skipped");
+    }
     else {
       const imageArgs = [script("generate-images.mjs"), "--project", slug];
       if (options.force) imageArgs.push("--force");
@@ -337,8 +352,23 @@ async function finishPipeline(slug, options) {
         },
       });
       await emitImages(slug);
+      const review = await prepareImageReview(slug, options);
+      setStage(
+        "image-review",
+        "waiting",
+        "Approve every image, then continue to composition.",
+      );
+      emit({ type: "image-review", slug, review: publicImageReviewState(slug, review) });
+      emit({ type: "paused", reason: "image-review", slug });
+      return true;
     }
 
+    await finishPostImagePipeline(slug, options);
+    return false;
+}
+
+async function finishPostImagePipeline(slug, options) {
+    const projectDir = videoDir(slug);
     if (options.captions) {
       await runStage("captions", node, [script("align-words.mjs"), "--project", slug]);
     }
@@ -387,6 +417,7 @@ async function resumeAfterNarrationReview(slug, options) {
     stages: [
       { id: "review", label: "Assemble narration", status: "pending" },
       { id: "images", label: "Images", status: "pending" },
+      { id: "image-review", label: "Image review", status: "pending" },
       ...(options.captions
         ? [{ id: "captions", label: "Caption timing", status: "pending" }]
         : []),
@@ -411,7 +442,44 @@ async function resumeAfterNarrationReview(slug, options) {
       slug,
     ]);
     await emitTiming(slug);
-    await finishPipeline(slug, options);
+    const paused = await finishPipeline(slug, options);
+    if (!paused) emit({ type: "done", slug });
+  } catch (error) {
+    emit({ type: "error", message: String(error.message ?? error) });
+  } finally {
+    if (current) {
+      current.done = true;
+      void persistCurrent();
+    }
+  }
+}
+
+async function resumeAfterImageReview(slug, options) {
+  current = {
+    id: String(Date.now()),
+    slug,
+    stages: [
+      { id: "image-review", label: "Image approval", status: "pending" },
+      ...(options.captions
+        ? [{ id: "captions", label: "Caption timing", status: "pending" }]
+        : []),
+      { id: "compose", label: "Composition", status: "pending" },
+      { id: "check", label: "Validation", status: "pending" },
+      ...(options.render ? [{ id: "render", label: "Render", status: "pending" }] : []),
+    ],
+    events: [],
+    child: null,
+    done: false,
+  };
+  emit({ type: "run", runId: current.id, slug, stages: current.stages });
+  try {
+    const state = await loadImageReview(slug);
+    if (!state || state.status !== "approved") {
+      throw new Error("Image approval was not saved before continuation.");
+    }
+    setStage("image-review", "done", `${state.lines.length} images approved`);
+    await emitImages(slug);
+    await finishPostImagePipeline(slug, options);
     emit({ type: "done", slug });
   } catch (error) {
     emit({ type: "error", message: String(error.message ?? error) });
@@ -442,6 +510,21 @@ function publicReviewState(slug, state) {
       })),
     })),
     validation: validateReview(state),
+  };
+}
+
+function publicImageReviewState(slug, state) {
+  if (!state) return null;
+  return {
+    ...state,
+    lines: state.lines.map((line) => ({
+      ...line,
+      takes: line.takes.map((take) => ({
+        ...take,
+        imageUrl: `/${["media", slug, ...take.image.split("/")].map(encodeURIComponent).join("/")}?v=${encodeURIComponent(take.id)}`,
+      })),
+    })),
+    validation: validateImageReview(state),
   };
 }
 
@@ -1537,6 +1620,103 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (route === "/api/image-review" && request.method === "GET") {
+      const slug = String(url.searchParams.get("slug") ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await loadImageReview(slug);
+      if (!state) {
+        sendJson(response, 404, { error: "This project has no image review yet." });
+        return;
+      }
+      sendJson(response, 200, { review: publicImageReviewState(slug, state) });
+      return;
+    }
+
+    if (route === "/api/image-review/regenerate" && request.method === "POST") {
+      if ((current && !current.done) || imageReviewActions > 0) {
+        sendJson(response, 409, { error: "A pipeline stage is already running." });
+        return;
+      }
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      imageReviewActions += 1;
+      try {
+        const state = await regenerateImageTake(
+          slug,
+          Number(body.lineIndex),
+          body.prompt,
+        );
+        sendJson(response, 200, { review: publicImageReviewState(slug, state) });
+      } catch (error) {
+        const state = await loadImageReview(slug);
+        sendJson(response, 500, {
+          error: String(error.message ?? error),
+          review: publicImageReviewState(slug, state),
+        });
+      } finally {
+        imageReviewActions -= 1;
+      }
+      return;
+    }
+
+    if (route === "/api/image-review/select" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await selectImageTake(
+        slug,
+        Number(body.lineIndex),
+        String(body.takeId ?? ""),
+      );
+      sendJson(response, 200, { review: publicImageReviewState(slug, state) });
+      return;
+    }
+
+    if (route === "/api/image-review/approve-image" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await approveImage(slug, Number(body.lineIndex));
+      sendJson(response, 200, { review: publicImageReviewState(slug, state) });
+      return;
+    }
+
+    if (route === "/api/image-review/continue" && request.method === "POST") {
+      if ((current && !current.done) || imageReviewActions > 0) {
+        sendJson(response, 409, { error: "A pipeline stage is already running." });
+        return;
+      }
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await loadImageReview(slug);
+      const validation = validateImageReview(state);
+      if (!validation.valid) {
+        sendJson(response, 400, { error: validation.errors.join(" ") });
+        return;
+      }
+      const approved = await approveImageReview(slug);
+      sendJson(response, 200, { started: true });
+      void resumeAfterImageReview(slug, approved.studioOptions ?? {});
+      return;
+    }
+
     if (route === "/api/narration-review/line" && request.method === "PUT") {
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
@@ -1603,6 +1783,7 @@ const server = http.createServer(async (request, response) => {
     if (route === "/api/state") {
       sendJson(response, 200, {
         busy: Boolean(current && !current.done),
+        imageReviewBusy: imageReviewActions > 0,
         resetting: Boolean(serviceResetPromise),
         run: current
           ? { id: current.id, slug: current.slug, stages: current.stages, done: current.done }
@@ -1612,7 +1793,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (route === "/api/run" && request.method === "POST") {
-      if (current && !current.done) {
+      if ((current && !current.done) || imageReviewActions > 0) {
         sendJson(response, 409, { error: "A run is already in progress." });
         return;
       }
@@ -1743,7 +1924,7 @@ process.once("SIGTERM", shutDownStudio);
 await restoreCurrent();
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`\n  YouTube Short studio\n  http://localhost:${port}\n`);
+  console.log(`\n  YouTube studio\n  http://localhost:${port}\n`);
   console.log("  Paste a script, watch the pipeline run, play the result.");
   console.log("  Ctrl+C to stop.\n");
 });

@@ -3,7 +3,7 @@
   "label": "Romance / heartbreak",
   "summary": "Two recurring adults across a relationship arc: meeting, deepening, a turning point, and a final emotional choice. Scenes stay grounded in ordinary domestic places and imply the absent partner rather than always showing both people.",
   "castTags": "{{age}} characters",
-  "topicDirection": "Both recurring characters are {{age}}s, {{ageDetail}}. Show expressive faces, natural hands, and body language, and never default to a static couple portrait or two people standing face-to-face.",
+  "topicDirection": "Both recurring characters are {{age}}s, {{ageDetail}}. Favor back-turned or profile staging, guarded posture, and a quiet sense of secrecy; reveal emotion through silhouette and body language. Show natural hands when visible, and never default to a static couple portrait or two people standing face-to-face.",
   "storyBeats": {
     "single": "standalone emotional beat",
     "opening": "opening and first encounter",
@@ -42,12 +42,16 @@
   "cast": {
     "mode": "recurring-pair",
     "pairAtTurningPointRatio": 0.57,
+    "objectSignal": "\\b(?:playlist|record player|vinyl|saved on my phone|old photograph|old photo|keepsake)\\b",
     "pairPlan": "Two {{age}} figures together at medium distance, filling roughly a third of the frame height, shown facing each other, seen from behind holding hands, or walking side by side. Read them as solid flat silhouettes and posture, with faces turned away, shadowed, or left unrendered.",
     "soloAPlan": "One {{age}} woman alone at medium distance, filling roughly a third of the frame height, seen from behind or in profile as a solid flat silhouette with her face turned away or unrendered. The absent partner is implied only by an empty chair, a second cup, or a long shadow.",
     "soloBPlan": "One {{age}} man alone at medium distance, filling roughly a third of the frame height, seen from behind or in profile as a solid flat silhouette with his face turned away or unrendered. The absent partner is implied only by an empty chair, a second cup, or a long shadow.",
-    "pairBrief": "Two {{age}} figures at medium distance, silhouetted, faces not shown.",
-    "soloABrief": "One {{age}} woman at medium distance, silhouetted, face not shown.",
-    "soloBBrief": "One {{age}} man at medium distance, silhouetted, face not shown.",
+    "pairBrief": "Two {{age}} figures at medium distance sharing one intimate natural gesture, profile or three-quarter view, quiet private mood.",
+    "pairTags": "1girl, 1boy, young adults",
+    "soloABrief": "One {{age}} woman at medium distance, back turned or in profile, guarded secretive posture.",
+    "soloATags": "1girl, young adult",
+    "soloBBrief": "One {{age}} man at medium distance, back turned or in profile, guarded secretive posture.",
+    "soloBTags": "1boy, young adult",
     "soloALabel": "woman",
     "soloBLabel": "man",
     "age": {
@@ -58,7 +62,7 @@
       },
       "overrideRules": [
         {
-          "match": "\\b(?:old|older|elderly|aged|ageing|aging|grey[- ]hair\\w*|gray[- ]hair\\w*|wrinkl\\w*|decades|grandmother|grandfather|grandparents?|retired|retirement|a lifetime|golden years|fifty years|forty years|thirty years)\\b",
+          "match": "\\b(?:older (?:adult|man|woman|person|couple)|elderly|aged (?:adult|man|woman|person|couple)|ageing (?:adult|man|woman|person|couple)|aging (?:adult|man|woman|person|couple)|grey[- ]hair\\w*|gray[- ]hair\\w*|wrinkl\\w*|decades|grandmother|grandfather|grandparents?|retired|retirement|a lifetime|golden years|fifty years|forty years|thirty years)\\b",
           "descriptor": "older adult",
           "detail": "later in life, lined faces, grey or greying hair, settled bearing",
           "negatives": ""
@@ -75,6 +79,11 @@
   "subjectTypeOther": "one clearly recognizable non-human subject",
   "continuityTemplate": "Scene {{sceneNumber}} of {{total}}, with its own distinct location, camera distance, and light.",
   "sceneDirectionRules": [
+    {
+      "match": "\\bplaylist\\b|\\bsaved on my phone\\b",
+      "visualAction": "A weathered black smartphone lies face-up on a dusty walnut nightstand beside one worn leather keepsake. The entire screen surface is featureless dark glass except for one soft amber circular light pulse. Warm light through blinds and visible dust carry the memory.",
+      "shotPlan": "Medium object-only still life with the phone unmistakably dominant, the supporting keepsake clearly separated, and warm window shadows crossing the paper-like scene."
+    },
     {
       "match": "\\bstopped asking\\b.*\\bmade it home\\b|\\bmade it home\\b",
       "visualAction": "A lone {{age}} arrives at a dark home doorway with keys still in hand and checks a silent phone that never received the familiar check-in.",
@@ -164,7 +173,7 @@
     {
       "match": "\\b(?:rain|storm|umbrella)\\b",
       "visualAction": "The emotion becomes physical through rain: one {{age}} hesitates beneath an umbrella while the other crosses the wet street toward or away from them.",
-      "shotPlan": "Vertical exterior view with reflections, diagonal movement, and the umbrella used as a clear story prop rather than decoration."
+      "shotPlan": "Wide exterior view with reflections, diagonal movement, and the umbrella used as a clear story prop rather than decoration."
     },
     {
       "match": "\\b(?:photo|photograph|memory|remember)\\b",
@@ -173,7 +182,7 @@
     }
   ],
   "fallbackShots": [
-    "Medium-wide vertical composition with clear foreground, midground, and background separation.",
+    "Medium-wide horizontal composition with clear foreground, midground, and background separation.",
     "Medium composition with the subject placed off-centre and generous empty space above.",
     "Low-angle medium view with a large simple sky or wall filling the upper frame.",
     "Slightly high medium view looking down across the surface or floor into the space beyond."

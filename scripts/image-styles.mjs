@@ -245,7 +245,7 @@ export function applyStyle(imageGen, style, { fast = false, speedLora = null } =
   next.vae = style.vae ?? null;
   next.fallbackProvider = style.fallbackProvider ?? null;
   Object.assign(next, style.sampling ?? {});
-  // Some looks are not 9:16. The storybook preset paints square art that the composition
+  // Some looks are not 16:9. The storybook preset paints square art that the composition
   // centres over a blurred enlargement of itself, so it must not be cropped to the frame.
   Object.assign(next, style.framing ?? {});
   next.styleSuffix = style.stylePrompt;

@@ -1,9 +1,9 @@
 {
-  "title": "New YouTube Short",
+  "title": "New YouTube Video",
   "topic": "romance",
-  "duration": 60,
-  "width": 1080,
-  "height": 1920,
+  "duration": 600,
+  "width": 1920,
+  "height": 1080,
   "fps": 30,
   "hyperframesVersion": "0.7.78",
   "voicebox": {
@@ -38,11 +38,11 @@
     "cfg": 6.5,
     "sampler": "dpmpp_2m",
     "scheduler": "karras",
-    "genWidth": 768,
-    "genHeight": 1344,
+    "genWidth": 1344,
+    "genHeight": 768,
     "model": "gemini-3.1-flash-image",
-    "aspectRatio": "9:16",
+    "aspectRatio": "16:9",
     "imageSize": "2K",
-    "styleSuffix": "Premium editorial visual for a vertical 9:16 technology explainer. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent, restrained cobalt only when a second data color is necessary. Strong silhouette, cinematic depth, crisp material detail, one dominant subject, uncluttered background. Separate foreground, subject, and background planes for parallax. Wide empty margins and a calm, uncluttered lower third. Mobile-safe composition, 2K."
+    "styleSuffix": "Premium editorial visual for a horizontal 16:9 technology explainer. Charcoal-black environment, warm off-white subject highlights, acid-lime focal accent, restrained cobalt only when a second data color is necessary. Strong silhouette, cinematic depth, crisp material detail, one dominant subject, uncluttered background. Separate foreground, subject, and background planes for parallax. Wide empty margins and a calm, uncluttered lower third. Screen-safe composition, 2K."
   }
 }

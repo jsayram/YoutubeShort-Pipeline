@@ -39,7 +39,7 @@ await run(
     destination,
     "--non-interactive",
     "--example=blank",
-    "--resolution=portrait",
+    "--resolution=landscape",
   ],
   { cwd: repoRoot },
 );

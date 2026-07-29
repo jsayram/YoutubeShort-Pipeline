@@ -206,17 +206,26 @@ function castModeSequence(total, cast) {
   return modes;
 }
 
-function castPlanFor(index, total, topic) {
+function castPlanFor(index, total, topic, line = "") {
   const cast = topic.cast ?? { mode: "none" };
   if (cast.mode !== "recurring-pair") {
     return { castMode: "", castPlan: "", castBrief: "" };
   }
-  const mode = castModeSequence(total, cast)[index] ?? "pair";
+  // A narration beat centered on a keepsake or device must remain an object still even when it
+  // lands on an opening/turning/closing anchor. Otherwise a phrase such as "old playlist" gets
+  // turned into a generic couple portrait and the concrete prop disappears.
+  const mode = cast.objectSignal && matches(cast.objectSignal, line)
+    ? "object"
+    : (castModeSequence(total, cast)[index] ?? "pair");
   const byMode = {
-    pair: { castPlan: cast.pairPlan, castBrief: cast.pairBrief },
-    object: { castPlan: cast.objectPlan, castBrief: cast.objectBrief ?? "" },
-    "solo-a": { castPlan: cast.soloAPlan, castBrief: cast.soloABrief },
-    "solo-b": { castPlan: cast.soloBPlan, castBrief: cast.soloBBrief },
+    pair: { castPlan: cast.pairPlan, castBrief: cast.pairBrief, castTags: cast.pairTags },
+    object: {
+      castPlan: cast.objectPlan,
+      castBrief: cast.objectBrief ?? "",
+      castTags: cast.objectTags ?? "",
+    },
+    "solo-a": { castPlan: cast.soloAPlan, castBrief: cast.soloABrief, castTags: cast.soloATags },
+    "solo-b": { castPlan: cast.soloBPlan, castBrief: cast.soloBBrief, castTags: cast.soloBTags },
   };
   return { castMode: mode, ...byMode[mode] };
 }
@@ -288,7 +297,8 @@ export function buildScenePrompt(line, index, template, context = {}) {
   // Resolved from the full script when available so every scene shares one age.
   const castAge =
     context.castAge ?? resolveCastAge((context.lines ?? [line]).join(" "), topic);
-  const { castMode, castPlan, castBrief } = castPlanFor(index, total, topic);
+  const { castMode, castPlan, castBrief, castTags } =
+    castPlanFor(index, total, topic, promptLine);
   const { visualAction, shotPlan } = sceneDirectionFor(promptLine, index, castMode, topic);
   const continuity = topic.continuityTemplate
     .replaceAll("{{sceneNumber}}", String(index + 1))
@@ -304,11 +314,14 @@ export function buildScenePrompt(line, index, template, context = {}) {
     .replaceAll("{{shotPlan}}", shotPlan)
     .replaceAll("{{castPlan}}", castPlan)
     .replaceAll("{{castBrief}}", castBrief)
-    .replaceAll("{{castTags}}", topic.castTags ?? "")
-    .replaceAll("{{topicDirection}}", topic.topicDirection ?? "")
+    .replaceAll(
+      "{{castTags}}",
+      castMode === "object" ? "" : (castTags ?? topic.castTags ?? ""),
+    )
+    .replaceAll("{{topicDirection}}", castMode === "object" ? "" : (topic.topicDirection ?? ""))
     .replaceAll("{{continuity}}", continuity)
-    .replaceAll("{{age}}", castAge?.descriptor ?? "")
-    .replaceAll("{{ageDetail}}", castAge?.detail ?? "");
+    .replaceAll("{{age}}", castMode === "object" ? "" : (castAge?.descriptor ?? ""))
+    .replaceAll("{{ageDetail}}", castMode === "object" ? "" : (castAge?.detail ?? ""));
   const unresolved = prompt.match(/\{\{[^}]+\}\}/g);
   if (unresolved) {
     throw new Error(`Unknown prompt variable(s): ${[...new Set(unresolved)].join(", ")}.`);
@@ -320,6 +333,7 @@ export function buildScenePrompt(line, index, template, context = {}) {
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\s+([,.;:])/g, "$1")
     .replace(/,\s*,/g, ",")
+    .replace(/^[,;:\s]+/, "")
     .trim();
   return { id: `${String(index + 1).padStart(2, "0")}-${slug}`, prompt: tidied, castMode };
 }

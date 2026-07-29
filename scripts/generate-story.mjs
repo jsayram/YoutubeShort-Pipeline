@@ -103,7 +103,7 @@ async function api(endpoint, options = {}) {
     method: options.method ?? "GET",
     headers: {
       "Content-Type": "application/json",
-      "X-Voicebox-Client-Id": "youtube-short-pipeline",
+      "X-Voicebox-Client-Id": "youtube-pipeline",
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
@@ -442,7 +442,7 @@ async function generateAcceptedLine(text, index) {
 
 async function exportGeneration(generationId, file) {
   const response = await fetch(`${baseUrl}/history/${generationId}/export-audio`, {
-    headers: { "X-Voicebox-Client-Id": "youtube-short-pipeline" },
+    headers: { "X-Voicebox-Client-Id": "youtube-pipeline" },
   });
   if (!response.ok) {
     throw new Error(`Voicebox audio export failed for ${generationId}: ${await response.text()}`);

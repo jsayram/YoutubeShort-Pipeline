@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>YouTube Short studio</title>
+    <title>YouTube studio</title>
     <style>
       :root {
         --bg: #0b0b0f;
@@ -189,8 +189,94 @@
       }
       .qa-ok { color: var(--ok); }
       .qa-bad { color: var(--bad); }
+      .image-review-summary {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--bg);
+        padding: 11px 12px;
+        margin-bottom: 12px;
+      }
+      .image-review-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .image-review-card {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: var(--bg);
+        padding: 12px;
+      }
+      .image-review-card[data-approved="true"] {
+        border-color: rgba(111, 207, 142, 0.55);
+      }
+      .image-review-card > img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        border-radius: 8px;
+        background: var(--panel-2);
+      }
+      .image-review-card textarea {
+        min-height: 104px;
+        margin: 8px 0;
+        font-size: 12px;
+      }
+      .image-takes {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        margin: 10px 0;
+        padding-bottom: 3px;
+      }
+      .image-take {
+        flex: 0 0 76px;
+        opacity: 0.6;
+        cursor: pointer;
+      }
+      .image-take:has(input:checked) {
+        opacity: 1;
+      }
+      .image-take img {
+        display: block;
+        width: 76px;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        border: 2px solid var(--line);
+        border-radius: 6px;
+      }
+      .image-take:has(input:checked) img {
+        border-color: var(--accent);
+      }
+      .image-take input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .image-generation-details {
+        border-top: 1px solid var(--line);
+        margin-top: 10px;
+        padding-top: 8px;
+      }
+      .image-generation-details summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .audit-prompt {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: var(--muted);
+        font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin-top: 8px;
+      }
       @media (max-width: 620px) {
         .service-grid {
+          grid-template-columns: 1fr;
+        }
+        .image-review-grid {
           grid-template-columns: 1fr;
         }
       }
@@ -513,7 +599,7 @@
       }
       .shot {
         position: relative;
-        aspect-ratio: 9 / 16;
+        aspect-ratio: 16 / 9;
         border-radius: 8px;
         overflow: hidden;
         background: var(--panel-2);
@@ -592,7 +678,7 @@
   <body>
     <div class="wrap">
       <header>
-        <h1>YouTube Short studio</h1>
+        <h1>YouTube studio</h1>
         <div class="sub">
           Paste a script. Every stage runs top to bottom — stills appear as they render, the
           finished file plays at the bottom. Images come back wordless; optional captions are
@@ -850,7 +936,8 @@ Start a recording and talk about your day."></textarea>
       let activeRunSlug = null;
       let pipelineBusy = false;
       let servicesRestarting = false;
-      const formStateKey = "youtube-short-studio-form-v1";
+      let imageReviewWorking = false;
+      const formStateKey = "youtube-studio-form-v1";
       const savedFormIds = [
         "slug",
         "title",
@@ -917,6 +1004,7 @@ Start a recording and talk about your day."></textarea>
         scaffold: "Project",
         script: "Script and prompts",
         images: "Images",
+        "image-review": "Image review",
         voice: "Narration",
         review: "Narration review",
         captions: "Caption timing",
@@ -984,6 +1072,7 @@ Start a recording and talk about your day."></textarea>
           // Rebuild the live gallery from files as well as events. This covers narration-review
           // continuations, browser refreshes, and a thumbnail event arriving before its grid.
           void hydrateLiveImages(event.slug);
+          void loadImageReview(event.slug);
           return;
         }
 
@@ -1092,9 +1181,20 @@ Start a recording and talk about your day."></textarea>
           return;
         }
 
+        if (event.type === "image-review") {
+          renderImageReview(event.slug, event.review);
+          return;
+        }
+
         if (event.type === "paused" && event.reason === "narration-review") {
           setRunning(false);
           $("narration-review").scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+
+        if (event.type === "paused" && event.reason === "image-review") {
+          setRunning(false);
+          stageEl("image-review")?.scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
@@ -1146,9 +1246,11 @@ Start a recording and talk about your day."></textarea>
       }
 
       function updateRunControls() {
-        $("run").disabled = pipelineBusy || servicesRestarting;
+        $("run").disabled = pipelineBusy || servicesRestarting || imageReviewWorking;
         $("run").textContent = servicesRestarting
           ? "Services restarting…"
+          : imageReviewWorking
+            ? "Image regenerating…"
           : pipelineBusy
             ? "Pipeline running…"
             : "Run pipeline";
@@ -1355,6 +1457,195 @@ Start a recording and talk about your day."></textarea>
         }
         const data = await response.json();
         renderNarrationReview(slug, data.review);
+      }
+
+      let imageReviewSlug = null;
+      let imageReviewPoll = null;
+
+      function formatImageUsage(usage) {
+        if (!usage) return "Usage unavailable";
+        if (usage.kind === "local") return "Local · 0 cloud credits";
+        const parts = [`${Number(usage.requests ?? 0)} cloud request${usage.requests === 1 ? "" : "s"}`];
+        if (usage.creditsUsed != null) parts.push(`${usage.creditsUsed} credits`);
+        else parts.push("credit cost not reported");
+        if (usage.quotaRemaining != null) parts.push(`${usage.quotaRemaining} remaining`);
+        else parts.push("quota not reported");
+        return parts.join(" · ");
+      }
+
+      function formatProjectUsage(usage) {
+        if (!usage) return "";
+        const parts = [usage.provider || "image provider"];
+        if (usage.requests) parts.push(`${usage.requests} cloud request${usage.requests === 1 ? "" : "s"}`);
+        else parts.push("0 cloud requests");
+        if (usage.creditsUsed != null) parts.push(`${usage.creditsUsed} credits used`);
+        if (usage.estimatedCost != null && usage.estimatedCost > 0) {
+          parts.push(`estimated $${Number(usage.estimatedCost).toFixed(4)}`);
+        }
+        if (usage.quotaRemaining != null) parts.push(`${usage.quotaRemaining} quota remaining`);
+        else parts.push("remaining quota not reported");
+        return parts.join(" · ");
+      }
+
+      function selectedImageTake(line) {
+        return line.takes.find((take) => take.id === line.selectedTakeId) ?? line.takes.at(-1);
+      }
+
+      function renderImageReview(slug, review) {
+        const host = extra("image-review");
+        if (!host || !review) return;
+        if (review.status === "approved") {
+          host.replaceChildren();
+          return;
+        }
+        imageReviewSlug = slug;
+        const valid = review.validation?.valid === true;
+        const approvedCount = review.lines.filter((line) => line.approved).length;
+        host.innerHTML = `
+          <div class="image-review-summary">
+            <b>${approvedCount}/${review.lines.length} images approved</b>
+            <div class="sub">${escapeHtml(formatProjectUsage(review.usage))}</div>
+            <div class="sub">${escapeHtml(review.usage?.quotaNote ?? "")}</div>
+          </div>
+          <div class="image-review-grid">
+            ${review.lines.map((line) => {
+              const selected = selectedImageTake(line);
+              const matching = selected?.prompt === line.prompt;
+              const takes = line.takes.map((take, index) => `
+                <label class="image-take" title="Take ${index + 1}${take.prompt === line.prompt ? "" : " · earlier prompt"}">
+                  <input type="radio" name="image-take-${line.index}"
+                    data-select-image-take data-line-index="${line.index}"
+                    value="${escapeHtml(take.id)}"
+                    ${take.id === line.selectedTakeId ? "checked" : ""}
+                    ${take.prompt !== line.prompt ? "disabled" : ""} />
+                  <img src="${escapeHtml(take.imageUrl)}" alt="Image take ${index + 1}" />
+                  <span class="sub">Take ${index + 1}</span>
+                </label>`).join("");
+              const details = selected ? `
+                <details class="image-generation-details">
+                  <summary>Generation details and exact provider prompt</summary>
+                  <div class="sub" style="margin-top:8px">
+                    ${escapeHtml(selected.provider || "Unknown provider")}
+                    ${selected.model ? ` · ${escapeHtml(selected.model)}` : ""}
+                    ${selected.seed != null ? ` · seed ${escapeHtml(selected.seed)}` : ""}
+                  </div>
+                  <div class="sub">${escapeHtml(formatImageUsage(selected.usage))}</div>
+                  <div class="audit-prompt">${escapeHtml(selected.finalPrompt || "Exact final prompt was not recorded for this older take.")}</div>
+                  ${selected.negativePrompt ? `<div class="audit-prompt"><b>Negative prompt</b>\n${escapeHtml(selected.negativePrompt)}</div>` : ""}
+                  ${selected.settings ? `<div class="audit-prompt"><b>Settings</b>\n${escapeHtml(JSON.stringify(selected.settings, null, 2))}</div>` : ""}
+                  ${selected.auditRunId ? `<div class="sub">Audit run: ${escapeHtml(selected.auditRunId)}</div>` : ""}
+                </details>` : "";
+              return `
+                <article class="image-review-card" data-image-review-line="${line.index}"
+                  data-approved="${line.approved === true}">
+                  ${selected ? `<img src="${escapeHtml(selected.imageUrl)}" alt="Scene ${escapeHtml(line.key)} preview" />` : ""}
+                  <div style="margin-top:9px"><b>${escapeHtml(line.key)} · ${escapeHtml(line.id)}</b></div>
+                  <div class="sub">${escapeHtml(line.narration)}</div>
+                  <label style="margin-top:10px">Scene prompt · edits affect only this image</label>
+                  <textarea data-image-prompt>${escapeHtml(line.prompt)}</textarea>
+                  <div class="image-takes">${takes}</div>
+                  <div class="sub">${escapeHtml(formatImageUsage(selected?.usage))}</div>
+                  ${line.error ? `<div class="err">${escapeHtml(line.error)}</div>` : ""}
+                  ${!matching ? `<div class="err">This take used an earlier prompt. Regenerate before approval.</div>` : ""}
+                  <div class="actions" style="margin-top:10px">
+                    <button class="ghost compact" data-regenerate-image ${line.generating ? "disabled" : ""}>
+                      ${line.generating ? "Generating…" : "Regenerate this image"}
+                    </button>
+                    <button class="compact" data-approve-image
+                      ${line.approved || line.generating || !matching ? "disabled" : ""}>
+                      ${line.approved ? "Approved ✓" : "Approve image"}
+                    </button>
+                    <span class="sub" data-image-status></span>
+                  </div>
+                  ${details}
+                </article>`;
+            }).join("")}
+          </div>
+          <div class="actions" style="margin-top:16px">
+            <button data-continue-images ${valid ? "" : "disabled"}>Continue to composition</button>
+            <span class="err" data-image-review-error></span>
+          </div>`;
+
+        clearTimeout(imageReviewPoll);
+        if (review.lines.some((line) => line.generating)) {
+          imageReviewPoll = setTimeout(() => loadImageReview(slug), 2000);
+        }
+      }
+
+      async function imageReviewRequest(route, body, statusNode) {
+        if (statusNode) statusNode.textContent = "Working…";
+        const response = await fetch(route, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (data.review) renderImageReview(body.slug, data.review);
+        if (!response.ok) {
+          const message = data.error ?? "The image action failed.";
+          const errorNode = extra("image-review")?.querySelector("[data-image-review-error]");
+          if (errorNode) errorNode.textContent = message;
+          if (statusNode) statusNode.textContent = message;
+          return null;
+        }
+        return data;
+      }
+
+      stagesEl.addEventListener("click", async (event) => {
+        const card = event.target.closest("[data-image-review-line]");
+        if (event.target.matches("[data-continue-images]")) {
+          event.target.disabled = true;
+          const data = await imageReviewRequest("/api/image-review/continue", {
+            slug: imageReviewSlug,
+          });
+          if (data) setRunning(true);
+          else event.target.disabled = false;
+          return;
+        }
+        if (!card) return;
+        const lineIndex = Number(card.dataset.imageReviewLine);
+        const status = card.querySelector("[data-image-status]");
+        if (event.target.matches("[data-regenerate-image]")) {
+          event.target.disabled = true;
+          imageReviewWorking = true;
+          updateRunControls();
+          try {
+            await imageReviewRequest("/api/image-review/regenerate", {
+              slug: imageReviewSlug,
+              lineIndex,
+              prompt: card.querySelector("[data-image-prompt]").value,
+            }, status);
+          } finally {
+            imageReviewWorking = false;
+            updateRunControls();
+          }
+        } else if (event.target.matches("[data-approve-image]")) {
+          event.target.disabled = true;
+          await imageReviewRequest("/api/image-review/approve-image", {
+            slug: imageReviewSlug,
+            lineIndex,
+          }, status);
+        }
+      });
+
+      stagesEl.addEventListener("change", async (event) => {
+        if (!event.target.matches("[data-select-image-take]")) return;
+        await imageReviewRequest("/api/image-review/select", {
+          slug: imageReviewSlug,
+          lineIndex: Number(event.target.dataset.lineIndex),
+          takeId: event.target.value,
+        });
+      });
+
+      async function loadImageReview(slug) {
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(slug) || !stageNodes.has("image-review")) return;
+        const response = await fetch(
+          `/api/image-review?slug=${encodeURIComponent(slug)}&v=${Date.now()}`,
+          { cache: "no-store" },
+        ).catch(() => null);
+        if (!response?.ok) return;
+        const data = await response.json();
+        renderImageReview(slug, data.review);
       }
 
       // Derive a slug from the title unless one was typed.
@@ -1785,7 +2076,7 @@ Start a recording and talk about your day."></textarea>
             cell.innerHTML = `<span>${escapeHtml(image.id)}</span>`;
             grid.append(cell);
           }
-          if (image.ready && !cell.querySelector("img")) {
+          if (image.ready) {
             cell.classList.remove("waiting");
             cell.innerHTML =
               `<img src="${escapeHtml(image.url)}" alt="" />` +
@@ -1917,6 +2208,7 @@ Start a recording and talk about your day."></textarea>
         describeStyle();
         loadPromptEditor();
         loadNarrationReview(slug);
+        loadImageReview(slug);
         return true;
       }
 
@@ -2198,6 +2490,7 @@ Start a recording and talk about your day."></textarea>
         .then((response) => response.json())
         .then((state) => {
           setServicesRestarting(Boolean(state.resetting));
+          imageReviewWorking = Boolean(state.imageReviewBusy);
           setRunning(Boolean(state.busy));
         });
     </script>

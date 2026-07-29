@@ -5,6 +5,7 @@ import {
   promptWithReferences,
   referencesForScene,
   splitImageItems,
+  styleForScene,
 } from "./image-worker-common.mjs";
 
 const styles = await loadStyles();
@@ -31,9 +32,9 @@ assert.equal(flux.provider, "flux2-local");
 assert.equal(flux.fallbackProvider, "cloudflare-flux2");
 assert.equal(flux.requiredModels.diffusionModel, "flux-2-klein-4b.safetensors");
 assert.equal(flux.referencePrompts.length, 3);
-assert.match(flux.sceneTemplate, /interpret the full sentence as a story event/i);
-assert.match(flux.stylePrompt, /paper-watercolor editorial illustration/i);
-assert.match(flux.stylePrompt, /cold-press paper tooth/i);
+assert.match(flux.sceneTemplate, /interpret the full sentence as one readable story event/i);
+assert.match(flux.stylePrompt, /poetic comic-book illustration/i);
+assert.match(flux.stylePrompt, /layered paper shapes/i);
 assert.match(flux.stylePrompt, /controlled warm-dark palette/i);
 assert.doesNotMatch(flux.stylePrompt, /Japanese animated|Ghibli/i);
 assert.doesNotMatch(flux.sceneTemplate, /hooded|faceless/i);
@@ -42,7 +43,7 @@ assert.deepEqual(
   ["character", "character", "style"],
 );
 assert.match(flux.referencePrompts[2].prompt, /No person/i);
-assert.match(flux.referencePrompts[0].prompt, /translucent layered watercolor washes/i);
+assert.match(flux.referencePrompts[0].prompt, /simplified paper-cut figure/i);
 assert.match(flux.referencePrompts[2].prompt, /burnt umber/i);
 
 const pixazo = styles.find((style) => style.id === "pixazo-sdxl-watercolor");
@@ -50,9 +51,9 @@ assert.equal(pixazo.provider, "pixazo-sdxl");
 assert.equal(pixazo.promptProfile, "flux2-storybook");
 assert.equal(pixazo.sampling.numSteps, 20);
 assert.equal(pixazo.sampling.guidanceScale, 5);
-assert.equal(pixazo.framing.genWidth, 576);
-assert.equal(pixazo.framing.genHeight, 1024);
-assert.match(pixazo.stylePrompt, /paper-watercolor editorial illustration/i);
+assert.equal(pixazo.framing.genWidth, 1024);
+assert.equal(pixazo.framing.genHeight, 576);
+assert.match(pixazo.stylePrompt, /poetic comic-book illustration/i);
 assert.match(pixazo.negativeExtra, /text, letters, words, numbers/i);
 
 const storybook = styles.find((style) => style.id === "storybook");
@@ -68,6 +69,8 @@ assert.equal(livingStorybook.compositionPreset, "living-storybook");
 assert.match(livingStorybook.stylePrompt, /motion-ready staging/i);
 
 const animagine = styles.find((style) => style.id === "animagine-dark-storybook");
+const animagineLofi = styles.find((style) => style.id === "animagine-lofi-melancholy");
+const flatLinePoetry = styles.find((style) => style.id === "flat-line-poetry");
 assert.equal(animagine.provider, "comfyui");
 assert.match(animagine.sceneTemplate, /Illustrate this exact narration: \{\{line\}\}/i);
 assert.match(animagine.sceneTemplate, /\{\{visualAction\}\}/i);
@@ -79,6 +82,70 @@ assert.equal(animagine.referencePrompts.length, 1);
 assert.equal(animagine.referencePrompts[0].role, "style");
 assert.match(animagine.referencePrompts[0].prompt, /no person/i);
 assert.equal(animagine.sampling.referenceWeight, 0.35);
+assert.equal(animagine.framing.genWidth, 1024);
+assert.equal(animagine.framing.genHeight, 1024);
+
+assert.equal(animagineLofi.provider, "comfyui");
+assert.equal(animagineLofi.promptProfile, "animagine-lofi-melancholy");
+assert.equal(animagineLofi.postProcess, "paper-grain");
+assert.equal(animagineLofi.sampling.steps, 28);
+assert.equal(animagineLofi.sampling.cfg, 6);
+assert.equal(animagineLofi.sampling.sampler, "euler_ancestral");
+assert.equal(animagineLofi.sampling.styleSeed, 1959877624);
+assert.equal(animagineLofi.framing.genWidth, 1344);
+assert.equal(animagineLofi.framing.genHeight, 768);
+assert.equal(animagineLofi.framing.outWidth, 1920);
+assert.equal(animagineLofi.framing.outHeight, 1080);
+assert.equal(animagineLofi.styleStudies.length, 3);
+assert.equal(animagineLofi.referencePrompts, undefined);
+assert.match(animagineLofi.stylePrompt, /hand-drawn anime illustration/i);
+assert.match(animagineLofi.stylePrompt, /bold sketch-like black linework/i);
+assert.match(animagineLofi.stylePrompt, /heavy visible coarse film grain/i);
+assert.match(animagineLofi.stylePrompt, /twenty percent rust orange deep amber/i);
+assert.match(animagineLofi.stylePrompt, /ten percent muted deep teal/i);
+assert.match(animagineLofi.stylePrompt, /wide horizontal framing/i);
+assert.match(animagineLofi.negativeExtra, /multi-panel layout/i);
+assert.match(animagineLofi.negativeExtra, /readable text/i);
+
+const illustriousAcrylic = styles.find(
+  (style) => style.id === "illustrious-acrylic-melancholy",
+);
+const fluxAcrylic = styles.find((style) => style.id === "flux2-acrylic-melancholy");
+assert.equal(illustriousAcrylic.provider, "comfyui");
+assert.equal(illustriousAcrylic.promptProfile, "acrylic-melancholy-tags");
+assert.match(illustriousAcrylic.stylePrompt, /heavy impasto brushstrokes/i);
+assert.match(illustriousAcrylic.stylePrompt, /deep emerald green/i);
+assert.match(illustriousAcrylic.stylePrompt, /frayed comic-paper edge/i);
+assert.equal(illustriousAcrylic.postProcess, "paper-grain");
+assert.equal(fluxAcrylic.provider, "flux2-local");
+assert.equal(fluxAcrylic.promptProfile, "acrylic-melancholy-prose");
+assert.match(fluxAcrylic.stylePrompt, /heavy impasto brushstrokes/i);
+assert.match(fluxAcrylic.summary, /prompt conditioning only/i);
+assert.equal(fluxAcrylic.loras, undefined);
+assert.equal(fluxAcrylic.postProcess, "acrylic-unsigned");
+
+// FLUX and Illustrious share the literal cut-paper contract.
+for (const style of [flux, flatLinePoetry]) {
+  assert.match(style.stylePrompt, /paper/i, `${style.id} must keep visible paper material`);
+  assert.match(
+    style.stylePrompt,
+    /paper-cut|cut-paper/i,
+    `${style.id} must simplify figures and shapes as cut paper`,
+  );
+  assert.match(style.stylePrompt, /burnt umber/i, `${style.id} must share the warm-dark palette`);
+  assert.match(style.stylePrompt, /charcoal/i, `${style.id} must share the warm-dark palette`);
+  assert.match(style.stylePrompt, /amber light/i, `${style.id} must make warm light dominant`);
+  assert.match(style.negativeExtra, /photorealistic|photograph/i);
+  assert.match(style.negativeExtra, /dominant blue lighting|cold cyan wash/i);
+  assert.match(style.negativeExtra, /panel border|multi-panel/i);
+}
+assert.match(animagine.stylePrompt, /rough oil and gouache/i);
+assert.match(animagine.stylePrompt, /coarse paper/i);
+assert.match(animagine.stylePrompt, /deep burnt umber and charcoal/i);
+assert.match(animagine.negativeExtra, /photorealistic|photograph/i);
+assert.equal(referencesForScene({ castMode: "object" }, animagine.referencePrompts).length, 1);
+assert.equal(referencesForScene({ castMode: "solo-a" }, animagine.referencePrompts).length, 1);
+assert.equal(referencesForScene({ castMode: "pair" }, animagine.referencePrompts).length, 1);
 
 const { references, scenes } = splitImageItems(
   [{ id: "01-scene", prompt: "A traveler waits." }],
@@ -94,13 +161,21 @@ assert.match(referencedPrompt, /do not copy its pose or background/i);
 assert.doesNotMatch(referencedPrompt, /hidden face/i);
 assert.deepEqual(
   referencesForScene({ castMode: "solo-a" }, references).map((item) => item.id),
-  ["protagonist-a-watercolor-reference-v5", "warm-dark-watercolor-material-reference-v5"],
+  ["protagonist-a-paper-comic-reference-v6", "warm-dark-paper-comic-material-reference-v6"],
 );
 assert.deepEqual(
   referencesForScene({ castMode: "solo-b" }, references).map((item) => item.id),
-  ["protagonist-b-watercolor-reference-v5", "warm-dark-watercolor-material-reference-v5"],
+  ["protagonist-b-paper-comic-reference-v6", "warm-dark-paper-comic-material-reference-v6"],
 );
 assert.equal(referencesForScene({ castMode: "pair" }, references).length, 3);
+assert.deepEqual(
+  referencesForScene({ castMode: "none" }, references).map((item) => item.role),
+  ["style"],
+);
+assert.deepEqual(
+  referencesForScene({ castMode: "object" }, references).map((item) => item.role),
+  ["style"],
+);
 
 const anime = styles.find((style) => style.id === "anime");
 assert.match(anime.sceneTemplate, /\{\{sentiment\}\}/i);
@@ -169,7 +244,6 @@ assert.doesNotMatch(simple.sceneTemplate, /\{\{cast(?:Plan|Brief)\}\}/i);
 assert.doesNotMatch(simple.sceneTemplate, /\{\{shotPlan\}\}/i);
 assert.doesNotMatch(simple.negativeExtra, /two adult women together/i);
 
-const flatLinePoetry = styles.find((style) => style.id === "flat-line-poetry");
 // Moved off FLUX deliberately: FLUX zeroes its negative conditioning and runs at guidance 1,
 // so negativePrompt never reaches the model. This look depends on suppressing panels and
 // lettering, which only works on an SDXL checkpoint with real classifier-free guidance.
@@ -184,12 +258,12 @@ assert.match(flatLinePoetry.sceneTemplate, /\{\{castPlan\}\}/i);
 // {{storyBeat}} is deliberately absent: "opening and first encounter" is narrative meta with
 // nothing to draw, and this checkpoint reads tags rather than prose.
 assert.doesNotMatch(flatLinePoetry.sceneTemplate, /\{\{storyBeat\}\}/i);
-assert.match(flatLinePoetry.stylePrompt, /flat-color screenprint/i);
-assert.match(flatLinePoetry.stylePrompt, /textured paper/i);
-assert.match(flatLinePoetry.compactStylePrompt, /matte risograph ink/i);
+assert.match(flatLinePoetry.stylePrompt, /poetic comic-book illustration/i);
+assert.match(flatLinePoetry.stylePrompt, /paper grain and fibre/i);
+assert.match(flatLinePoetry.compactStylePrompt, /matte screenprint ink/i);
 assert.doesNotMatch(flatLinePoetry.compactStylePrompt, /gradient sky|gradient background/i);
 assert.match(flatLinePoetry.negativeExtra, /anime face|character sheet/i);
-assert.doesNotMatch(flatLinePoetry.stylePrompt, /brick red|rust/i);
+assert.match(flatLinePoetry.stylePrompt, /oxblood rust/i);
 assert.doesNotMatch(flatLinePoetry.negativeExtra, /detailed visible face/i);
 assert.match(flatLinePoetry.negativeExtra, /anime|comic panel/i);
 
@@ -205,5 +279,15 @@ assert.match(fluxPrompt, /no readable text/i);
 assert.match(fluxPrompt, /speech bubbles/i);
 assert.match(fluxPrompt, /comic strip or multi-panel/i);
 assert.match(fluxPrompt, /They say you can't go back/);
+const fluxObjectPrompt = buildFluxPrompt(
+  { prompt: "A phone on a nightstand", castMode: "object" },
+  "warm paper comic",
+);
+assert.match(fluxObjectPrompt, /object-only still life in an unoccupied setting/i);
+const objectStyle = styleForScene(
+  { castMode: "object" },
+  "warm paper, simplified figure, abstract shapes, paper-cut silhouettes, amber light",
+);
+assert.equal(objectStyle, "warm paper, abstract shapes, amber light");
 
 console.log("Story-aware photographic, vector, ink, anime, storybook, FLUX, and reference routing passed.");

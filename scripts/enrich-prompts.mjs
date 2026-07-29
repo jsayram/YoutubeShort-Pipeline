@@ -69,6 +69,46 @@ const FORMAT_INSTRUCTIONS = {
 export function buildSystemPrompt(profile) {
   const category = detectProviderCategory(profile);
   const format = detectFormat(profile);
+  const creativeArchetypeMode = profile.enrichmentMode === "creative-archetype";
+
+  if (creativeArchetypeMode) {
+    const archetypes = (profile.sceneArchetypes ?? [])
+      .map((archetype, index) => `${index + 1}. ${archetype}`)
+      .join("\n");
+    return [
+      "You are a cinematic anime scene director for a visually consistent short video.",
+      "Treat each narration line as an EMOTIONAL SEED, not a literal inventory of objects to copy.",
+      "Invent ONE evocative, physically coherent scene that expresses the beat through atmosphere, " +
+        "gesture, distance, setting, and light. The image may depart from the narration's literal nouns.",
+      "",
+      "Creative rules:",
+      `- ${CATEGORY_INSTRUCTIONS[category]}`,
+      "- Choose or creatively vary one of the scene families below. Rotate families across the video; " +
+        "do not repeat the previous scene's setting, action, camera distance, or silhouette.",
+      "- You may choose an empty environment, one person, or two people according to the emotional " +
+        "idea. Do not inherit a literal object's draft cast classification.",
+      "- Give the renderer a clear subject, pose or action, setting, camera viewpoint, depth structure, " +
+        "time of day, and two or three palette colors.",
+      "- Favor expansive horizontal perspective, large sky or architectural negative space, back views, " +
+        "profiles, silhouettes, and quiet gestures. Use close character studies sparingly.",
+      "- Keep the scene emotionally connected to the narration, but do not preserve every named object.",
+      "- Do not default to illustrating a phone, message, playlist, photograph, mirror, cup, or other " +
+        "noun merely because it appears in the narration. Prefer the strongest cinematic metaphor.",
+      "- Use only one scene, never a montage, split screen, comic grid, or multiple panels.",
+      "- The image must be wordless. Never request readable text, captions, signs, labels, messages, " +
+        "playlist interfaces, book lettering, logos, or watermarks.",
+      `- ${FORMAT_INSTRUCTIONS[format]}`,
+      profile.enrichmentGuide ? `- ${profile.enrichmentGuide}` : "",
+      "",
+      "Scene families:",
+      archetypes,
+      "",
+      "The drawing medium, grain, and global palette are appended later by the provider. " +
+        "Do not waste output repeating the style contract.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
 
   return [
     "You are a visual scene director for a short video. Your job is to translate an abstract " +
@@ -139,9 +179,43 @@ export function sceneConstraints(item) {
   };
 }
 
-function buildUserPrompt(item, index, total, narrationLines, enrichedNeighbors, format) {
+export function buildUserPrompt(
+  item,
+  index,
+  total,
+  narrationLines,
+  enrichedNeighbors,
+  format,
+  profile = {},
+) {
   const line = narrationLines[index] ?? item.prompt;
   const constraints = sceneConstraints(item);
+  if (profile.enrichmentMode === "creative-archetype") {
+    const parts = [
+      `Narration line ${index + 1} of ${total}: "${line}"`,
+      constraints.emotionalTone
+        ? `Emotional tone from the story plan: ${constraints.emotionalTone}`
+        : null,
+      index > 0 && enrichedNeighbors[index - 1]
+        ? `Previous generated scene to avoid repeating: ${enrichedNeighbors[index - 1]}`
+        : null,
+      index < total - 1 && narrationLines[index + 1]
+        ? `Next narration beat for pacing context: "${narrationLines[index + 1]}"`
+        : null,
+      "",
+      "Invent a fresh cinematic scene inspired by the emotion, not a literal illustration. " +
+        "Select or transform one scene family, then specify the subject and quiet gesture, the exact " +
+        "place, camera viewpoint, foreground/background depth, dramatic dusk/dawn/night light, and " +
+        "a warm-versus-deep color relationship. You may choose an empty setting, one person, or two " +
+        "people; ignore the draft's literal object/cast classification. Keep it one wordless horizontal " +
+        "scene, and do not automatically reuse nouns from the narration.",
+      format === "tags"
+        ? "Reply with only a compact comma-separated tag list, nothing else."
+        : "Reply with only the scene description, nothing else.",
+    ];
+    return parts.filter((part) => part !== null).join("\n");
+  }
+
   const parts = [
     `Narration line ${index + 1} of ${total}: "${line}"`,
     "",
@@ -441,7 +515,7 @@ export async function main(argv = process.argv.slice(2)) {
     }
 
     const userPrompt = buildUserPrompt(
-      item, i, prompts.length, narrationLines, enrichedDescriptions, format,
+      item, i, prompts.length, narrationLines, enrichedDescriptions, format, profile,
     );
     try {
       const scene = await localLlmGenerate({
@@ -452,10 +526,18 @@ export async function main(argv = process.argv.slice(2)) {
       });
       enrichedDescriptions[i] = scene;
       const constraints = sceneConstraints(item);
+      const creativeArchetypeMode = profile.enrichmentMode === "creative-archetype";
+      const outputItem = creativeArchetypeMode
+        ? {
+            ...item,
+            sourceCastMode: item.castMode ?? null,
+            castMode: "creative",
+          }
+        : item;
       enrichedPrompts[i] = {
-        ...item,
+        ...outputItem,
         prompt: buildAuthoritativePrompt({
-          item,
+          item: outputItem,
           narration: narrationLines[i] ?? "",
           scene,
           format,
@@ -468,7 +550,14 @@ export async function main(argv = process.argv.slice(2)) {
           format,
           generatedAt: new Date().toISOString(),
           description: scene,
-          constraints,
+          constraints: creativeArchetypeMode
+            ? {
+                ...constraints,
+                sourceCastMode: item.castMode ?? null,
+                effectiveCastMode: "creative",
+                castPolicy: "Qwen chooses an empty setting, one person, or two people.",
+              }
+            : constraints,
           sourcePrompt: item.prompt,
         },
       };

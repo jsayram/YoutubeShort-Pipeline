@@ -39,7 +39,7 @@ test("refresh safely rejoins a run and full service restart remains explicit", a
   assert.doesNotMatch(html, /navigator\.sendBeacon\("\/api\/services\/reset"\)/);
   assert.match(html, /async function hydrateLiveImages\(slug\)/);
   assert.match(html, /void hydrateLiveImages\(event\.slug\)/);
-  assert.match(html, /youtube-short-studio-form-v1/);
+  assert.match(html, /youtube-studio-form-v1/);
   assert.match(html, /localStorage\.setItem\(formStateKey/);
   assert.match(html, /localStorage\.removeItem\(formStateKey\)/);
   assert.match(html, /setServicesRestarting\(data\.resetting === true\)/);

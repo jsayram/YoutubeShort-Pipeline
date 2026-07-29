@@ -28,7 +28,7 @@ import { loadStyles } from "./image-styles.mjs";
 import { resolveTopic } from "./topics.mjs";
 import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
 
-const CLIENT_HEADERS = { "X-Voicebox-Client-Id": "youtube-short-pipeline" };
+const CLIENT_HEADERS = { "X-Voicebox-Client-Id": "youtube-pipeline" };
 const lineLocks = new Set();
 
 export function reviewPath(projectDir) {

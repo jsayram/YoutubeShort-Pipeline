@@ -55,7 +55,7 @@ const start = await fetch(`${baseUrl}/speak`, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "X-Voicebox-Client-Id": "youtube-short-pipeline",
+    "X-Voicebox-Client-Id": "youtube-pipeline",
   },
   body: JSON.stringify({
     text: narration,

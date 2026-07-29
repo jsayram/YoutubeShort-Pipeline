@@ -22,13 +22,36 @@ import {
 const FLUX_NO_TEXT_REQUIREMENT =
   "Hard requirement: this is one single silent illustrated scene with no readable text, letters, " +
   "numbers, captions, dialogue, or speech bubbles anywhere in it, and it is not a comic strip or " +
-  "multi-panel layout. Every surface that could carry writing is left blank.";
+  "multi-panel layout. Every surface that could carry writing is left blank. The artwork is unsigned " +
+  "and unbranded; both lower corners contain only uninterrupted paint or paper texture.";
+const FLUX_OBJECT_ONLY_REQUIREMENT =
+  "Composition requirement: an object-only still life in an unoccupied setting. The narration-named " +
+  "prop and its immediate environment are the only subjects.";
+
+export function styleForScene(item, styleSuffix = "") {
+  if (String(item.castMode ?? "") !== "object") return styleSuffix;
+  // A look may describe how recurring figures are simplified. Those tokens are useful in people
+  // scenes but become a direct request for people in a still life, especially for anime-tuned
+  // checkpoints. Keep the paper/ink/palette contract and drop only figure-specific clauses.
+  return String(styleSuffix)
+    .split(",")
+    .filter((term) => !/\b(?:figure|human|anatomy|facial|silhouette)\w*\b/i.test(term))
+    .join(",")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export function buildFluxPrompt(item, styleSuffix) {
   const source = splitNegations(stripQuotedText(makeWordlessVisualPrompt(item.prompt)));
-  const style = splitNegations(styleSuffix ?? "");
+  const style = splitNegations(styleForScene(item, styleSuffix));
   const cleaned = scrubTextNouns([source.positive, style.positive].filter(Boolean).join(". "));
-  return [cleaned, FLUX_NO_TEXT_REQUIREMENT].filter(Boolean).join("\n\n");
+  return [
+    cleaned,
+    String(item.castMode ?? "") === "object" ? FLUX_OBJECT_ONLY_REQUIREMENT : "",
+    FLUX_NO_TEXT_REQUIREMENT,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function buildGeminiPrompt(item, styleSuffix) {
@@ -166,20 +189,29 @@ export function promptWithReferences(prompt, references) {
 }
 
 export function referencesForScene(scene, references) {
+  const castMode = String(scene.castMode ?? "");
+  const eligible = references.filter(
+    (reference) =>
+      !Array.isArray(reference.appliesTo) ||
+      reference.appliesTo.map(String).includes(castMode),
+  );
   if (Array.isArray(scene.references)) {
     if (!scene.references.length) return [];
     const wanted = new Set(scene.references.map(String));
-    return references.filter((reference) => wanted.has(reference.id));
+    return eligible.filter((reference) => wanted.has(reference.id));
   }
 
-  const characters = references.filter((reference) => reference.role === "character");
-  if (characters.length < 2 || !/^solo-[ab]$/.test(String(scene.castMode ?? ""))) {
-    return references;
+  const characters = eligible.filter((reference) => reference.role === "character");
+  if (["none", "object"].includes(castMode)) {
+    return eligible.filter((reference) => reference.role !== "character");
   }
-  const chosen = scene.castMode === "solo-a" ? characters[0] : characters[1];
+  if (characters.length < 2 || !/^solo-[ab]$/.test(castMode)) {
+    return eligible;
+  }
+  const chosen = castMode === "solo-a" ? characters[0] : characters[1];
   return [
     chosen,
-    ...references.filter((reference) => reference.role !== "character"),
+    ...eligible.filter((reference) => reference.role !== "character"),
   ];
 }
 
@@ -192,6 +224,7 @@ const POST_PROCESS_FILTERS = {
   // is the prompt's job, and a fixed duotone push here would fight scenes that want a cool tone.
   "paper-grain": "noise=alls=14:allf=t+u,vignette=PI/5,eq=saturation=0.92:contrast=1.03",
 };
+const COMPLEX_POST_PROCESSES = new Set(["acrylic-unsigned"]);
 
 export async function writeExactImage({
   bytes,
@@ -209,19 +242,34 @@ export async function writeExactImage({
       ? `scale=${outWidth}:${outHeight}:force_original_aspect_ratio=decrease,pad=${outWidth}:${outHeight}:(ow-iw)/2:(oh-ih)/2:color=0x111014`
       : `scale=${outWidth}:${outHeight}:force_original_aspect_ratio=increase,crop=${outWidth}:${outHeight}`;
   const postFilter = postProcess ? POST_PROCESS_FILTERS[postProcess] : null;
-  if (postProcess && !postFilter) {
-    throw new Error(`Unknown postProcess "${postProcess}". Use one of: ${Object.keys(POST_PROCESS_FILTERS).join(", ")}.`);
+  const complexPostProcess = COMPLEX_POST_PROCESSES.has(postProcess);
+  if (postProcess && !postFilter && !complexPostProcess) {
+    throw new Error(
+      `Unknown postProcess "${postProcess}". Use one of: ${[
+        ...Object.keys(POST_PROCESS_FILTERS),
+        ...COMPLEX_POST_PROCESSES,
+      ].join(", ")}.`,
+    );
   }
   const filter = postFilter ? `${crop},${postFilter}` : crop;
   try {
+    const filterArgs = complexPostProcess
+      ? [
+          "-filter_complex",
+          `[0:v]${crop},split[base][patch];` +
+            "[patch]crop=115:100:760:1765,hflip[clean];" +
+            "[base][clean]overlay=890:1765,noise=alls=8:allf=t+u[out]",
+          "-map",
+          "[out]",
+        ]
+      : ["-vf", filter];
     await run("ffmpeg", [
       "-y",
       "-loglevel",
       "error",
       "-i",
       temporary,
-      "-vf",
-      filter,
+      ...filterArgs,
       "-frames:v",
       "1",
       finalPath,

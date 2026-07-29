@@ -23,6 +23,7 @@ import {
   mergePartialManifest,
   selectRequestedScenes,
 } from "./image-generation-audit.mjs";
+import { referencesForScene, styleForScene } from "./image-worker-common.mjs";
 
 // Local image generation through a running ComfyUI. Same shape as the Voicebox step: the app is
 // a local HTTP service, this script only speaks its documented API and never edits its tree.
@@ -38,6 +39,7 @@ const promptsFile = process.env.IMAGE_PROMPTS_FILE
   : path.join(projectDir, "content", "image-prompts.json");
 const prompts = await readJson(promptsFile);
 const gen = config.imageGen ?? {};
+const sharedStyleSeed = Number(gen.styleSeed);
 
 // ComfyUI accepts more than one request for the same image, so a Studio restart used to leave
 // the old worker alive while a new worker queued the entire project again. Keep the guard in the
@@ -117,16 +119,16 @@ const sampler = flags.sampler ?? gen.sampler ?? "dpmpp_2m";
 const scheduler = flags.scheduler ?? gen.scheduler ?? "karras";
 const usesAnimagine = /animagine/i.test(checkpoint);
 
-// SDXL is trained on ~1 megapixel buckets. 768x1344 is its native 9:16-ish bucket; going
-// straight to 1080x1920 produces duplicated limbs and warped geometry. Generate in-bucket,
+// SDXL is trained on ~1 megapixel buckets. 1344x768 is its native 16:9-ish bucket; going
+// straight to 1920x1080 produces duplicated limbs and warped geometry. Generate in-bucket,
 // then scale to the real frame size.
-const genWidth = Number(gen.genWidth ?? 768);
-const genHeight = Number(gen.genHeight ?? 1344);
+const genWidth = Number(gen.genWidth ?? 1344);
+const genHeight = Number(gen.genHeight ?? 768);
 // Output framing defaults to the video frame, but a style can override it. Square storybook art
-// is centred over a blurred copy of itself in the composition, so cropping it to 9:16 here would
+// is centred over a blurred copy of itself in the composition, so cropping it to 16:9 here would
 // throw away the very margins that framing depends on.
-const outWidth = Number(gen.outWidth ?? config.width ?? 1080);
-const outHeight = Number(gen.outHeight ?? config.height ?? 1920);
+const outWidth = Number(gen.outWidth ?? config.width ?? 1920);
+const outHeight = Number(gen.outHeight ?? config.height ?? 1080);
 
 // The style suffix historically carried its own "no readable text, no logo, no watermark" tail.
 // Those phrases were being fed to the positive encoder, where they read as a request for text.
@@ -212,6 +214,13 @@ const audit = await createImageGenerationAudit({
     outHeight,
     loras: gen.loras ?? [],
     postProcess: gen.postProcess ?? null,
+    styleSeed: Number.isFinite(sharedStyleSeed) ? sharedStyleSeed : null,
+    referenceConditioning: {
+      weight: Number(gen.referenceWeight ?? 0.7),
+      weightType: String(gen.referenceWeightType ?? "linear"),
+      endAt: Number(gen.referenceEndAt ?? 0.85),
+      embedsScaling: String(gen.referenceEmbedsScaling ?? "V only"),
+    },
     selectedScenes: selection.prefixes,
     promptPolicy: {
       sceneAuthority: "enriched concrete scene",
@@ -245,6 +254,14 @@ function resolveSeedSalt(forced) {
 
 const sceneSeedSalt = resolveSeedSalt(flags.force);
 const referenceSeedSalt = resolveSeedSalt(flags["force-references"]);
+if (Number.isFinite(sharedStyleSeed)) {
+  for (const item of scenePrompts) {
+    if (item.seed !== undefined && item.seed !== null) continue;
+    item.seed = sceneSeedSalt
+      ? Math.abs((Math.trunc(sharedStyleSeed) ^ sceneSeedSalt) | 0)
+      : Math.trunc(sharedStyleSeed);
+  }
+}
 if (sceneSeedSalt) console.log(`Forced regeneration: scene seed salt ${sceneSeedSalt}.`);
 if (referenceSeedSalt) console.log(`Forced regeneration: reference seed salt ${referenceSeedSalt}.`);
 
@@ -253,13 +270,14 @@ if (referenceSeedSalt) console.log(`Forced regeneration: reference seed salt ${r
 // frames are meant to be wordless so captions can be added over them afterwards.
 export function conditioningFor(item) {
   const source = splitNegations(stripQuotedText(makeWordlessVisualPrompt(item.prompt)));
+  const applicableStyleSuffix = styleForScene(item, styleSuffix);
   // Two passes. splitNegations moves explicit prohibitions to the negative side; scrubTextNouns
   // then removes any surviving clause that merely mentions lettering, which the encoder would
   // read as a request for it.
   const positive = scrubTextNouns(
     [
       source.positive,
-      styleSuffix,
+      applicableStyleSuffix,
       // Animagine 4 was trained on ordered tags rather than prose. Its documented quality tags
       // materially improve subject readability and anatomy when this checkpoint backs a preset.
       usesAnimagine ? "safe, masterpiece, high score, great score, absurdres" : "",
@@ -280,6 +298,21 @@ export function conditioningFor(item) {
     usesAnimagine
       ? "lowres, bad anatomy, bad hands, missing fingers, extra digits, fewer digits, cropped, " +
         "worst quality, low quality, low score, bad score, average score, blurry"
+      : "",
+    String(item.castMode ?? "") === "object"
+      ? "(person:1.6), (human:1.6), (woman:1.6), (man:1.6), (girl:1.6), (boy:1.6), " +
+        "(character:1.5), (face:1.5), (hands:1.4), (body:1.4), (human figure:1.6)"
+      : "",
+    String(item.castMode ?? "") === "pair"
+      ? "(extra person:1.7), (three people:1.7), (trio:1.7), (2girls:1.6), (2boys:1.6), " +
+        "(two women:1.6), (two men:1.6), (multiple umbrellas:1.4)"
+      : "",
+    /^solo-[ab]$/.test(String(item.castMode ?? ""))
+      ? "(extra person:1.7), (two people:1.7), (couple:1.6), (crowd:1.6)"
+      : "",
+    usesAnimagine
+      ? "(clean cel shading:1.5), (glossy digital anime:1.5), (pastel palette:1.4), " +
+        "(bright white background:1.4), (flat empty sky:1.3)"
       : "",
     // A style preset can push against the wrong medium, e.g. "photograph" when the look is
     // meant to be flat vector.
@@ -303,6 +336,9 @@ const loras = Array.isArray(gen.loras) ? gen.loras.filter((entry) => entry?.name
 const ipAdapterFile = gen.ipAdapter ?? "ip-adapter-plus_sdxl_vit-h.safetensors";
 const clipVisionFile = gen.clipVision ?? "clip_vision_h.safetensors";
 const referenceWeight = Number(gen.referenceWeight ?? 0.7);
+const referenceWeightType = String(gen.referenceWeightType ?? "linear");
+const referenceEndAt = Number(gen.referenceEndAt ?? 0.85);
+const referenceEmbedsScaling = String(gen.referenceEmbedsScaling ?? "V only");
 const uploaded = new Map();
 
 async function uploadReference(relativePath) {
@@ -377,13 +413,13 @@ function referenceChain(handles, startModel) {
         image: [imageId, 0],
         clip_vision: ["clipvision", 0],
         weight: referenceWeight,
-        weight_type: "linear",
+        weight_type: referenceWeightType,
         combine_embeds: "concat",
         start_at: 0,
         // Releasing the reference before the end lets the prompt own late detail, so scenes
         // differ from each other instead of all converging on the reference image.
-        end_at: 0.85,
-        embeds_scaling: "V only",
+        end_at: referenceEndAt,
+        embeds_scaling: referenceEmbedsScaling,
       },
     };
     model = [applyId, 0];
@@ -438,7 +474,7 @@ async function generate(item, referenceHandles) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       prompt: workflowFor(item, referenceHandles),
-      client_id: "youtube-short-pipeline",
+      client_id: "youtube-pipeline",
     }),
   });
   if (!queued.ok) throw new Error(`ComfyUI rejected the workflow: ${await queued.text()}`);
@@ -501,6 +537,23 @@ for (const [index, item] of ordered.entries()) {
     ? `assets/references/${item.id}.png`
     : `public/generated/${item.id}.png`;
 
+  if (isReference && item.source) {
+    const sourcePath = path.resolve(String(item.source));
+    await fs.access(sourcePath);
+    await run("ffmpeg", [
+      "-y",
+      "-loglevel",
+      "error",
+      "-i",
+      sourcePath,
+      "-frames:v",
+      "1",
+      finalPath,
+    ]);
+    console.log(`${progressLabel(item, true)} ${item.id} — fixed style study`);
+    continue;
+  }
+
   // Regenerating scenes should not silently redesign the recurring character. Reference art is
   // stable until the user explicitly asks for --force-references.
   const forceItem = isReference ? flags["force-references"] : flags.force;
@@ -536,7 +589,12 @@ for (const [index, item] of ordered.entries()) {
 
   const itemStart = Date.now();
   // A scene inherits the shared reference art unless it explicitly declares its own list.
-  const wanted = isReference ? [] : (item.references ?? sharedReferences);
+  const wanted = isReference
+    ? []
+    : (item.references ??
+      referencesForScene(item, referencePrompts).map(
+        (reference) => `assets/references/${reference.id}.png`,
+      ));
   const references = [];
   for (const reference of wanted) {
     references.push(await uploadReference(reference));
@@ -697,6 +755,13 @@ await audit.finish("completed", {
   manifest: "public/generated/manifest.json",
   generated: manifest.filter((entry) => !entry.skipped).length,
   reused: manifest.filter((entry) => entry.skipped).length,
+  usage: {
+    requests: 0,
+    creditsUsed: 0,
+    estimatedCost: 0,
+    quotaRemaining: null,
+    quotaNote: "Local ComfyUI generation does not consume cloud credits.",
+  },
 });
 } catch (error) {
   if (audit.document.status !== "failed") await audit.fail(error);

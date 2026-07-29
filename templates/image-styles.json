@@ -162,11 +162,11 @@
   },
   {
     "id": "flux2-storybook",
-    "label": "FLUX.2 painted storybook (local first)",
+    "label": "FLUX.2 warm paper-comic (local first)",
     "provider": "flux2-local",
     "fallbackProvider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "Prompt-faithful paper-watercolor story scenes with a consistent warm-dark umber, charcoal, rust, ochre, beige and amber palette. Uses recurring character/material references, local FLUX.2 first, and Cloudflare only as configured fallback.",
+    "summary": "Prompt-faithful layered paper-comic scenes with simplified figures, abstract graphic shapes, and one consistent warm-dark umber, charcoal, rust, ochre, beige and amber palette. Uses recurring character/material references, local FLUX.2 first, and Cloudflare only as configured fallback.",
     "requiredModels": {
       "diffusionModel": "flux-2-klein-4b.safetensors",
       "textEncoder": "qwen_3_4b.safetensors",
@@ -177,59 +177,59 @@
       "steps": 4,
       "guidance": 1,
       "sampler": "euler",
-      "genWidth": 768,
-      "genHeight": 1344,
-      "outWidth": 1080,
-      "outHeight": 1920
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
     },
     "referencePrompts": [
       {
-        "id": "protagonist-a-watercolor-reference-v5",
+        "id": "protagonist-a-paper-comic-reference-v6",
         "role": "character",
-        "prompt": "A wordless paper-watercolor character reference for the recurring adult woman in a mature relationship story. Show only this one woman standing neutrally against a plain warm-beige cold-press paper ground, with shoulder-length dark hair, an ordinary rust coat, charcoal trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body study with translucent layered watercolor washes, dry graphite contours, broken ink lines, matte pigment blooms, restrained risograph grain, visible paper tooth, and warm amber edge light. Controlled warm-dark palette of burnt umber, soft charcoal, rust, muted ochre, warm beige, and only a trace of dusty teal. No man, second person, interaction, landscape, room, prop, lettering, label, logo, or border."
+        "prompt": "A wordless layered paper-comic character reference for one recurring adult woman. One simplified paper-cut figure standing neutrally against plain warm-beige fibrous paper, shoulder-length dark hair, ordinary rust coat, charcoal trousers, simple shoes, natural average proportions, relaxed hands, minimal facial detail. Torn deckled paper edges, overlapping matte paper planes, opaque gouache blocks, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, warm amber edge light. Deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, and only a tiny dusty teal accent. No second person, interaction, landscape, room, prop, lettering, logo, panel, or border."
       },
       {
-        "id": "protagonist-b-watercolor-reference-v5",
+        "id": "protagonist-b-paper-comic-reference-v6",
         "role": "character",
-        "prompt": "A wordless paper-watercolor character reference for the recurring adult man in a mature relationship story. Show only this one man standing neutrally against a plain warm-beige cold-press paper ground, with loose shorter dark hair, an ordinary deep-charcoal coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body study with translucent layered watercolor washes, dry graphite contours, broken ink lines, matte pigment blooms, restrained risograph grain, visible paper tooth, and warm amber edge light. Controlled warm-dark palette of burnt umber, soft charcoal, rust, muted ochre, warm beige, and only a trace of dusty teal or navy. No woman, second person, interaction, landscape, room, prop, lettering, label, logo, or border."
+        "prompt": "A wordless layered paper-comic character reference for one recurring adult man. One simplified paper-cut figure standing neutrally against plain warm-beige fibrous paper, loose short dark hair, ordinary deep-charcoal coat, dark trousers, simple shoes, natural average proportions, relaxed hands, minimal facial detail. Torn deckled paper edges, overlapping matte paper planes, opaque gouache blocks, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, warm amber edge light. Deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, and only a tiny dusty navy accent. No second person, interaction, landscape, room, prop, lettering, logo, panel, or border."
       },
       {
-        "id": "warm-dark-watercolor-material-reference-v5",
+        "id": "warm-dark-paper-comic-material-reference-v6",
         "role": "style",
-        "prompt": "A wordless paper-watercolor material and palette reference: visible warm-beige cold-press paper tooth, translucent layered watercolor washes, feathered pigment edges, dry graphite hatching, broken ink contours, matte pigment blooms, restrained risograph grain, and subtle aged print wear. Controlled warm-dark swatches of deep burnt umber, soft charcoal, rust, muted ochre, warm beige, amber light, and only restrained dusty teal or navy accents. Abstract art-material sample only. No person, face, character, landscape, room, recognizable object, composition, lettering, watermark, logo, or border."
+        "prompt": "A wordless layered paper-comic material reference: visible warm-beige paper fibre, torn deckled edges, overlapping cut-paper planes, matte screenprint ink, opaque gouache blocks, dry graphite hatching, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, and subtle aged wear. Warm-dark swatches of deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, amber light, and only tiny dusty teal or navy accents. Abstract material sample only. No person, face, character, room, recognizable object, lettering, logo, panel, or border."
       }
     ]
   },
   {
     "id": "cloudflare-flux2-storybook",
-    "label": "FLUX.2 painted storybook (Cloudflare)",
+    "label": "FLUX.2 warm paper-comic (Cloudflare)",
     "provider": "cloudflare-flux2",
     "promptProfile": "flux2-storybook",
-    "summary": "The same prompt-faithful warm-dark paper-watercolor treatment through Cloudflare Workers AI.",
+    "summary": "The same prompt-faithful warm-dark layered paper-comic treatment through Cloudflare Workers AI.",
     "download": "No model download. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in .env.",
     "sampling": {
       "steps": 4,
       "guidance": 1,
-      "genWidth": 768,
-      "genHeight": 1344,
-      "outWidth": 1080,
-      "outHeight": 1920
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
     },
     "referencePrompts": [
       {
-        "id": "protagonist-a-watercolor-reference-v5",
+        "id": "protagonist-a-paper-comic-reference-v6",
         "role": "character",
-        "prompt": "A wordless paper-watercolor character reference for the recurring adult woman in a mature relationship story. Show only this one woman standing neutrally against a plain warm-beige cold-press paper ground, with shoulder-length dark hair, an ordinary rust coat, charcoal trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body study with translucent layered watercolor washes, dry graphite contours, broken ink lines, matte pigment blooms, restrained risograph grain, visible paper tooth, and warm amber edge light. Controlled warm-dark palette of burnt umber, soft charcoal, rust, muted ochre, warm beige, and only a trace of dusty teal. No man, second person, interaction, landscape, room, prop, lettering, label, logo, or border."
+        "prompt": "A wordless layered paper-comic character reference for one recurring adult woman. One simplified paper-cut figure standing neutrally against plain warm-beige fibrous paper, shoulder-length dark hair, ordinary rust coat, charcoal trousers, simple shoes, natural average proportions, relaxed hands, minimal facial detail. Torn deckled paper edges, overlapping matte paper planes, opaque gouache blocks, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, warm amber edge light. Deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, and only a tiny dusty teal accent. No second person, interaction, landscape, room, prop, lettering, logo, panel, or border."
       },
       {
-        "id": "protagonist-b-watercolor-reference-v5",
+        "id": "protagonist-b-paper-comic-reference-v6",
         "role": "character",
-        "prompt": "A wordless paper-watercolor character reference for the recurring adult man in a mature relationship story. Show only this one man standing neutrally against a plain warm-beige cold-press paper ground, with loose shorter dark hair, an ordinary deep-charcoal coat, dark trousers, simple shoes, natural average proportions, relaxed hands, and simplified mature facial structure. Three-quarter full-body study with translucent layered watercolor washes, dry graphite contours, broken ink lines, matte pigment blooms, restrained risograph grain, visible paper tooth, and warm amber edge light. Controlled warm-dark palette of burnt umber, soft charcoal, rust, muted ochre, warm beige, and only a trace of dusty teal or navy. No woman, second person, interaction, landscape, room, prop, lettering, label, logo, or border."
+        "prompt": "A wordless layered paper-comic character reference for one recurring adult man. One simplified paper-cut figure standing neutrally against plain warm-beige fibrous paper, loose short dark hair, ordinary deep-charcoal coat, dark trousers, simple shoes, natural average proportions, relaxed hands, minimal facial detail. Torn deckled paper edges, overlapping matte paper planes, opaque gouache blocks, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, warm amber edge light. Deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, and only a tiny dusty navy accent. No second person, interaction, landscape, room, prop, lettering, logo, panel, or border."
       },
       {
-        "id": "warm-dark-watercolor-material-reference-v5",
+        "id": "warm-dark-paper-comic-material-reference-v6",
         "role": "style",
-        "prompt": "A wordless paper-watercolor material and palette reference: visible warm-beige cold-press paper tooth, translucent layered watercolor washes, feathered pigment edges, dry graphite hatching, broken ink contours, matte pigment blooms, restrained risograph grain, and subtle aged print wear. Controlled warm-dark swatches of deep burnt umber, soft charcoal, rust, muted ochre, warm beige, amber light, and only restrained dusty teal or navy accents. Abstract art-material sample only. No person, face, character, landscape, room, recognizable object, composition, lettering, watermark, logo, or border."
+        "prompt": "A wordless layered paper-comic material reference: visible warm-beige paper fibre, torn deckled edges, overlapping cut-paper planes, matte screenprint ink, opaque gouache blocks, dry graphite hatching, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, and subtle aged wear. Warm-dark swatches of deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, amber light, and only tiny dusty teal or navy accents. Abstract material sample only. No person, face, character, room, recognizable object, lettering, logo, panel, or border."
       }
     ]
   },
@@ -268,6 +268,101 @@
     ]
   },
   {
+    "id": "animagine-lofi-melancholy",
+    "label": "Animagine lo-fi melancholy (Qwen-directed)",
+    "provider": "comfyui",
+    "promptProfile": "animagine-lofi-melancholy",
+    "postProcess": "paper-grain",
+    "summary": "Qwen invents varied cinematic scenes from each narration beat while Animagine keeps a fixed hand-drawn lo-fi anime contract: bold sketch lines, flat colors, heavy grain, rough paper, warm amber against deep teal/navy, and expansive negative space.",
+    "match": [
+      "animagine"
+    ],
+    "prefersCheckpoint": [
+      "animagine"
+    ],
+    "download": "Animagine XL is already installed.",
+    "sampling": {
+      "steps": 28,
+      "cfg": 6,
+      "sampler": "euler_ancestral",
+      "scheduler": "normal",
+      "styleSeed": 1959877624
+    },
+    "framing": {
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "styleStudies": [
+      {
+        "id": "animagine-secret-sunset-style-study-v1",
+        "source": "templates/references/animagine-secret-sunset-style-study-v1.jpg",
+        "use": "Approved dark solo composition, warm backlight, negative-space, and secrecy study; documented rather than injected."
+      },
+      {
+        "id": "animagine-romance-variation-board-v1",
+        "source": "templates/references/animagine-romance-variation-board-v1.jpg",
+        "use": "Approved scene-variety study for rain, interior, station, market, and balcony compositions; documented rather than injected."
+      },
+      {
+        "id": "animagine-romance-storyboard-style-board-v2",
+        "source": "templates/references/animagine-romance-storyboard-style-board-v2.jpg",
+        "use": "Approved vintage panel, paper, sepia-line, amber/umber, and restrained olive/teal style study; documented rather than injected."
+      }
+    ]
+  },
+  {
+    "id": "illustrious-acrylic-melancholy",
+    "label": "Illustrious dark acrylic melancholy",
+    "provider": "comfyui",
+    "promptProfile": "acrylic-melancholy-tags",
+    "postProcess": "paper-grain",
+    "summary": "Illustrious renders a Qwen-directed cinematic scene with heavy acrylic impasto, broken ink contours, deep emerald/navy shadows, rust and amber light, canvas grain, and a frayed comic-paper finish.",
+    "match": [
+      "illustrious"
+    ],
+    "prefersCheckpoint": [
+      "illustrious"
+    ],
+    "download": "Illustrious XL is already installed.",
+    "sampling": {
+      "steps": 30,
+      "cfg": 6,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras"
+    },
+    "framing": {
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    }
+  },
+  {
+    "id": "flux2-acrylic-melancholy",
+    "label": "FLUX.2 dark acrylic melancholy (local)",
+    "provider": "flux2-local",
+    "promptProfile": "acrylic-melancholy-prose",
+    "postProcess": "acrylic-unsigned",
+    "summary": "FLUX.2 Klein renders the same Qwen-directed dark acrylic look through prompt conditioning only. The installed FLUX.1 painterly LoRA is intentionally not attached because it is a different architecture.",
+    "requiredModels": {
+      "diffusionModel": "flux-2-klein-4b.safetensors",
+      "textEncoder": "qwen_3_4b.safetensors",
+      "vae": "flux2-vae.safetensors"
+    },
+    "download": "Uses the already installed FLUX.2 Klein 4B BF16 model, Qwen 3 4B text encoder, and FLUX.2 VAE.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 1,
+      "sampler": "euler",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    }
+  },
+  {
     "id": "pixazo-sdxl-watercolor",
     "label": "Pixazo SDXL watercolor (free, experimental)",
     "provider": "pixazo-sdxl",
@@ -279,10 +374,10 @@
       "guidanceScale": 5
     },
     "framing": {
-      "genWidth": 576,
-      "genHeight": 1024,
-      "outWidth": 1080,
-      "outHeight": 1920
+      "genWidth": 1024,
+      "genHeight": 576,
+      "outWidth": 1920,
+      "outHeight": 1080
     }
   },
   {
@@ -323,11 +418,11 @@
   },
   {
     "id": "flat-line-poetry",
-    "label": "Flat line-art poetry (webtoon, mood sky)",
+    "label": "Illustrious warm paper-comic",
     "provider": "comfyui",
     "promptProfile": "flat-line-poetry",
     "postProcess": "paper-grain",
-    "summary": "Clean flat-color webtoon and graphic-novel line art: bold outlines, cel-shaded fills, and a smooth gradient sky that shifts warm or cool with the line's mood. Camera distance varies scene to scene, with paper grain added after generation. Matches quote-poetry Shorts rather than a painterly storybook look.",
+    "summary": "Illustrious tuned to the shared layered paper-comic look: simplified paper-cut figures, abstract graphic environments, matte ink, and a consistent warm-dark amber palette.",
     "match": [
       "illustrious",
       "animagine",
@@ -343,10 +438,18 @@
       "cfg": 6,
       "sampler": "dpmpp_2m",
       "scheduler": "karras",
-      "genWidth": 768,
-      "genHeight": 1344,
-      "outWidth": 1080,
-      "outHeight": 1920
-    }
+      "referenceWeight": 0.35,
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "referencePrompts": [
+      {
+        "id": "illustrious-warm-paper-comic-material-v1",
+        "role": "style",
+        "prompt": "safe, wordless layered paper-comic material study, warm-beige fibrous paper, torn deckled edges, overlapping cut-paper planes, matte screenprint ink, opaque gouache blocks, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, dominant amber light, tiny dusty teal or navy accent, abstract material sample only, no person, no character, no face, no room, no landscape, no recognizable object, no text, no panel, no border"
+      }
+    ]
   }
 ]

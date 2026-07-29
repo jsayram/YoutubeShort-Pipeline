@@ -3,6 +3,7 @@ import { test } from "node:test";
 import {
   buildAuthoritativePrompt,
   buildSystemPrompt,
+  buildUserPrompt,
   detectFormat,
   detectProviderCategory,
   reconstructPrompt,
@@ -15,7 +16,7 @@ test("natural-language enrichment preserves framing and replaces old anchors", (
     "Narration: They say you can't go back. Story position: opening. " +
     "Visual anchors: tonight, proving, wrong. " +
     "Scene 1 of 12, with its own distinct location, camera distance, and light. " +
-    "Build the vertical frame from layered foreground and background depth.";
+    "Build the horizontal frame from layered foreground and background depth.";
   const scene =
     "A worn leather suitcase sits open on a rain-soaked train platform bench. " +
     "Early morning fog softens the distant tracks.";
@@ -25,7 +26,7 @@ test("natural-language enrichment preserves framing and replaces old anchors", (
   assert.match(result, /no people in it/);
   assert.match(result, /worn leather suitcase/);
   assert.match(result, /Scene 1 of 12/);
-  assert.match(result, /Build the vertical frame/);
+  assert.match(result, /Build the horizontal frame/);
   assert.doesNotMatch(result, /Visual anchors:/);
   assert.doesNotMatch(result, /tonight, proving, wrong/);
 });
@@ -91,6 +92,45 @@ test("provider category and format are derived without changing provider templat
   assert.match(buildSystemPrompt(people), /soft notification glow/);
   assert.match(buildSystemPrompt(people), /heart is optional, never required/i);
   assert.match(buildSystemPrompt(symbolic), /abstract shapes/);
+});
+
+test("creative archetype enrichment treats narration as an emotional seed", () => {
+  const profile = {
+    format: "ordered-tags",
+    enrichmentMode: "creative-archetype",
+    enrichmentGuide: "Favor quiet secrecy.",
+    sceneTemplate: "Show {{castPlan}} in one wordless scene.",
+    stylePrompt: "hand-drawn lo-fi anime, heavy grain",
+    sceneArchetypes: [
+      "solitary figure in a deep-perspective alley",
+      "back-view figure beneath a vast sunset sky",
+      "quiet candlelit interior",
+    ],
+  };
+  const system = buildSystemPrompt(profile);
+  assert.match(system, /EMOTIONAL SEED/i);
+  assert.match(system, /may depart from the narration's literal nouns/i);
+  assert.match(system, /Rotate families/i);
+  assert.match(system, /solitary figure in a deep-perspective alley/i);
+  assert.match(system, /drawing medium, grain, and global palette are appended later/i);
+  assert.doesNotMatch(system, /Preserve every concrete object explicitly named/i);
+
+  const user = buildUserPrompt(
+    {
+      prompt: "emotional interpretation grief, required visual event a phone on a table",
+      castMode: "object",
+    },
+    0,
+    2,
+    ["I still have your old playlist.", "Sometimes I almost text you."],
+    [],
+    "tags",
+    profile,
+  );
+  assert.match(user, /inspired by the emotion, not a literal illustration/i);
+  assert.match(user, /fresh cinematic scene/i);
+  assert.match(user, /wordless horizontal scene/i);
+  assert.doesNotMatch(user, /Preserve every physical object/i);
 });
 
 test("authoritative enrichment lets the concrete Qwen scene replace a competing draft plan", () => {

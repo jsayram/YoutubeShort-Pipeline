@@ -84,8 +84,8 @@ const narrationDuration = Number(
   timing.narrationDuration ?? timing.spokenDuration ?? lines.at(-1).end,
 );
 const duration = Number((narrationDuration + tail).toFixed(3));
-const width = Number(config.width ?? 1080);
-const height = Number(config.height ?? 1920);
+const width = Number(config.width ?? 1920);
+const height = Number(config.height ?? 1080);
 
 const scenes = lines.map((line, index) => {
   const paced = Number.isFinite(Number(line.imageStart)) && Number.isFinite(Number(line.imageEnd));
@@ -202,7 +202,7 @@ function renderHtml() {
     .join(",\n");
 
   return `<!doctype html>
-<html lang="en" data-resolution="portrait">
+<html lang="en" data-resolution="landscape">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=${width}, height=${height}" />

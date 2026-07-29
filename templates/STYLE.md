@@ -1,6 +1,6 @@
-# YouTube Shorts visual and motion style
+# YouTube visual and motion style
 
-This is the default visual system for every Short made with this pipeline. Treat it as the source
+This is the default visual system for every video made with this pipeline. Treat it as the source
 of truth for image generation, HTML composition, infographic design, typography, and motion.
 
 The style in one sentence:
@@ -13,10 +13,10 @@ fades.
 
 ## Output format
 
-- Canvas: 1080 × 1920, vertical 9:16.
+- Canvas: 1920 × 1080, horizontal 16:9.
 - Frame rate: 30 fps.
-- Default duration: 60 seconds.
-- Safe area: keep essential content at least 72 px from the sides, 120 px from the top, and 160 px
+- Default duration: 10 minutes (600 seconds).
+- Safe area: keep essential content at least 140 px from the sides, 60 px from the top, and 130 px
   from the bottom.
 - Body text: no smaller than 28 px.
 - Labels: no smaller than 20 px.

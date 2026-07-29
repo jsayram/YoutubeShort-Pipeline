@@ -69,8 +69,8 @@ const narrationDuration = Number(
   timing.narrationDuration ?? timing.spokenDuration ?? lines.at(-1).end,
 );
 const duration = Number((narrationDuration + tail).toFixed(3));
-const width = Number(config.width ?? 1080);
-const height = Number(config.height ?? 1920);
+const width = Number(config.width ?? 1920);
+const height = Number(config.height ?? 1080);
 const FADE = 0.5;
 
 const scenes = lines.map((line, index) => {
@@ -227,7 +227,7 @@ ${moteMarkup(scene)}
     .join(",\n");
 
   return `<!doctype html>
-<html lang="en" data-resolution="portrait">
+<html lang="en" data-resolution="landscape">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=${width}, height=${height}" />
@@ -267,8 +267,8 @@ ${moteMarkup(scene)}
         position: absolute;
         left: 50%;
         top: 50%;
-        width: ${Math.round(width * 1.72)}px;
-        height: ${Math.round(height * 1.12)}px;
+        width: ${Math.round(width * 1.12)}px;
+        height: ${Math.round(height * 1.72)}px;
         transform: translate(-50%, -50%);
         background-size: cover;
         background-position: center;
@@ -276,11 +276,11 @@ ${moteMarkup(scene)}
       }
       .art-frame {
         position: absolute;
-        left: 0;
-        top: 50%;
-        width: ${width}px;
-        height: ${width}px;
-        margin-top: -${Math.round(width / 2)}px;
+        left: 50%;
+        top: 0;
+        width: ${height}px;
+        height: ${height}px;
+        margin-left: -${Math.round(height / 2)}px;
         overflow: hidden;
         isolation: isolate;
         box-shadow: 0 44px 110px rgba(0, 0, 0, 0.48);
@@ -395,7 +395,7 @@ ${moteMarkup(scene)}
       }
       #vignette {
         background: radial-gradient(
-          760px 1180px at 50% 49%,
+          1180px 760px at 50% 49%,
           transparent 51%,
           rgba(0, 0, 0, 0.7) 100%
         );

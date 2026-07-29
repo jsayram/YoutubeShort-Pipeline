@@ -46,10 +46,10 @@ const vaeName = flags.vae ?? gen.vae ?? "flux2-vae.safetensors";
 const steps = Number(flags.steps ?? gen.steps ?? 4);
 const guidance = Number(flags.guidance ?? gen.guidance ?? 1);
 const sampler = flags.sampler ?? gen.sampler ?? "euler";
-const sceneWidth = Number(gen.genWidth ?? 768);
-const sceneHeight = Number(gen.genHeight ?? 1344);
-const outWidth = Number(gen.outWidth ?? config.width ?? 1080);
-const outHeight = Number(gen.outHeight ?? config.height ?? 1920);
+const sceneWidth = Number(gen.genWidth ?? 1344);
+const sceneHeight = Number(gen.genHeight ?? 768);
+const outWidth = Number(gen.outWidth ?? config.width ?? 1920);
+const outHeight = Number(gen.outHeight ?? config.height ?? 1080);
 const referenceWidth = Number(gen.referenceWidth ?? 768);
 const referenceHeight = Number(gen.referenceHeight ?? 768);
 const outputDir = path.join(projectDir, "public", "generated");
@@ -221,7 +221,7 @@ async function generate(specification) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       prompt: workflowFor(specification),
-      client_id: "youtube-short-pipeline-flux2",
+      client_id: "youtube-pipeline-flux2",
     }),
   });
   if (!response.ok) throw new Error(`ComfyUI rejected FLUX.2: ${await response.text()}`);
@@ -307,11 +307,13 @@ try {
         skipped: true,
         prompt,
         promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
+        postProcess: gen.postProcess ?? null,
       });
       await audit.startScene(item.id, {
         finalPrompt: prompt,
         seed: Number(item.seed ?? seedFor(item.id, sceneSeedSalt)),
         settings: { steps, guidance, sampler, width: sceneWidth, height: sceneHeight },
+        postProcess: gen.postProcess ?? null,
       });
       await audit.completeScene(item.id, { status: "reused", output: manifest.at(-1) });
       continue;
@@ -324,6 +326,7 @@ try {
       seed,
       settings: { steps, guidance, sampler, width: sceneWidth, height: sceneHeight },
       references: selectedReferences.map((reference) => reference.id),
+      postProcess: gen.postProcess ?? null,
     });
     let bytes;
     try {
@@ -362,6 +365,7 @@ try {
       references: selectedReferences.map((reference) => reference.id),
       prompt,
       promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
+      postProcess: gen.postProcess ?? null,
     });
     await audit.completeScene(item.id, { output: manifest.at(-1) });
   }
@@ -379,6 +383,13 @@ try {
     manifest: "public/generated/manifest.json",
     generated: manifest.filter((entry) => !entry.skipped).length,
     reused: manifest.filter((entry) => entry.skipped).length,
+    usage: {
+      requests: 0,
+      creditsUsed: 0,
+      estimatedCost: 0,
+      quotaRemaining: null,
+      quotaNote: "Local ComfyUI FLUX generation does not consume cloud credits.",
+    },
   });
   console.log(
     `FLUX.2 local finished in ${((Date.now() - startedAt) / 1000).toFixed(0)}s with ${references.length} reusable reference image(s).`,

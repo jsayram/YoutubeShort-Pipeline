@@ -70,6 +70,8 @@ test("FLUX local, Cloudflare FLUX, and Gemini receive the same wordless concrete
     assert.match(prompt, /old vinyl record sleeve/i);
     assert.match(prompt, /dim amber glow/i);
     assert.match(prompt, /no readable text/i);
+    assert.match(prompt, /artwork is unsigned and unbranded/i);
+    assert.match(prompt, /lower corners contain only uninterrupted paint or paper texture/i);
     assert.doesNotMatch(prompt, /message bubble/i);
   }
 });

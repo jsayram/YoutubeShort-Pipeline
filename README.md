@@ -1,6 +1,6 @@
-# YouTube Short Pipeline
+# YouTube Pipeline
 
-A reusable local pipeline for making 60-second, 9:16 YouTube Shorts with:
+A reusable local pipeline for making long-form, 16:9 YouTube videos with:
 
 - ComfyUI, FLUX.2 Klein, Animagine, Google GenAI, Cloudflare, or Pixazo SDXL for visual assets
 - Voicebox for a local male voice-over
@@ -73,6 +73,15 @@ passing selected take. Editing a line preserves its earlier takes as history, re
 base prompt, and immediately generates a take for the revised wording. Turn the toggle off for the
 non-interactive first-passing-take workflow.
 
+Studio also pauses at **Image review** before composition. Every scene shows its narration,
+editable project-local scene prompt, selected image, retained image takes, and a collapsed
+generation audit containing the exact provider prompt, negative prompt, model, seed, and settings.
+**Regenerate this image** changes only that scene and never overwrites an earlier take. Every image
+must be approved before **Continue to composition** is enabled. Editing or selecting a take clears
+approval only for that scene. Cloud takes show the provider-reported credits and remaining quota
+when supplied; otherwise Studio shows the exact cloud request count and explicitly says that the
+provider did not report its credit cost or remaining balance.
+
 Active-word captions are optional and off by default. Turn on **Highlight spoken words** in
 Studio to align the narration, show short phrase groups, and highlight the current word in gold
 inside the HyperFrames composition. The captions disappear during silent pauses. The saved setting
@@ -99,12 +108,13 @@ The Local services controls now separate lightweight reads from destructive reco
 - **Restart everything…** asks for confirmation, cancels the current pipeline, stops browser
   audio/video, clears ComfyUI's queue, and restarts ComfyUI and Voicebox.
 
-Refreshing or closing the browser during an active pipeline displays the browser's leave-page
-warning. Cancelling that warning leaves the run alone. Continuing the refresh triggers the same
-full local-service reset before the new page reconnects. Studio keeps **Run pipeline** disabled
-while that reset is active. Voicebox is considered ready only after its old application process
-has fully exited and its health and profile APIs pass several consecutive checks; the environment
-check also waits through a normal Voicebox startup instead of failing during model loading.
+Refreshing or closing the browser does not cancel the pipeline or erase the page state. Studio
+replays the saved run, restores narration and image approvals, and rereads finished image files
+when the page reconnects. Only the explicit **Restart everything…** control clears the active
+Studio session and restarts local services. Voicebox is considered ready only after its old
+application process has fully exited and its health and profile APIs pass several consecutive
+checks; the environment check also waits through a normal Voicebox startup instead of failing
+during model loading.
 
 The Studio's Content provider dropdown loads a matching prompt profile from
 `templates/prompt.json`. Open **Edit image prompts** beneath the dropdown to work at three safe
@@ -262,7 +272,7 @@ Build the HyperFrames composition in `videos/my-video-name/index.html`, then val
 ```sh
 cd "videos/my-video-name"
 npx --yes hyperframes@0.7.78 check
-npx --yes hyperframes@0.7.78 snapshot --at 5,15,25,35,45,55
+npx --yes hyperframes@0.7.78 snapshot --at <timestamps evenly spaced across the video's duration>
 npm run dev
 ```
 
@@ -274,7 +284,7 @@ npm run render -- --project my-video-name --approved
 ```
 
 The finished file is saved as
-`videos/my-video-name/renders/my-video-name.mp4` and verified for duration, 1080×1920, and audio.
+`videos/my-video-name/renders/my-video-name.mp4` and verified for duration, 1920×1080, and audio.
 Before delivery, the pipeline removes descriptive, authoring, location, and chapter metadata
 without re-encoding the picture or sound. It then copies the clean MP4 to
 `iCloud Drive/YoutubeShortPipeline/ready`. After uploading it, move it manually from `ready` to
@@ -291,7 +301,7 @@ npm run deliver -- --project my-video-name
 
 Open this folder in the coding agent and ask:
 
-> Create a 60-second vertical YouTube Short from this script. Follow AGENTS.md, use the configured
+> Create a long-form, 16:9 YouTube video from this script. Follow AGENTS.md, use the configured
 > Voicebox profile, generate coherent visual assets, show me the final preview, and do not render
 > until I approve it.
 
@@ -305,7 +315,7 @@ For optional direct Voicebox control in Claude Code, see [Architecture](docs/ARC
 - [Clean integration architecture](docs/ARCHITECTURE.md)
 - [AI topic-to-asset-pack master prompt](templates/AI-ASSET-PACK-PROMPT.md)
 - [Animated visual style guide](docs/STYLE-GUIDE.html)
-- [Reusable Shorts style specification](templates/STYLE.md)
+- [Reusable video style specification](templates/STYLE.md)
 
 Keep `.env` private. The whole `videos/` tree is ignored by Git — this repository is the pipeline,
 not the videos it produces. See [Exact workflow](docs/WORKFLOW.md) for what that means for your

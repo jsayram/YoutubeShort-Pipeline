@@ -42,7 +42,7 @@ for (const [index, scene] of animagineScenes.entries()) {
 }
 assert.match(
   animagineScenes[0].prompt,
-  /two young adult figures at medium distance, silhouetted/i,
+  /two young adult figures at medium distance sharing one intimate natural gesture/i,
 );
 assert.match(animagineScenes[0].prompt, /dark home doorway/i);
 assert.match(animagineScenes[1].prompt, /late workplace light/i);

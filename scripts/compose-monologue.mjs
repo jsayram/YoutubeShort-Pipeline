@@ -4,7 +4,7 @@ import { parseArgs, readJson, videoDir, writeJson } from "./lib.mjs";
 
 // The illustrated emotional monologue composition.
 //
-// Square artwork centred in a 9:16 frame, over an enlarged blurred copy of itself, under a warm
+// Square artwork centred in a 16:9 frame, over an enlarged blurred copy of itself, under a warm
 // wash, vignette and grain, with drifting environmental motion and one-word captions driven by
 // real word-level timings.
 //
@@ -57,8 +57,8 @@ if (!files.length) {
   throw new Error(`No images in public/generated. Run: npm run images -- --project ${slug}`);
 }
 
-const width = Number(config.width ?? 1080);
-const height = Number(config.height ?? 1920);
+const width = Number(config.width ?? 1920);
+const height = Number(config.height ?? 1080);
 const tail = Number(flags.tail ?? 2.5);
 const spoken = Number(timing.spokenDuration ?? timing.words.at(-1).end);
 const duration = Number((spoken + tail).toFixed(2));
@@ -146,7 +146,7 @@ function renderHtml() {
   const overlayTrack = scenes.length + 1;
 
   return `<!doctype html>
-<html lang="en" data-resolution="portrait">
+<html lang="en" data-resolution="landscape">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=${width}, height=${height}" />
@@ -190,7 +190,7 @@ function renderHtml() {
         will-change: transform, opacity;
       }
 
-      /* The enlarged blurred copy that fills the space above and below the square. Painted as a
+      /* The enlarged blurred copy that fills the space left and right of the square. Painted as a
          background rather than a second <img> of the same file: two identical img entries at the
          same start and duration get discovered twice during compilation. The blur is a static
          CSS value, never animated, since animating filter is not seek-safe. */
@@ -198,22 +198,22 @@ function renderHtml() {
         position: absolute;
         left: 50%;
         top: 50%;
-        width: ${Math.round(width * 1.6)}px;
-        height: ${Math.round(width * 1.6)}px;
+        width: ${Math.round(height * 1.6)}px;
+        height: ${Math.round(height * 1.6)}px;
         transform: translate(-50%, -50%);
         background-size: cover;
         background-position: center;
         filter: blur(48px) saturate(0.75) brightness(0.55);
       }
 
-      /* The sharp square sits centred, its own width edge to edge. */
+      /* The sharp square sits centred, its own height edge to edge. */
       .art-wrap {
         position: absolute;
-        left: 0;
-        top: 50%;
-        width: ${width}px;
-        height: ${width}px;
-        margin-top: -${Math.round(width / 2)}px;
+        left: 50%;
+        top: 0;
+        width: ${height}px;
+        height: ${height}px;
+        margin-left: -${Math.round(height / 2)}px;
         overflow: hidden;
       }
       .art {

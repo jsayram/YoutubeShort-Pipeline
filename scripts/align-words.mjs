@@ -69,7 +69,7 @@ if (!engine) {
 
 const language = config.voicebox?.language ?? "en";
 const model = flags.model ?? (language === "en" ? "small.en" : "small");
-const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "youtube-short-caption-align-"));
+const temporaryRoot = await fs.mkdtemp(path.join(os.tmpdir(), "youtube-caption-align-"));
 const words = [];
 
 console.log(`Aligning ${timing.lines.length} Voicebox line(s) with ${engine}…`);

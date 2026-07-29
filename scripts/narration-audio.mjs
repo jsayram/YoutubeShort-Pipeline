@@ -150,7 +150,7 @@ export async function measureWavPeakDb(filePath, startSeconds, endSeconds) {
 }
 
 export async function transcribeVoiceClip(filePath, options) {
-  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "youtube-short-voice-qa-"));
+  const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "youtube-voice-qa-"));
   const tempAudio = path.join(tempDir, "line.wav");
 
   try {

@@ -49,14 +49,15 @@ const model = "@cf/black-forest-labs/flux-2-klein-4b";
 const endpoint =
   `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}` +
   `/ai/run/${model}`;
-const sceneWidth = Number(gen.genWidth ?? 768);
-const sceneHeight = Number(gen.genHeight ?? 1344);
-const outWidth = Number(gen.outWidth ?? config.width ?? 1080);
-const outHeight = Number(gen.outHeight ?? config.height ?? 1920);
+const sceneWidth = Number(gen.genWidth ?? 1344);
+const sceneHeight = Number(gen.genHeight ?? 768);
+const outWidth = Number(gen.outWidth ?? config.width ?? 1920);
+const outHeight = Number(gen.outHeight ?? config.height ?? 1080);
 const referenceSize = Math.min(480, Number(gen.referenceWidth ?? 480));
 const guidance = Number(flags.guidance ?? gen.guidance ?? 1);
 const outputDir = path.join(projectDir, "public", "generated");
 const referenceDir = path.join(projectDir, "assets", "references");
+let cloudRequestCount = 0;
 await fs.mkdir(outputDir, { recursive: true });
 await fs.mkdir(referenceDir, { recursive: true });
 
@@ -104,6 +105,7 @@ async function cloudflareImage({ prompt, width, height, seed, referenceFiles = [
   for (const [index, file] of referenceFiles.slice(0, 4).entries()) {
     form.append(`input_image_${index}`, new Blob([file.bytes]), `${file.id}.png`);
   }
+  cloudRequestCount += 1;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiToken}` },
@@ -252,6 +254,13 @@ try {
     manifest: "public/generated/manifest.json",
     generated: manifest.filter((entry) => !entry.skipped).length,
     reused: manifest.filter((entry) => entry.skipped).length,
+    usage: {
+      requests: cloudRequestCount,
+      creditsUsed: null,
+      quotaRemaining: null,
+      quotaNote:
+        "Cloudflare did not report credit cost or remaining account quota in the image response.",
+    },
   });
   console.log(
     `Cloudflare FLUX.2 finished in ${((Date.now() - startedAt) / 1000).toFixed(0)}s with ${references.length} reusable reference image(s).`,

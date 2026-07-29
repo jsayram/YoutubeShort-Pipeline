@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { loadPromptDocument, buildScenePrompts } from "./prompt-profiles.mjs";
+import { buildScenePrompts, loadPromptDocument, resolveCastAge } from "./prompt-profiles.mjs";
 import { DEFAULT_TOPIC_ID, loadTopics, resolveTopic } from "./topics.mjs";
 
 const promptDocument = await loadPromptDocument();
@@ -34,6 +34,20 @@ test("romance owns the cast rules that used to be hardcoded in every style", asy
   assert.match(romance.negatives, /same-sex couple/i);
   assert.ok(romance.sceneDirectionRules.length > 10, "romance keeps its scene direction rules");
   assert.equal(DEFAULT_TOPIC_ID, "romance", "default stays romance so existing projects are stable");
+});
+
+test("old objects do not accidentally age the recurring romance cast", async () => {
+  const romance = await resolveTopic("romance");
+  assert.equal(resolveCastAge("I still have your old playlist saved on my phone.", romance).descriptor, "young adult");
+  assert.equal(resolveCastAge("We grew old together over fifty years.", romance).descriptor, "older adult");
+  const [playlistScene] = buildScenePrompts(
+    ["I still have your old playlist saved on my phone, untouched since you left."],
+    "{{castPlan}} | {{visualAction}}",
+    romance,
+  );
+  assert.equal(playlistScene.castMode, "object");
+  assert.match(playlistScene.prompt, /No people anywhere in this frame/i);
+  assert.match(playlistScene.prompt, /weathered black smartphone/i);
 });
 
 test("neutral imposes no cast, so a non-people topic stays clean", async () => {
