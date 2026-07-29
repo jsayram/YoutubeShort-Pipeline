@@ -31,7 +31,7 @@ export function buildCaptionOverlay({ timing, config, duration, trackIndex }) {
   const accent = safeColor(captionConfig.accent, "#f4c75b");
   const inactive = safeColor(captionConfig.color, "#fffaf0");
   const panel = safeColor(captionConfig.panel, "rgba(8, 8, 11, 0.78)", true);
-  const bottom = clamp(Number(captionConfig.bottomPx ?? 238), 120, 520);
+  const bottom = clamp(Number(captionConfig.bottomPx ?? 130), 70, 300);
   const fontSize = clamp(Number(captionConfig.fontSizePx ?? 64), 44, 84);
   const chunkData = JSON.stringify(chunks).replaceAll("<", "\\u003c");
 
@@ -49,8 +49,8 @@ export function buildCaptionOverlay({ timing, config, duration, trackIndex }) {
       }
       #hf-caption-safe {
         position: absolute;
-        left: 70px;
-        right: 70px;
+        left: 140px;
+        right: 140px;
         bottom: ${bottom}px;
         display: flex;
         justify-content: center;
@@ -63,7 +63,7 @@ export function buildCaptionOverlay({ timing, config, duration, trackIndex }) {
         align-items: baseline;
         column-gap: 16px;
         row-gap: 7px;
-        max-width: 940px;
+        max-width: 1600px;
         min-height: 104px;
         padding: 20px 32px 23px;
         border: 1px solid rgba(255, 255, 255, 0.11);

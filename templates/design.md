@@ -1,11 +1,11 @@
 # Design Spec — [PROJECT TITLE]
 
-The single source of truth for how this Short looks and moves. Every still, card, caption, and
+The single source of truth for how this video looks and moves. Every still, card, caption, and
 beat follows this file. Where this file and a prompt disagree, this file wins. The house
 playbook in `templates/STYLE.md` explains the reasoning and the pattern library; the values
 here are what actually gets built.
 
-**Output:** 1080×1920, 30 fps, duration set by the narration (see `video.json`). Vertical,
+**Output:** 1920×1080, 30 fps, duration set by the narration (see `video.json`). Horizontal,
 motion-graphics led. Nobody is on screen — all motion lives in the graphics.
 
 The **Storyboard** at the bottom is the shot-by-shot plan, matched to the spoken timestamps in
@@ -113,7 +113,8 @@ Deliberate and unhurried. Nothing bounces for decoration.
   same way, one of them is wrong.
 - **Cuts vs cross-fades.** Hard cut on a change of subject. A 0.5s cross-fade only between
   related ideas. Never fade to black mid-video.
-- **Rhythm.** Default for six scenes: fast → fast → hold → fast → peak → hold.
+- **Rhythm.** Default across the video's runtime: fast → fast → hold → fast → peak → hold,
+  distributed across however many scenes the narration needs.
 - **Seek-safe properties only:** `opacity`, transforms (`x`, `y`, `scale`, `rotation`),
   `color`, `backgroundColor`, `borderRadius`, `strokeDashoffset`. Never `width`, `height`,
   `top`, `left`, or `filter`.

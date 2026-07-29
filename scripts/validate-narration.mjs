@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseArgs, readJson, videoDir } from "./lib.mjs";
 import {
   analyzeVoiceClip,
+  expectedAudiblePauseMs,
   measureWavPeakDb,
   probeAudioDuration,
 } from "./narration-audio.mjs";
@@ -62,10 +63,16 @@ for (const [index, line] of timing.lines.entries()) {
   const next = timing.lines[index + 1];
   if (next) {
     const measuredPause = Number(next.speechStart) - Number(line.speechEnd);
-    if (Math.abs(measuredPause - requestedPause) > tolerance) {
+    const expectedPause =
+      expectedAudiblePauseMs(
+        requestedPause * 1000,
+        line.trailingQuietMs,
+        next.leadingQuietMs,
+      ) / 1000;
+    if (Math.abs(measuredPause - expectedPause) > tolerance) {
       errors.push(
         `${label} has ${measuredPause.toFixed(3)}s before the next voice; ` +
-          `${requestedPause.toFixed(3)}s is required`,
+          `${expectedPause.toFixed(3)}s is required after preserving boundary quiet`,
       );
     }
     if (Number(line.imageEnd) !== Number(next.speechStart)) {
@@ -110,7 +117,7 @@ if (errors.length) {
 
 console.log(
   `Narration validated: ${timing.lines.length} lines · ` +
-    `${requestedPause.toFixed(2)}s audible pauses · ` +
+    `${requestedPause.toFixed(2)}s requested minimum pause · ` +
     `${narrationDuration.toFixed(3)}s audio · ${Number(timing.videoDuration).toFixed(3)}s video.`,
 );
 for (const warning of warnings) console.warn(`Warning: ${warning}`);

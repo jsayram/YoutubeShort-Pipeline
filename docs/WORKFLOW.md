@@ -15,10 +15,11 @@ The second command creates a clean HyperFrames project under `videos/topic-name`
 
 Edit:
 
-1. `content/narration.txt`: roughly 125 to 145 words for a natural 60-second delivery. Put one
-   spoken beat on each line. Voicebox reads every line as its own clip, so the line breaks decide
-   the phrasing and the scene timing.
-2. `content/image-prompts.json`: one prompt per scene, usually six.
+1. `content/narration.txt`: roughly 125 to 145 words per minute of narration for a natural
+   delivery — about 1,300 to 1,600 words for the default 10-minute video. Put one spoken beat on
+   each line. Voicebox reads every line as its own clip, so the line breaks decide the phrasing
+   and the scene timing.
+2. `content/image-prompts.json`: one prompt per scene, matching the narration's line count.
 3. `content/STYLE.md`: the color, type, image, layout, and motion direction.
 4. `video.json`: duration, output size, frame rate, voice profile, and image model.
 
@@ -140,6 +141,20 @@ each saved Voicebox line independently and restores it to the line's measured gl
 window. Do not replace this with one full-track transcription: speech engines can compress the
 three-second gaps and shift every later caption early.
 
+## Final Cut assembly
+
+After image approval, Studio writes `videos/<slug>/final-cut/<slug>.fcpxml` before it builds the
+HyperFrames composition. The XML uses the same generated images, narration mix, real scene timing,
+resolution, frame rate, and duration as the project. Studio then continues through HyperFrames
+composition and validation, so every completed project has both an editable Final Cut starting
+point and the existing deterministic HyperFrames backup.
+
+Regenerate only the Final Cut assembly with:
+
+```sh
+npm run final-cut -- --project topic-name
+```
+
 ## 4. Compose the video
 
 In `videos/topic-name/index.html`:
@@ -157,12 +172,12 @@ In `videos/topic-name/index.html`:
 ```sh
 cd "videos/topic-name"
 npx --yes hyperframes@0.7.78 check
-npx --yes hyperframes@0.7.78 snapshot --at 5,15,25,35,45,55
+npx --yes hyperframes@0.7.78 snapshot --at <timestamps evenly spaced across the video's duration>
 npm run dev
 ```
 
-Review the six snapshots as a contact sheet, then watch the complete preview on a phone-sized
-viewport. Fix clipping, weak hierarchy, blank frames, timing gaps, and narration sync.
+Review the snapshots as a contact sheet, then watch the complete preview end to end. Fix clipping,
+weak hierarchy, blank frames, timing gaps, and narration sync.
 
 ## 6. Render only after approval
 
@@ -172,9 +187,9 @@ npm run render -- --project topic-name --approved
 ```
 
 The render command runs a final HyperFrames check, removes descriptive and authoring metadata
-without re-encoding, verifies exact duration, 1080×1920 output, and audio, then copies the clean
+without re-encoding, verifies exact duration, 1920×1080 output, and audio, then copies the clean
 MP4 to `iCloud Drive/YoutubeShortPipeline/ready`. The local clean copy remains under the project's
-`renders/` folder so Studio can play it. After the Short is uploaded, move its iCloud copy from
+`renders/` folder so Studio can play it. After the video is uploaded, move its iCloud copy from
 `ready` to `published`.
 
 To run only the cleanup and delivery step for an existing render:

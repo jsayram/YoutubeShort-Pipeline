@@ -5,6 +5,8 @@ import test from "node:test";
 import {
   editNarrationLine,
   loadNarrationReview,
+  readStudioSourceScript,
+  resolveStudioScriptInput,
   selectNarrationTake,
   validateReview,
 } from "./narration-review.mjs";
@@ -39,6 +41,31 @@ test("approval requires a passing selected take that speaks the current wording"
   state.lines[0].takes.push(take("current", "Current wording."));
   state.lines[0].selectedTakeId = "current";
   assert.equal(validateReview(state).valid, true);
+});
+
+test("saved narration edits override the immutable Studio source on rerun", async (t) => {
+  const slug = `narration-source-test-${process.pid}-${Date.now()}`;
+  const projectDir = videoDir(slug);
+  t.after(() => fs.rm(projectDir, { recursive: true, force: true }));
+  await fs.mkdir(path.join(projectDir, "content"), { recursive: true });
+  await fs.writeFile(
+    path.join(projectDir, "content", "narration.txt"),
+    "My persistent narration edit.\n",
+  );
+
+  const first = await resolveStudioScriptInput(projectDir, "The untouched original script.", {
+    preferNarration: true,
+  });
+  assert.equal(first.sourceScript, "The untouched original script.");
+  assert.equal(first.narrationScript, "My persistent narration edit.");
+  assert.equal(first.preservedNarration, true);
+
+  const rerun = await resolveStudioScriptInput(projectDir, "A submitted replacement.", {
+    preferNarration: true,
+  });
+  assert.equal(rerun.sourceScript, "The untouched original script.");
+  assert.equal(rerun.narrationScript, "My persistent narration edit.");
+  assert.equal(await readStudioSourceScript(projectDir), "The untouched original script.");
 });
 
 test("editing persists new text, retains take history, rebuilds prompts, and rejects old takes", async (t) => {
@@ -134,6 +161,8 @@ test("Studio orders narration before images and keeps refresh and automatic path
   const stageBlock = studio.slice(studio.indexOf("function stageList"), studio.indexOf("async function startRun"));
   assert.ok(stageBlock.indexOf('id: "voice"') < stageBlock.indexOf('id: "images"'));
   assert.match(studio, /options\.reviewNarration === false\) voiceArgs\.push\("--auto-approve"\)/);
+  assert.match(studio, /resolveStudioScriptInput\(projectDir, scriptText/);
+  assert.match(studio, /preferNarration: exists/);
   assert.match(studio, /route === "\/api\/narration-review" && request\.method === "GET"/);
   assert.match(studio, /setStage\("review", "waiting"/);
   assert.match(

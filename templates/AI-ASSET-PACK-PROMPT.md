@@ -1,4 +1,4 @@
-# Topic-to-YouTube-Short asset-pack prompt
+# Topic-to-YouTube-Video asset-pack prompt
 
 Replace the values in the input block, then give this entire prompt to an AI agent.
 Only `TOPIC` is required. The agent should make reasonable decisions for blank fields.
@@ -17,13 +17,13 @@ SOURCE_MATERIAL: {{URLs, notes, documents, repositories, or "none"}}
 REQUIRED_FACTS: {{Claims, examples, statistics, or "research them"}}
 VISUAL_DIRECTION: {{Mood, references, colors, or "choose for me"}}
 OUTPUT_NAME: {{short-kebab-case-name}}
-DURATION_SECONDS: {{60}}
-ASPECT_RATIO: {{9:16}}
+DURATION_SECONDS: {{600}}
+ASPECT_RATIO: {{16:9}}
 ```
 
 ## Assignment
 
-Create a complete, reusable asset pack for a narrated YouTube Short about `TOPIC`.
+Create a complete, reusable asset pack for a narrated YouTube video about `TOPIC`.
 
 Do not stop after proposing ideas. Research, write, create, validate, and package the actual files.
 The completed ZIP must be ready to hand to another AI agent that will build the video.
@@ -33,9 +33,9 @@ when the topic itself is missing or a factual ambiguity would materially change 
 
 ## Project context
 
-- Default destination: YouTube Shorts.
-- Default canvas: 1080×1920, vertical 9:16.
-- Default duration: 60 seconds.
+- Default destination: YouTube (long-form).
+- Default canvas: 1920×1080, horizontal 16:9.
+- Default duration: 10 minutes (600 seconds).
 - Default frame rate: 30 fps.
 - This asset pack feeds a HyperFrames-based video pipeline.
 - Read the pipeline's `templates/STYLE.md` when it is available.
@@ -58,7 +58,8 @@ when the topic itself is missing or a factual ambiguity would materially change 
 
 Write a natural voice-over that sounds spoken, not promotional.
 
-- Target 130–145 words for a 60-second video.
+- Target roughly 130–145 words per minute of narration — about 1,300 to 1,600 words for the
+  default 10-minute video, scaled to whatever `DURATION_SECONDS` is actually set to.
 - Every narration line must contain ten words to 15 words or fewer.
 - Use one spoken idea per line.
 - Use contractions where they sound natural.
@@ -86,7 +87,8 @@ Run a word-count check. Run a separate check proving no line exceeds ten words.
 
 ## Storyboard requirements
 
-Create `script/storyboard.md` with six scenes unless the topic clearly needs fewer.
+Create `script/storyboard.md` with as many scenes as the narration's line count calls for — scene
+count follows the script, not a fixed number.
 
 The scene timings must add up exactly to `DURATION_SECONDS`.
 
@@ -116,7 +118,7 @@ Create `STYLE.md` with:
 - Exact color palette in hex.
 - Background, foreground, muted, accent, warning, and data colors.
 - Headline, label, caption, and code typography.
-- 1080×1920 safe margins.
+- 1920×1080 safe margins.
 - Card, badge, button, device, and infographic styling.
 - Motion timing and easing guidance.
 - Texture, depth, and decorative-layer guidance.
@@ -167,7 +169,7 @@ The pack should usually include:
 - One primary device, environment, or object illustration.
 - One interface, terminal, code, document, or process illustration.
 - Three to five topic-specific infographics.
-- One 1080×1920 safe-frame template.
+- One 1920×1080 safe-frame template.
 
 Do not create generic diagrams. Each infographic must explain a real part of the story.
 
@@ -269,7 +271,7 @@ It must say:
 - Read the script, storyboard, style guide, sources, and manifest first.
 - Use supplied SVGs for exact logos, diagrams, labels, and information.
 - Use generated images only as visual ingredients.
-- Keep important content inside vertical safe margins.
+- Keep important content inside screen-safe margins.
 - Prefer transform and opacity animation.
 - Support reduced motion.
 - Keep the final CTA visible for at least four seconds.
@@ -373,7 +375,7 @@ SOURCE_MATERIAL: Official Obsidian Help and Claude Code documentation
 REQUIRED_FACTS: Research them
 VISUAL_DIRECTION: Editorial dark workspace, crystalline purple, warm human accent
 OUTPUT_NAME: obsidian-claude-second-brain
-DURATION_SECONDS: 60
-ASPECT_RATIO: 9:16
+DURATION_SECONDS: 600
+ASPECT_RATIO: 16:9
 ```
 

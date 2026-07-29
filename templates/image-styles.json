@@ -340,6 +340,36 @@
     }
   },
   {
+    "id": "drawthings-oil-gouache",
+    "label": "Draw Things oil-and-gouache editorial",
+    "provider": "drawthings",
+    "promptProfile": "drawthings-oil-gouache",
+    "summary": "The verified Draw Things recipe for restrained rough oil-and-gouache story scenes: Illustrious XL v2, the compatible textured-painterly LoRA at 65%, sane guidance, and native SDXL 16:9 generation.",
+    "drawThingsModel": "illustrious_xl_v2.0_f16.ckpt",
+    "download": "Open Draw Things, select Illustrious-XL-v2.0 and Textured-Painterly-Style-Illustrious-v1, then leave the HTTP API enabled on port 7860.",
+    "sampling": {
+      "steps": 30,
+      "cfg": 5.5,
+      "guidanceScale": 5.5,
+      "sampler": "Euler A AYS",
+      "shift": 1,
+      "clipSkip": 2
+    },
+    "framing": {
+      "genWidth": 1024,
+      "genHeight": 576,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "loras": [
+      {
+        "file": "textured_painterly_style_illustrious_v1_lora_f16.ckpt",
+        "mode": "all",
+        "weight": 0.65
+      }
+    ]
+  },
+  {
     "id": "flux2-acrylic-melancholy",
     "label": "FLUX.2 dark acrylic melancholy (local)",
     "provider": "flux2-local",

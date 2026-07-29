@@ -20,6 +20,7 @@ assert.deepEqual(orphaned.map((style) => style.id), [], "style(s) reference a mi
 for (const required of [
   "flux2-storybook",
   "cloudflare-flux2-storybook",
+  "drawthings-oil-gouache",
   "animagine-dark-storybook",
   "pixazo-sdxl-watercolor",
   "gemini",
@@ -111,12 +112,26 @@ const illustriousAcrylic = styles.find(
   (style) => style.id === "illustrious-acrylic-melancholy",
 );
 const fluxAcrylic = styles.find((style) => style.id === "flux2-acrylic-melancholy");
+const drawThingsPainterly = styles.find((style) => style.id === "drawthings-oil-gouache");
 assert.equal(illustriousAcrylic.provider, "comfyui");
 assert.equal(illustriousAcrylic.promptProfile, "acrylic-melancholy-tags");
 assert.match(illustriousAcrylic.stylePrompt, /heavy impasto brushstrokes/i);
 assert.match(illustriousAcrylic.stylePrompt, /deep emerald green/i);
 assert.match(illustriousAcrylic.stylePrompt, /frayed comic-paper edge/i);
 assert.equal(illustriousAcrylic.postProcess, "paper-grain");
+assert.equal(drawThingsPainterly.provider, "drawthings");
+assert.equal(drawThingsPainterly.drawThingsModel, "illustrious_xl_v2.0_f16.ckpt");
+assert.equal(drawThingsPainterly.sampling.steps, 30);
+assert.equal(drawThingsPainterly.sampling.guidanceScale, 5.5);
+assert.equal(drawThingsPainterly.sampling.sampler, "Euler A AYS");
+assert.equal(drawThingsPainterly.sampling.shift, 1);
+assert.equal(drawThingsPainterly.sampling.clipSkip, 2);
+assert.equal(drawThingsPainterly.framing.genWidth, 1024);
+assert.equal(drawThingsPainterly.framing.genHeight, 576);
+assert.equal(drawThingsPainterly.loras[0].weight, 0.65);
+assert.match(drawThingsPainterly.stylePrompt, /oil painting/i);
+assert.match(drawThingsPainterly.stylePrompt, /gouache painting/i);
+assert.match(drawThingsPainterly.negativeExtra, /lime green/i);
 assert.equal(fluxAcrylic.provider, "flux2-local");
 assert.equal(fluxAcrylic.promptProfile, "acrylic-melancholy-prose");
 assert.match(fluxAcrylic.stylePrompt, /heavy impasto brushstrokes/i);

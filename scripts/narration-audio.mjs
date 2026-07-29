@@ -5,6 +5,21 @@ import { commandOutput, resolveHyperframesVersion } from "./lib.mjs";
 
 const DEFAULT_THRESHOLD_DB = -42;
 
+// Source clips keep their natural leading and trailing quiet so no speech decay is trimmed.
+// A requested pause is therefore a minimum: it cannot be shorter than the quiet already present
+// at the two clip boundaries.
+export function expectedAudiblePauseMs(
+  requestedPauseMs,
+  previousTrailingQuietMs,
+  nextLeadingQuietMs,
+) {
+  return Math.max(
+    0,
+    Number(requestedPauseMs) || 0,
+    (Number(previousTrailingQuietMs) || 0) + (Number(nextLeadingQuietMs) || 0),
+  );
+}
+
 export async function probeAudioDuration(filePath) {
   return Number(
     await commandOutput("ffprobe", [

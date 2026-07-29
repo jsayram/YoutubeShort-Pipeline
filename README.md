@@ -5,10 +5,20 @@ A reusable local pipeline for making long-form, 16:9 YouTube videos with:
 - ComfyUI, FLUX.2 Klein, Animagine, Google GenAI, Cloudflare, or Pixazo SDXL for visual assets
 - Voicebox for a local male voice-over
 - HyperFrames for composition, animation, preview, and rendering
+- Final Cut Pro FCPXML assemblies for optional hands-on editing
 - ChatGPT Codex or Claude Code as the directing agent
 
 Voicebox and HyperFrames stay external. This project uses their public interfaces and never edits
 their repositories.
+
+After narration and images are approved, Studio creates both outputs by default:
+
+- `videos/<slug>/final-cut/<slug>.fcpxml` — an editable Final Cut Pro project assembly.
+- `videos/<slug>/index.html` — the existing HyperFrames composition and automated render path.
+
+Use **Open in Final Cut Pro** on the completed Studio stage to import the assembly. HyperFrames
+continues to compose and validate after the Final Cut file is written, so it remains the
+deterministic backup output for every project.
 
 ## One-time setup
 
@@ -48,6 +58,12 @@ HyperFrames does not need a clone or global installation. The project runs the p
 
 ```sh
 npm run new -- my-video-name
+```
+
+To refresh only the Final Cut assembly after changing media or narration:
+
+```sh
+npm run final-cut -- --project my-video-name
 ```
 
 Then edit these four files:

@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { commandOutput, loadEnv, readJson, repoRoot } from "./lib.mjs";
 import { localLlmStatus } from "./local-llm.mjs";
@@ -32,8 +33,61 @@ if (localLlm.reachable && localLlm.modelReady) {
 
 const templateConfig = await readJson(path.join(repoRoot, "templates", "video.json"));
 const provider = templateConfig.imageGen?.provider ?? "comfyui";
+const finalCutBridge = path.resolve(
+  process.env.FINAL_CUT_BRIDGE_DIR ?? path.join(repoRoot, "..", "final-cut-youtube-bridge"),
+);
+const finalCutCli = path.join(finalCutBridge, "src", "cli.mjs");
+const finalCutReady = await fs.access(finalCutCli).then(() => true, () => false);
+if (finalCutReady) console.log(`✓ Final Cut bridge at ${finalCutBridge}`);
+else {
+  failures.push(
+    `Final Cut bridge is missing at ${finalCutBridge}. ` +
+      "Set FINAL_CUT_BRIDGE_DIR in .env if it was moved.",
+  );
+}
 
-if (provider === "comfyui" || provider === "local") {
+if (provider === "drawthings" || provider === "draw-things") {
+  const drawThingsUrl = (
+    process.env.DRAWTHINGS_BASE_URL ?? "http://127.0.0.1:7860"
+  ).replace(/\/$/, "");
+  const sharedSecret = process.env.DRAWTHINGS_SHARED_SECRET;
+  const response = await fetch(drawThingsUrl, {
+    headers: sharedSecret ? { Authorization: `Bearer ${sharedSecret}` } : {},
+  }).catch(() => null);
+  if (!response?.ok) {
+    failures.push(
+      `Draw Things is not reachable at ${drawThingsUrl}. Open Draw Things and enable its HTTP API server.`,
+    );
+  } else {
+    const status = await response.json().catch(() => ({}));
+    console.log(`✓ Draw Things at ${drawThingsUrl}`);
+    const wantedModel = templateConfig.imageGen.drawThingsModel;
+    if (status.model === wantedModel) console.log(`✓ Draw Things model "${wantedModel}"`);
+    else {
+      failures.push(
+        `Draw Things has "${status.model ?? "no model"}" selected; choose "${wantedModel}".`,
+      );
+    }
+    const wantedLoras = templateConfig.imageGen.loras ?? [];
+    const activeLoras = Array.isArray(status.loras) ? status.loras : [];
+    for (const wanted of wantedLoras) {
+      const active = activeLoras.find((entry) => entry.file === wanted.file);
+      if (active) {
+        const currentWeight = Number(active.weight);
+        const note =
+          currentWeight === Number(wanted.weight)
+            ? ""
+            : ` (UI is ${currentWeight}; the pipeline overrides it per request)`;
+        console.log(`✓ Draw Things LoRA "${wanted.file}" at pipeline weight ${wanted.weight}${note}`);
+      } else {
+        failures.push(
+          `Draw Things must have LoRA "${wanted.file}" available; ` +
+            `active: ${activeLoras.map((entry) => entry.file).join(", ") || "none"}.`,
+        );
+      }
+    }
+  }
+} else if (provider === "comfyui" || provider === "local") {
   const comfyUrl = (process.env.COMFYUI_BASE_URL ?? "http://127.0.0.1:8188").replace(/\/$/, "");
   const stats = await fetch(`${comfyUrl}/system_stats`).catch(() => null);
   if (stats?.ok) {

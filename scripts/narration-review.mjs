@@ -39,6 +39,45 @@ export async function loadNarrationReview(slug) {
   return readJson(reviewPath(videoDir(slug))).catch(() => null);
 }
 
+// Studio keeps the pasted source separate from the editable narration working copy. Once a
+// project exists, content/narration.txt wins on every rerun so review edits cannot be reset by
+// the unchanged source text still visible in Studio.
+export async function resolveStudioScriptInput(
+  projectDir,
+  submittedScript,
+  { preferNarration = true } = {},
+) {
+  const sourcePath = path.join(projectDir, "content", "source-script.txt");
+  const narrationPath = path.join(projectDir, "content", "narration.txt");
+  const submitted = String(submittedScript ?? "").trim();
+  if (!submitted) throw new Error("The original script is empty.");
+
+  await fs.mkdir(path.dirname(sourcePath), { recursive: true });
+  try {
+    await fs.writeFile(sourcePath, `${submitted}\n`, { flag: "wx" });
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+  }
+
+  const narration = await fs.readFile(narrationPath, "utf8").catch(() => "");
+  return {
+    sourceScript: (await fs.readFile(sourcePath, "utf8")).trim(),
+    narrationScript: preferNarration && narration.trim() ? narration.trim() : submitted,
+    preservedNarration: Boolean(preferNarration && narration.trim()),
+  };
+}
+
+export async function readStudioSourceScript(projectDir) {
+  const source = await fs
+    .readFile(path.join(projectDir, "content", "source-script.txt"), "utf8")
+    .catch(() => "");
+  if (source.trim()) return source.trim();
+  const narration = await fs
+    .readFile(path.join(projectDir, "content", "narration.txt"), "utf8")
+    .catch(() => "");
+  return narration.trim();
+}
+
 export async function saveReviewContinuation(slug, studioOptions) {
   const projectDir = videoDir(slug);
   const state = await requireState(slug);

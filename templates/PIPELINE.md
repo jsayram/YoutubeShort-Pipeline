@@ -5,19 +5,22 @@
 - Topic or source:
 - Audience:
 - Main point:
-- Duration: 60 seconds
-- Destination: YouTube Shorts
+- Duration: 10 minutes (600 seconds)
+- Destination: YouTube (long-form)
 
 ## Scene plan
 
-| Scene | Time | Purpose | Visual | Motion |
+Scene count follows narration line count. Use runtime percentage, not fixed seconds, when
+sketching the plan before the actual narration timings are known:
+
+| Scene | Runtime | Purpose | Visual | Motion |
 |---|---:|---|---|---|
-| 1 | 0-8s | Hook | | |
-| 2 | 8-19s | Definition | | |
-| 3 | 19-30s | Process | | |
-| 4 | 30-39s | Example | | |
-| 5 | 39-51s | Contrast or warning | | |
-| 6 | 51-60s | Action and close | | |
+| 1 | 0-7% | Hook | | |
+| 2 | 7-18% | Definition | | |
+| 3 | 18-42% | Process | | |
+| 4 | 42-67% | Example | | |
+| 5 | 67-88% | Contrast or warning | | |
+| 6 | 88-100% | Action and close | | |
 
 ## Checklist
 
@@ -25,8 +28,8 @@
 - [ ] Image prompts match the style file.
 - [ ] Google images are generated.
 - [ ] Voicebox narration is generated and fitted to the target duration.
+- [ ] Final Cut Pro project assembly is generated.
 - [ ] HyperFrames composition passes `check`.
 - [ ] Midpoint contact sheet is reviewed.
 - [ ] Final preview is approved.
 - [ ] High-quality MP4 is rendered and verified.
-

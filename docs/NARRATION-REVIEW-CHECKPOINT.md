@@ -39,6 +39,10 @@ narration first so image generation does not begin while the script or timing ca
 
 - Lines are keyed by stable one-based position (`01`, `02`, and so on), not by words in an image
   filename.
+- Keep the originally submitted Studio script as immutable source material in
+  `content/source-script.txt`. Narration edits never rewrite it.
+- Once `content/narration.txt` exists for a project, it is the persistent working script and
+  overrides the original source on every regeneration or pipeline rerun.
 - Editing a sentence updates `content/narration.txt` atomically.
 - Rebuild that scene's prompt from the revised wording before images exist.
 - Preserve takes made for previous wording as history, visibly labelled with that wording.

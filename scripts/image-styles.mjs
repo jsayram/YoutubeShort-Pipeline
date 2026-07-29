@@ -72,6 +72,18 @@ export async function comfyModels(baseUrl) {
   };
 }
 
+export async function drawThingsStatus(
+  baseUrl = process.env.DRAWTHINGS_BASE_URL ?? "http://127.0.0.1:7860",
+) {
+  const sharedSecret = process.env.DRAWTHINGS_SHARED_SECRET;
+  const response = await fetch(baseUrl.replace(/\/$/, ""), {
+    headers: sharedSecret ? { Authorization: `Bearer ${sharedSecret}` } : {},
+    signal: AbortSignal.timeout(3_000),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+  return response.json().catch(() => null);
+}
+
 // Fragments are a priority list, not a set: `["animagine", "illustrious"]` means "animagine if it
 // is installed, otherwise illustrious". Iterate fragments rather than files, because iterating
 // files makes the winner depend on whatever order ComfyUI happens to list its directory in — so
@@ -91,7 +103,10 @@ const SPEED_SAMPLING = { steps: 6, cfg: 1.6, sampler: "euler", scheduler: "sgm_u
 
 export async function resolveStyles(baseUrl) {
   const styles = await loadStyles();
-  const models = await comfyModels(baseUrl);
+  const [models, drawThings] = await Promise.all([
+    comfyModels(baseUrl),
+    drawThingsStatus(),
+  ]);
   const speedLora = models ? firstMatch(models.loras, SPEED_FRAGMENTS) : null;
 
   const resolved = styles.map((style) => {
@@ -124,6 +139,31 @@ export async function resolveStyles(baseUrl) {
         reason: configured ? null : "PIXAZO_API is not configured in .env.",
         checkpoint: null,
         loras: [],
+      };
+    }
+
+    if (style.provider === "drawthings") {
+      if (!drawThings) {
+        return {
+          ...style,
+          available: false,
+          reason: "Draw Things is not reachable. Open the app and enable its HTTP API server.",
+          checkpoint: null,
+          loras: style.loras ?? [],
+        };
+      }
+      const requiredModel = String(style.drawThingsModel ?? "");
+      const activeModel = String(drawThings.model ?? "");
+      const modelReady = !requiredModel || activeModel === requiredModel;
+      return {
+        ...style,
+        available: modelReady,
+        reason: modelReady
+          ? null
+          : `Draw Things currently has "${activeModel || "no model"}" selected; choose "${requiredModel}".`,
+        checkpoint: null,
+        loras: style.loras ?? [],
+        activeModel,
       };
     }
 
@@ -244,6 +284,7 @@ export function applyStyle(imageGen, style, { fast = false, speedLora = null } =
   next.textEncoder = style.textEncoder ?? null;
   next.vae = style.vae ?? null;
   next.fallbackProvider = style.fallbackProvider ?? null;
+  next.drawThingsModel = style.drawThingsModel ?? null;
   Object.assign(next, style.sampling ?? {});
   // Some looks are not 16:9. The storybook preset paints square art that the composition
   // centres over a blurred enlargement of itself, so it must not be cropped to the frame.

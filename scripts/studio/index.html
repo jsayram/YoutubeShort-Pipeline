@@ -189,6 +189,15 @@
       }
       .qa-ok { color: var(--ok); }
       .qa-bad { color: var(--bad); }
+      .review-line.flagged {
+        border-color: var(--bad);
+        animation: flagpulse 1.6s ease-out 2;
+      }
+      @keyframes flagpulse {
+        0% { box-shadow: 0 0 0 0 rgba(226, 104, 95, 0.5); }
+        70% { box-shadow: 0 0 0 10px rgba(226, 104, 95, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(226, 104, 95, 0); }
+      }
       .image-review-summary {
         border: 1px solid var(--line);
         border-radius: 9px;
@@ -681,8 +690,8 @@
         <h1>YouTube studio</h1>
         <div class="sub">
           Paste a script. Every stage runs top to bottom — stills appear as they render, the
-          finished file plays at the bottom. Images come back wordless; optional captions are
-          rendered by HyperFrames.
+          editable Final Cut assembly is saved beside the project, and HyperFrames remains the
+          automated composition and render path.
         </div>
       </header>
 
@@ -1008,6 +1017,7 @@ Start a recording and talk about your day."></textarea>
         voice: "Narration",
         review: "Narration review",
         captions: "Caption timing",
+        "final-cut": "Final Cut project",
         compose: "Composition",
         check: "Validation",
         render: "Render",
@@ -1096,6 +1106,13 @@ Start a recording and talk about your day."></textarea>
 
         if (event.type === "log") {
           appendLog(event.stage, event.line);
+          // The voice/review stage runs generate-story.mjs, which can fail on one specific
+          // narration line's audio-quality check. Point the user straight at that line instead
+          // of leaving them with only a generic "stage exited with code 1" banner.
+          const badLine = event.line.match(
+            /Voicebox line (\d+) (?:did not pass after resume|failed twice): (.+?)\.\s*(?:Re-roll|Review)/,
+          );
+          if (badLine) void flagBadNarrationLine(Number(badLine[1]), badLine[2]);
           return;
         }
 
@@ -1207,6 +1224,34 @@ Start a recording and talk about your day."></textarea>
             : "";
           $("final").classList.remove("hidden");
           $("final").scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        }
+
+        if (event.type === "final-cut") {
+          const host = extra("final-cut");
+          if (!host) return;
+          const path = document.createElement("div");
+          path.className = "hint";
+          path.textContent = event.path;
+          const button = document.createElement("button");
+          button.textContent = "Open in Final Cut Pro";
+          button.addEventListener("click", async () => {
+            button.disabled = true;
+            $("err").textContent = "";
+            const response = await fetch("/api/final-cut/open", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug: event.slug }),
+            });
+            if (!response.ok) {
+              $("err").textContent = (await response.json()).error;
+              button.disabled = false;
+            } else {
+              button.textContent = "Opened in Final Cut Pro";
+            }
+          });
+          host.replaceChildren(path, button);
+          setMeta("final-cut", `${(event.bytes / 1000).toFixed(1)} KB`);
           return;
         }
 
@@ -1371,7 +1416,6 @@ Start a recording and talk about your day."></textarea>
               <textarea data-review-text>${escapeHtml(line.text)}</textarea>
               <div class="review-takes">${takes || `<div class="qa-bad">No take generated.</div>`}</div>
               <div class="actions">
-                <button class="ghost compact" data-save-line>Save edit and regenerate</button>
                 <button class="ghost compact" data-regenerate-line>Regenerate</button>
                 <span class="sub" data-line-status></span>
               </div>
@@ -1403,18 +1447,16 @@ Start a recording and talk about your day."></textarea>
         if (!card) return;
         const lineIndex = Number(card.dataset.reviewLine);
         const status = card.querySelector("[data-line-status]");
-        if (event.target.matches("[data-save-line]")) {
+        if (event.target.matches("[data-regenerate-line]")) {
           event.target.disabled = true;
+          // Always save the current textarea value before regenerating, even if it looks
+          // unchanged — editNarrationLine() is a no-op when the text matches, so this can never
+          // regress a plain re-roll, and it's the only way to guarantee this can't silently
+          // re-roll stale, pre-edit text.
           await reviewRequest("/api/narration-review/line", "PUT", {
             slug: narrationReviewSlug,
             lineIndex,
             text: card.querySelector("[data-review-text]").value,
-          }, status);
-        } else if (event.target.matches("[data-regenerate-line]")) {
-          event.target.disabled = true;
-          await reviewRequest("/api/narration-review/regenerate", "POST", {
-            slug: narrationReviewSlug,
-            lineIndex,
           }, status);
         }
       });
@@ -1457,6 +1499,22 @@ Start a recording and talk about your day."></textarea>
         }
         const data = await response.json();
         renderNarrationReview(slug, data.review);
+      }
+
+      // Re-open Narration review (it's often already hidden by the time this fires — approving
+      // hides it immediately, before the final assembly pass that can still reject a line) and
+      // scroll straight to the specific line that failed instead of leaving only a generic
+      // stage-failed banner.
+      async function flagBadNarrationLine(oneBasedLine, reason) {
+        const slug = narrationReviewSlug || $("slug")?.value;
+        if (!slug) return;
+        await loadNarrationReview(slug);
+        const card = document.querySelector(`[data-review-line="${oneBasedLine - 1}"]`);
+        if (!card) return;
+        card.classList.add("flagged");
+        const status = card.querySelector("[data-line-status]");
+        if (status) status.textContent = `Final assembly failed: ${reason}`;
+        card.scrollIntoView({ behavior: "smooth", block: "start" });
       }
 
       let imageReviewSlug = null;

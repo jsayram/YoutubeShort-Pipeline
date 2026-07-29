@@ -81,3 +81,26 @@ test("local LLM enrichment stays an optional provider-independent overlay", asyn
     assert.match(backend, /process\.env\.IMAGE_PROMPTS_FILE/);
   }
 });
+
+test("Studio creates Final Cut and HyperFrames outputs for every approved project", async () => {
+  const [html, studio, packageJson, template, exporter] = await Promise.all([
+    read("scripts/studio/index.html"),
+    read("scripts/studio.mjs"),
+    read("package.json"),
+    read("templates/video.json"),
+    read("scripts/generate-final-cut.mjs"),
+  ]);
+
+  assert.match(studio, /\{ id: "final-cut", label: "Final Cut project"/);
+  assert.match(studio, /runStage\("final-cut", node/);
+  assert.match(studio, /script\("generate-final-cut\.mjs"\)/);
+  assert.match(studio, /await emitFinalCut\(slug\)/);
+  assert.match(studio, /route === "\/api\/final-cut\/open"/);
+  assert.match(html, /"final-cut": "Final Cut project"/);
+  assert.match(html, /Open in Final Cut Pro/);
+  assert.equal(JSON.parse(template).finalCut.enabled, true);
+  assert.equal(JSON.parse(packageJson).scripts["final-cut"], "node scripts/generate-final-cut.mjs");
+  assert.match(exporter, /final-cut", `\$\{slug\}\.fcpxml`/);
+  assert.match(studio, /script\("compose-video\.mjs"\)/);
+  assert.match(studio, /`hyperframes@\$\{hyperframesVersion\}`/);
+});

@@ -7,6 +7,7 @@ import { commandOutput } from "./lib.mjs";
 import {
   analyzeVoiceClip,
   ensureVoiceClipQuietTail,
+  expectedAudiblePauseMs,
   probeAudioDuration,
   transcriptEndsWith,
 } from "./narration-audio.mjs";
@@ -43,6 +44,12 @@ test("quiet-tail repair preserves speech and appends enough silence", async () =
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }
+});
+
+test("audible pause preserves natural boundary quiet when it exceeds the request", () => {
+  assert.equal(expectedAudiblePauseMs(0, 66, 181), 247);
+  assert.equal(expectedAudiblePauseMs(200, 66, 181), 247);
+  assert.equal(expectedAudiblePauseMs(2000, 66, 181), 2000);
 });
 
 test("final-word check tolerates homophones Whisper spells differently", () => {

@@ -6,6 +6,11 @@
   "height": 1080,
   "fps": 30,
   "hyperframesVersion": "0.7.78",
+  "finalCut": {
+    "enabled": true,
+    "channel": "default",
+    "libraryPath": null
+  },
   "voicebox": {
     "profile": "MyOwn",
     "engine": "qwen",
@@ -26,7 +31,7 @@
     "accent": "#f4c75b",
     "color": "#fffaf0",
     "panel": "rgba(8, 8, 11, 0.78)",
-    "bottomPx": 238,
+    "bottomPx": 130,
     "fontSizePx": 64
   },
   "imageGen": {

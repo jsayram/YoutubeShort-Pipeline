@@ -15,6 +15,7 @@ import {
   analyzeVoiceClip,
   assembleVoiceClips,
   ensureVoiceClipQuietTail,
+  expectedAudiblePauseMs,
   expectedLastWord,
   normalizeVoiceClip,
   probeAudioDuration,
@@ -86,7 +87,7 @@ if (flags["dry-run"]) {
   }
   console.log(
     `\nWould build story "${storyName}" as ${profileName} / ${requestedEngine} ${modelSize}, ` +
-      `${(gapMs / 1000).toFixed(2)}s between audible lines.`,
+      `${(gapMs / 1000).toFixed(2)}s requested minimum pause between audible lines.`,
   );
   process.exit(0);
 }
@@ -335,7 +336,7 @@ await run(process.execPath, [
 
 console.log(
   `\nStory "${story.name}" has ${placed.length} verified lines, ` +
-    `${(gapMs / 1000).toFixed(2)}s of audible silence between them, and runs ` +
+    `${(gapMs / 1000).toFixed(2)}s requested minimum pauses, and runs ` +
     `${finalDuration.toFixed(2)}s.`,
 );
 console.log(`Saved ${finalPath} (${finalDuration.toFixed(3)}s)`);
@@ -348,7 +349,30 @@ async function inspectExistingLine(existing) {
   const sourceFile = sourceLinePath(existing.index);
   await exportGeneration(existing.generationId, sourceFile);
   await normalizeVoiceClip(sourceFile, file);
-  const qa = await inspectLine(file, existing.text, existing.index, 0);
+  let qa = await inspectLine(file, existing.text, existing.index, 0);
+
+  // Manual Voicebox re-rolls deserve the same safe boundary repair as newly generated takes.
+  // Once the final word is verified, appending silence preserves the take while preventing a
+  // hard file boundary from clipping its decay during assembly.
+  if (!qa.boundaryPassed && qa.lexicalPassed) {
+    const repaired = await ensureVoiceClipQuietTail(file, {
+      currentTrailingQuietMs: qa.analysis.trailingQuietMs,
+      targetQuietMs: Math.max(minTailQuietMs, 60),
+    });
+    qa = {
+      ...qa,
+      passed: repaired.analysis.trailingQuietMs >= minTailQuietMs,
+      reason: "",
+      boundaryPassed: repaired.analysis.trailingQuietMs >= minTailQuietMs,
+      tailPaddedMs: repaired.paddedMs,
+      analysis: repaired.analysis,
+    };
+    console.warn(
+      `Voicebox line ${existing.index + 1}'s final word was verified; appended ` +
+        `${repaired.paddedMs}ms of safe tail without trimming speech.`,
+    );
+  }
+
   if (!qa.passed) {
     throw new Error(
       `Voicebox line ${existing.index + 1} did not pass after resume: ${qa.reason}. ` +
@@ -501,13 +525,18 @@ function layoutClips(clips) {
   const result = [];
   for (const [index, clip] of clips.entries()) {
     const previous = result.at(-1);
+    const audiblePauseMs =
+      index === 0
+        ? 0
+        : expectedAudiblePauseMs(
+            gapMs,
+            previous.trailingQuietMs,
+            clip.leadingQuietMs,
+          );
     const clipStartMs =
       index === 0
         ? 0
-        : Math.max(
-            previous.clipEndMs,
-            Math.round(previous.speechEndMs + gapMs - clip.leadingQuietMs),
-          );
+        : Math.round(previous.speechEndMs + audiblePauseMs - clip.leadingQuietMs);
     const clipEndMs = clipStartMs + clip.durationMs;
     const speechStartMs = clipStartMs + clip.leadingQuietMs;
     const speechEndMs = clipEndMs - clip.trailingQuietMs;
@@ -563,8 +592,13 @@ function validateTimingPlan(timingData, assembledDuration) {
     const next = timingData.lines[index + 1];
     if (next) {
       const pause = next.speechStart - line.speechEnd;
-      if (Math.abs(pause - gapMs / 1000) > tolerance) {
-        errors.push(`line ${index + 1} pause is ${pause.toFixed(3)}s`);
+      const expectedPause =
+        expectedAudiblePauseMs(gapMs, line.trailingQuietMs, next.leadingQuietMs) / 1000;
+      if (Math.abs(pause - expectedPause) > tolerance) {
+        errors.push(
+          `line ${index + 1} pause is ${pause.toFixed(3)}s; ` +
+            `${expectedPause.toFixed(3)}s is required after preserving boundary quiet`,
+        );
       }
       if (next.imageStart < line.speechEnd - tolerance) {
         errors.push(`image ${index + 2} begins before line ${index + 1} finishes`);
@@ -610,9 +644,20 @@ function adoptStory(existing) {
   const placed = [...(existing.items ?? [])].sort(
     (a, b) => a.start_time_ms - b.start_time_ms,
   );
-  if (placed.length > lines.length || placed.some((item, i) => item.text.trim() !== lines[i])) {
+  if (placed.length > lines.length) {
     throw new Error(
-      "The script changed since that story was built. Use a new empty story or rebuild it.",
+      `Voicebox story "${existing.name}" has ${placed.length} items, but the script has ` +
+        `${lines.length} lines. Use a new empty story or rebuild it.`,
+    );
+  }
+  const mismatchIndex = placed.findIndex((item, index) => item.text.trim() !== lines[index]);
+  if (mismatchIndex >= 0) {
+    throw new Error(
+      `The script changed at line ${mismatchIndex + 1} since Voicebox story ` +
+        `"${existing.name}" was built.\n` +
+        `Script: ${JSON.stringify(lines[mismatchIndex])}\n` +
+        `Voicebox: ${JSON.stringify(placed[mismatchIndex].text.trim())}\n` +
+        "Rebuild the story after a narration edit, or restore the script text to resume it.",
     );
   }
   return {

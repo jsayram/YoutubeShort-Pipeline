@@ -36,21 +36,23 @@ fades.
 
 ## Story rhythm
 
-For a typical 60-second Short, use six scenes:
+Scene count follows narration line count, not a fixed number — a 10-minute default video runs far
+more than six scenes. Use this shape as a percentage of the video's actual runtime:
 
-| Scene | Time | Story job | Visual job | Motion character |
+| Beat | Runtime | Story job | Visual job | Motion character |
 |---|---:|---|---|---|
-| 1. Hook | 0–4s | State the pain, surprise, or desired outcome | One dominant visual and a short headline | Immediate slam, snap, or zoom |
-| 2. Promise | 4–11s | Say what the viewer will gain | Transform the hook into a clear solution | Fast assembly followed by a hold |
-| 3. How it works | 11–25s | Show the mechanism in simple steps | Process flow, device, or three-stage sequence | Precise clicks, draws, and fills |
-| 4. Proof | 25–40s | Show a concrete result or example | App screen, before/after, or one meaningful stat | Camera push, scrub, or state change |
-| 5. Payoff | 40–53s | Reveal the larger benefit | Full-frame result, comparison, or completed system | Peak motion and strongest transition |
-| 6. CTA | 53–60s | Tell the viewer what to do next | One sentence, one action, one visual anchor | Assemble, settle, and hold |
+| 1. Hook | 0–7% | State the pain, surprise, or desired outcome | One dominant visual and a short headline | Immediate slam, snap, or zoom |
+| 2. Promise | 7–18% | Say what the viewer will gain | Transform the hook into a clear solution | Fast assembly followed by a hold |
+| 3. How it works | 18–42% | Show the mechanism in simple steps | Process flow, device, or three-stage sequence | Precise clicks, draws, and fills |
+| 4. Proof | 42–67% | Show a concrete result or example | App screen, before/after, or one meaningful stat | Camera push, scrub, or state change |
+| 5. Payoff | 67–88% | Reveal the larger benefit | Full-frame result, comparison, or completed system | Peak motion and strongest transition |
+| 6. CTA | 88–100% | Tell the viewer what to do next | One sentence, one action, one visual anchor | Assemble, settle, and hold |
 
-Default rhythm: **fast → fast → hold → fast → peak → hold**.
+Default rhythm: **fast → fast → hold → fast → peak → hold**, stretched across however many scenes
+the narration actually needs within each beat.
 
-Do not force six scenes when the story is stronger with fewer. A scene that does not support the
-main promise should be removed.
+Do not force a fixed scene count when the story is stronger with fewer or more. A scene that does
+not support the main promise should be removed.
 
 ## Visual identity
 
@@ -101,7 +103,7 @@ Do not switch between light and dark scene by scene unless the change is part of
 - Body: `"SF Pro Text"`, `"Geist"`, or system sans. Weight 400–550.
 - Data and metadata: `"SF Mono"`, `"IBM Plex Mono"`, or a bundled monospace. Weight 500–700.
 
-Use no more than two font families in one Short. A single sans family plus one monospace is the
+Use no more than two font families in one video. A single sans family plus one monospace is the
 default.
 
 ### Hierarchy
@@ -266,17 +268,17 @@ Write image prompts in this order:
 4. **Medium:** editorial 3D, cut paper, product photography, ink diagram, or another named medium.
 5. **Palette and lighting:** use the fixed palette and one lighting direction.
 6. **Motion potential:** identify the layers that can move separately in HTML.
-7. **Technical constraints:** 9:16, 2K, safe margins, no text, no logos, no watermark.
+7. **Technical constraints:** 16:9, 2K, safe margins, no text, no logos, no watermark.
 
 ### Base style suffix
 
 Append this to every prompt:
 
-> Premium editorial visual for a vertical 9:16 technology explainer. Charcoal-black environment,
+> Premium editorial visual for a horizontal 16:9 technology explainer. Charcoal-black environment,
 > warm off-white subject highlights, acid-lime focal accent, restrained cobalt only when a second
 > data color is necessary. Strong silhouette, cinematic depth, crisp material detail, one dominant
 > subject, uncluttered background, and deliberate negative space for large HTML typography.
-> Separate foreground, subject, and background planes for parallax. Mobile-safe composition, 2K,
+> Separate foreground, subject, and background planes for parallax. Screen-safe composition, 2K,
 > no readable text, no numbers, no charts, no interface labels, no logo, no watermark.
 
 For light-mode stories, replace the charcoal environment with warm paper and keep strong dark
@@ -323,7 +325,7 @@ Reject and regenerate an image when:
 - It looks like a finished dashboard or generic stock infographic.
 - It has more than one equally dominant subject.
 - The palette changes without a story reason.
-- The important subject touches a mobile safe edge.
+- The important subject touches a screen-safe edge.
 - There is no usable negative space for typography.
 - Foreground and background cannot be separated for motion.
 - The image depends on tiny detail that will disappear on a phone.
@@ -378,7 +380,7 @@ Use two to four patterns per scene:
 - Exits: `power2.in` or `power3.in`.
 - Movement between states: `power2.inOut` or `sine.inOut`.
 - Ambient motion: `sine.inOut`.
-- Use at least three motion directions or entrance types in a full Short.
+- Use at least three motion directions or entrance types in a full video.
 - Do not use the same ease on every element.
 
 ### After Effects feel in HTML
@@ -410,7 +412,7 @@ Use transitions as story punctuation:
 - Split wipe: before becoming after.
 - Crossfade: only when two images represent a true continuation.
 
-Use one or two high-impact transitions per Short. Too many effects flatten their impact.
+Use one or two high-impact transitions per video. Too many effects flatten their impact.
 
 Match velocity across a moving cut. The outgoing scene accelerates away; the incoming scene enters
 at a similar speed and decelerates into place.
@@ -429,7 +431,7 @@ at a similar speed and decelerates into place.
 
 ## Quality review
 
-Review the Short with the sound off:
+Review the video with the sound off:
 
 - Is the viewer's problem clear in the first four seconds?
 - Is the value understandable by scene two?
@@ -444,7 +446,7 @@ Review the Short with the sound off:
 
 Review the contact sheet:
 
-- The six frames should clearly belong to one visual system.
+- Every scene should clearly belong to one visual system.
 - Layouts should vary: split, full-frame, data-led, app-led, and closing.
 - The accent color should guide the story rather than coat every frame.
 - No frame should look like a website dashboard or generic slide template.

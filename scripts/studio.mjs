@@ -33,6 +33,8 @@ import {
   editNarrationLine,
   generateNarrationTake,
   loadNarrationReview,
+  readStudioSourceScript,
+  resolveStudioScriptInput,
   saveReviewContinuation,
   selectNarrationTake,
   validateReview,
@@ -61,7 +63,11 @@ const videosRoot = path.join(repoRoot, "videos");
 const studioStatePath = path.join(videosRoot, ".studio-state.json");
 // One place to change when a style is retired. These ids were previously inlined at four call
 // sites, so deleting the style they named silently broke Studio.
-const DEFAULTS = { style: "flux2-storybook", promptStyle: "photographic", topic: DEFAULT_TOPIC_ID };
+const DEFAULTS = {
+  style: "flux2-storybook",
+  promptStyle: "photographic",
+  topic: DEFAULT_TOPIC_ID,
+};
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -230,6 +236,7 @@ function stageList(options) {
     { id: "review", label: "Narration review", status: "pending" },
     { id: "images", label: "Images", status: "pending" },
     { id: "image-review", label: "Image review", status: "pending" },
+    { id: "final-cut", label: "Final Cut project", status: "pending" },
     { id: "compose", label: "Composition", status: "pending" },
     { id: "check", label: "Validation", status: "pending" },
   ];
@@ -268,9 +275,19 @@ async function startRun({ slug, title, scriptText, options }) {
       await runStage("scaffold", node, [script("new-video.mjs"), slug]);
     }
 
+    const scriptState = await resolveStudioScriptInput(projectDir, scriptText, {
+      preferNarration: exists,
+    });
     const scriptFile = path.join(projectDir, "content", ".studio-script.txt");
     await fs.mkdir(path.dirname(scriptFile), { recursive: true });
-    await fs.writeFile(scriptFile, scriptText);
+    await fs.writeFile(scriptFile, scriptState.narrationScript);
+    if (scriptState.preservedNarration) {
+      emit({
+        type: "log",
+        stage: "script",
+        line: "Kept the saved narration edits; the original source script was not changed.",
+      });
+    }
     const prepareArgs = [script("prepare-script.mjs"), "--project", slug, "--script", scriptFile];
     if (title) prepareArgs.push("--title", title);
     if (options.keepPrompts) prepareArgs.push("--keep-prompts");
@@ -296,6 +313,8 @@ async function startRun({ slug, title, scriptText, options }) {
     preparedConfig.imageGen ??= {};
     preparedConfig.imageGen.enrichWithLLM = options.enrichWithLLM !== false;
     preparedConfig.imageGen.reviewBeforeComposition = true;
+    preparedConfig.finalCut ??= { enabled: true, channel: "default", libraryPath: null };
+    preparedConfig.finalCut.enabled = true;
     preparedConfig.voicebox ??= {};
     preparedConfig.voicebox.reviewBeforeImages = options.reviewNarration !== false;
     await writeJson(preparedConfigPath, preparedConfig);
@@ -373,6 +392,13 @@ async function finishPostImagePipeline(slug, options) {
       await runStage("captions", node, [script("align-words.mjs"), "--project", slug]);
     }
 
+    await runStage("final-cut", node, [
+      script("generate-final-cut.mjs"),
+      "--project",
+      slug,
+    ]);
+    await emitFinalCut(slug);
+
     // The selected content provider may own a matching motion treatment. The dispatcher reads
     // the saved video.json, so Studio and the command line always choose the same composer.
     const composeArgs = [script("compose-video.mjs"), "--project", slug];
@@ -421,6 +447,7 @@ async function resumeAfterNarrationReview(slug, options) {
       ...(options.captions
         ? [{ id: "captions", label: "Caption timing", status: "pending" }]
         : []),
+      { id: "final-cut", label: "Final Cut project", status: "pending" },
       { id: "compose", label: "Composition", status: "pending" },
       { id: "check", label: "Validation", status: "pending" },
       ...(options.render ? [{ id: "render", label: "Render", status: "pending" }] : []),
@@ -463,6 +490,7 @@ async function resumeAfterImageReview(slug, options) {
       ...(options.captions
         ? [{ id: "captions", label: "Caption timing", status: "pending" }]
         : []),
+      { id: "final-cut", label: "Final Cut project", status: "pending" },
       { id: "compose", label: "Composition", status: "pending" },
       { id: "check", label: "Validation", status: "pending" },
       ...(options.render ? [{ id: "render", label: "Render", status: "pending" }] : []),
@@ -628,6 +656,18 @@ async function emitVideo(slug) {
     url: `/media/${slug}/renders/${slug}.mp4?v=${Date.now()}`,
     bytes: stat.size,
     deliveryPath: delivery?.deliveredFile ?? null,
+  });
+}
+
+async function emitFinalCut(slug) {
+  const file = path.join(videoDir(slug), "final-cut", `${slug}.fcpxml`);
+  const stat = await fs.stat(file).catch(() => null);
+  if (!stat) return;
+  emit({
+    type: "final-cut",
+    slug,
+    path: file,
+    bytes: stat.size,
   });
 }
 
@@ -1028,13 +1068,10 @@ function rejectPromptWriteWhileRunning(response) {
   return true;
 }
 
-// The spoken script of a project. content/narration.txt is what the pipeline writes and what
-// Voicebox reads, so it is the authoritative copy; the studio's own scratch file is ignored.
+// The source box and spoken narration deliberately have different jobs. The source is immutable
+// context for the project; content/narration.txt is the authoritative editable Voicebox copy.
 async function readNarration(projectPath) {
-  const text = await fs
-    .readFile(path.join(projectPath, "content", "narration.txt"), "utf8")
-    .catch(() => "");
-  return text.trim();
+  return readStudioSourceScript(projectPath);
 }
 
 // A browser cannot hand back an absolute directory path — file inputs deliberately hide it. The
@@ -1730,18 +1767,6 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    if (route === "/api/narration-review/regenerate" && request.method === "POST") {
-      const body = await readBody(request);
-      const slug = String(body.slug ?? "").trim();
-      if (!validSlug(slug)) {
-        sendJson(response, 400, { error: "Bad project slug." });
-        return;
-      }
-      const result = await generateNarrationTake(slug, Number(body.lineIndex));
-      sendJson(response, 200, { review: publicReviewState(slug, result.state) });
-      return;
-    }
-
     if (route === "/api/narration-review/select" && request.method === "POST") {
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
@@ -1848,6 +1873,20 @@ const server = http.createServer(async (request, response) => {
       }
       sendJson(response, 200, { started: true });
       void startRender(slug);
+      return;
+    }
+
+    if (route === "/api/final-cut/open" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+        sendJson(response, 400, { error: "Bad slug." });
+        return;
+      }
+      const file = path.join(videoDir(slug), "final-cut", `${slug}.fcpxml`);
+      await fs.access(file);
+      await run("/usr/bin/open", ["-a", "Final Cut Pro", file]);
+      sendJson(response, 200, { opened: true });
       return;
     }
 
