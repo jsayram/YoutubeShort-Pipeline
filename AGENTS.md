@@ -1,16 +1,24 @@
 # YouTube pipeline agent guide
 
-This repository turns a script or topic into a long-form, 16:9 YouTube video. It coordinates three
-external tools:
+This repository turns a script or topic into a long-form, 16:9 YouTube video. It coordinates
+several external tools:
 
 - The selected provider creates still visual assets: local ComfyUI, local-first FLUX.2 Klein with
-  optional Cloudflare fallback, Google GenAI, or another registered provider.
+  optional Cloudflare fallback, Google GenAI, Pixazo SDXL, or another registered provider.
 - Voicebox creates narration through its local REST API, one clip per script line, assembled into a
-  Voicebox story.
+  Voicebox story. ElevenLabs is an optional alternative narration provider (`scripts/
+  elevenlabs-provider.mjs`) — hosted, paid, and gated behind explicit per-line confirmation in
+  Studio; Voicebox stays the default.
 - HyperFrames builds, previews, validates, and renders the video.
+- The Final Cut bridge (optional): `npm run final-cut -- --project <slug>` shells out to the
+  sibling repo `../final-cut-youtube-bridge` and writes an editable FCPXML assembly to
+  `videos/<slug>/final-cut/<slug>.fcpxml`. It doesn't replace the HyperFrames render path; Studio
+  runs both by default after image approval.
 
 Do not clone, vendor, import from, or edit the Voicebox or HyperFrames repositories. Voicebox is a
-running local application. HyperFrames is invoked through its versioned `npx` CLI.
+running local application. HyperFrames is invoked through its versioned `npx` CLI. The Final Cut
+bridge is different from both — it's a first-party sibling project, not a vendored external tool,
+so patch it directly when asked; keep its own `README.md` current when its behavior changes.
 
 Animation is authored in GSAP against the HyperFrames contract. The motion rules, ease vocabulary,
 and the list of seek-safe properties live in the project's `design.md`.
@@ -52,11 +60,12 @@ and the list of seek-safe properties live in the project's `design.md`.
     delivers it to `iCloud Drive/YoutubeShortPipeline/ready`. After publishing, the user moves it
     to the sibling `published` folder.
 
-## Approved upcoming work
+## Narration review checkpoint
 
-The per-line Voicebox review checkpoint is planned but not yet implemented. Before changing
-Studio's narration or stage ordering, read `docs/NARRATION-REVIEW-CHECKPOINT.md`; it contains the
-approved behavior, persistence model, compatibility constraints, and acceptance criteria.
+The per-line Voicebox review checkpoint is implemented and on by default (Studio's **Review
+narration before images** toggle). Before changing Studio's narration or stage ordering, read
+`docs/NARRATION-REVIEW-CHECKPOINT.md`; it contains the approved behavior, persistence model,
+compatibility constraints, and acceptance criteria this area must keep satisfying.
 
 ## Editing rules
 

@@ -1,0 +1,294 @@
+{
+  "id": "money-success-mindset",
+  "label": "Money, success & perseverance",
+  "summary": "A face-free wealth-psychology topic pack about persistence, disciplined execution, delayed gratification, and earned success. It translates abstract ideas into luxury vehicles, night architecture, watches, marinas, rain-soaked roads, and other object-led evidence of the work.",
+  "recommendedProfile": "luxury-night-photographic",
+  "titleOptions": [
+    "Nobody Sees the Nights That Make You Rich",
+    "The Dark Road to Success: Keep Going When Nothing Works",
+    "Your Future Is Built After Everyone Else Quits"
+  ],
+  "coreHook": "Success is not the glamorous destination people admire; it is the invisible bridge of disciplined nights, rejected shortcuts, repeated failures, and raw execution that almost nobody is willing to cross.",
+  "contentBlueprint": {
+    "targetRuntime": "10-12 minutes",
+    "editorialInfluence": "Napoleon Hill and Think and Grow Rich principles, expressed in original contemporary language rather than quotation or imitation",
+    "chapters": [
+      {
+        "id": "01-the-invisible-bridge",
+        "title": "The Invisible Bridge",
+        "timing": "0:00-2:10",
+        "purpose": "Open on the gap between wanting wealth and becoming capable of holding it.",
+        "keyPoints": [
+          "Desire names the destination; disciplined labor builds the crossing.",
+          "The visible symbols of success conceal years of invisible repetition.",
+          "Every useful action is another section of the bridge, even when the far side cannot yet be seen."
+        ]
+      },
+      {
+        "id": "02-dark-mode-discipline",
+        "title": "Dark-Mode Discipline",
+        "timing": "2:10-4:20",
+        "purpose": "Reframe lonely, uncelebrated work as the decisive competitive advantage.",
+        "keyPoints": [
+          "Motivation is temporary, but a private standard survives changing moods.",
+          "The hours with no applause reveal whether the goal is a wish or a commitment.",
+          "Delayed gratification means protecting tomorrow from tonight's impulses."
+        ]
+      },
+      {
+        "id": "03-pressure-and-persistence",
+        "title": "Pressure Is the Price of Expansion",
+        "timing": "4:20-6:35",
+        "purpose": "Turn setbacks, uncertainty, and slow progress into evidence that capacity is being built.",
+        "keyPoints": [
+          "Failure is information, not identity.",
+          "Persistence is intelligent adjustment repeated longer than discouragement lasts.",
+          "Pressure exposes weak systems so they can be rebuilt stronger."
+        ]
+      },
+      {
+        "id": "04-raw-execution",
+        "title": "Raw Execution Over Perfect Plans",
+        "timing": "6:35-8:50",
+        "purpose": "Move from philosophy to action: decide, execute, measure, refine, repeat.",
+        "keyPoints": [
+          "Definiteness of purpose reduces wasted motion.",
+          "Speed comes from removing indecision, not from skipping standards.",
+          "Momentum compounds when small promises to yourself are consistently kept."
+        ]
+      },
+      {
+        "id": "05-earned-success",
+        "title": "Become the Person Who Can Keep It",
+        "timing": "8:50-11:00",
+        "purpose": "Close on identity, stewardship, and success as proof of internal transformation.",
+        "keyPoints": [
+          "Money amplifies habits; it does not repair them.",
+          "The ultimate asset is the disciplined identity built while pursuing the goal.",
+          "Keep crossing the bridge until the life once imagined becomes the standard you can sustain."
+        ]
+      }
+    ]
+  },
+  "promptCatalog": [
+    {
+      "chapterId": "01-the-invisible-bridge",
+      "shots": [
+        {
+          "id": "01-wet-causeway",
+          "shotDescription": "Low road-level establishing shot of an empty Miami causeway leading toward a distant illuminated skyline, making the road itself the bridge between ambition and outcome.",
+          "prompt": "An empty rain-soaked Miami causeway stretching toward a distant illuminated skyline, black luxury sedan small in the far lane, wet asphalt and concrete barriers dominating the foreground + 3 AM darkness, recent rain, sparse amber street lamps, faint coastal haze and reflections across the road + raw shot on iPhone 15 Pro, low road-level perspective, realistic documentary automotive photography, natural lens distortion and subtle sensor noise + near-black charcoal, deep navy, restrained amber highlights, lonely determined cinematic mood --ar 16:9"
+        },
+        {
+          "id": "02-garage-before-dawn",
+          "shotDescription": "A matte dark-grey Porsche 911 alone in a concrete garage before dawn, framed as potential waiting for disciplined action rather than a showroom trophy.",
+          "prompt": "A pitch-black matte dark-grey Porsche 911 GT3 RS parked alone inside a stark concrete parking garage, empty bays receding behind it, no people + pre-dawn blue darkness, one flickering overhead fluorescent strip, damp tire marks and soft city glow entering through open slats + realistic 35mm automotive photography, low three-quarter angle, 35mm lens, raw grain and imperfect practical light + desaturated graphite, cold navy shadows, tiny warm highlights, controlled ambitious mood --ar 16:9"
+        },
+        {
+          "id": "03-ledger-and-watch",
+          "shotDescription": "Close object study of an unbranded mechanical watch, closed ledger, and single gold bar on mahogany, implying time, accounting, and delayed reward.",
+          "prompt": "An unbranded mechanical watch beside a closed black ledger and one restrained gold bar on a dark mahogany desk, objects separated with deliberate negative space + dim midnight interior, narrow warm desk-lamp beam, deep surrounding shadow, faint rain pattern reflected from a nearby window + realistic editorial still-life photography, shot on 50mm lens at table height, shallow natural depth of field, fine 35mm grain + black-brown shadows, muted gold and amber accents, severe focused wealth-psychology mood --ar 16:9"
+        }
+      ]
+    },
+    {
+      "chapterId": "02-dark-mode-discipline",
+      "shots": [
+        {
+          "id": "04-mansion-one-room-lit",
+          "shotDescription": "Wide exterior of a glass mega-mansion with only one room lit, turning the illuminated workspace into a metaphor for private discipline.",
+          "prompt": "A modern glass ultra-luxury Miami mansion at night with only one upper room illuminated, dark infinity pool and sharp concrete planes reflected below, no people visible + overcast twilight fading into midnight, humid coastal air, soft warm interior spill against deep exterior shadow + realistic architectural photography, 24mm tilt-shift lens, wide symmetrical framing, authentic material texture and restrained film grain + charcoal black, deep steel blue, isolated warm amber light, private disciplined atmosphere --ar 16:9"
+        },
+        {
+          "id": "05-empty-high-rise-workspace",
+          "shotDescription": "An empty high-rise balcony workspace at 2:47 AM with a closed laptop and handwritten notebook, city lights below but no readable text.",
+          "prompt": "An empty high-rise balcony workspace overlooking the Miami skyline, closed dark laptop, unbranded notebook and mechanical pencil aligned on a stone table, no readable text + 2:47 AM atmosphere, dim wall sconce, humid haze, distant windows and traffic lights far below + raw shot on iPhone 15 Pro, medium-wide environmental composition, realistic low-light photography, subtle digital grain and natural reflections + deep navy and black, subdued sodium amber, quiet relentless after-hours mood --ar 16:9"
+        },
+        {
+          "id": "06-yacht-before-sunrise",
+          "shotDescription": "A dark yacht tied at a silent marina before sunrise, presented as an earned future waiting beyond unseen work.",
+          "prompt": "A large black-and-white luxury yacht docked alone at a silent Miami marina, taut mooring lines and dark water filling the foreground, no people + final hour before sunrise, faint deck lights, gloomy cloud cover, soft mist and broken reflections across deep water + realistic shot on iPhone, low dock-level angle, authentic marina photography, natural low-light noise and slight lens flare + midnight blue, near-black water, restrained warm deck lights, patient aspirational mood --ar 16:9"
+        }
+      ]
+    },
+    {
+      "chapterId": "03-pressure-and-persistence",
+      "shots": [
+        {
+          "id": "07-porsche-in-storm",
+          "shotDescription": "A Porsche pushing through a hard downpour on an empty highway, with water spray and lane lines carrying forward momentum.",
+          "prompt": "A dark graphite Porsche 911 driving through heavy rain on an empty elevated city highway, controlled water spray trailing behind, lane markings pulling toward the horizon + stormy midnight, harsh rain, dim overhead lamps and blurred skyline beyond concrete barriers + realistic automotive tracking photography, shot from a parallel vehicle on 35mm lens, natural motion blur, raw photojournalistic grain + cold charcoal and navy, sparse amber lights, high-contrast resilient forward-driving mood --ar 16:9"
+        },
+        {
+          "id": "08-construction-in-rain",
+          "shotDescription": "A partially completed glass tower under rain with cranes frozen above it, showing success as unfinished structure rather than instant arrival.",
+          "prompt": "A partially completed modern glass high-rise rising above downtown Miami, exposed concrete floors and two silent cranes, no workers visible + rainy blue-hour dusk, low storm clouds, isolated safety lights and wet neighboring rooftops + realistic architectural documentary photography, 28mm lens from an adjacent rooftop, deep perspective, raw grain and true-to-life construction detail + slate grey, deep blue-black, restrained red and amber pin lights, pressure-tested unfinished momentum --ar 16:9"
+        },
+        {
+          "id": "09-scratched-watch",
+          "shotDescription": "Macro detail of a worn luxury watch with scratches and rain droplets, making endurance visible in the object itself.",
+          "prompt": "A worn unbranded steel mechanical watch resting on wet black stone, fine scratches on the case and rain droplets across the crystal, no hands or people + dim exterior night, single side light, dark marina reflections softly broken in the background + realistic macro product photography, 85mm macro lens, shallow depth of field, honest surface detail and subtle 35mm grain + gunmetal, black and muted silver with one warm amber reflection, hardened persevering mood --ar 16:9"
+        }
+      ]
+    },
+    {
+      "chapterId": "04-raw-execution",
+      "shots": [
+        {
+          "id": "10-lamborghini-exit-ramp",
+          "shotDescription": "A Lamborghini committing to a curved exit ramp at night, using the decisive line of the road as a metaphor for action.",
+          "prompt": "A matte black Lamborghini Huracan taking a sweeping empty highway exit ramp, car positioned at the point of commitment as the road curves sharply ahead + late-night rain residue, wet guardrails, sparse overhead lamps and distant Miami glow + realistic automotive photography, elevated 35mm panning shot, crisp car with restrained environmental motion blur, authentic road texture + deep charcoal, black and midnight blue, controlled amber reflections, decisive high-performance mood --ar 16:9"
+        },
+        {
+          "id": "11-keys-on-stone",
+          "shotDescription": "Minimal close shot of car keys, watch, and one unchecked box on a card with no readable writing, symbolizing the next executable move.",
+          "prompt": "Unbranded black performance-car keys beside a steel watch and a plain dark task card marked only by one empty square, no readable words, on a black stone counter + dim predawn kitchen inside a glass residence, narrow under-cabinet light, city reflections in the window + realistic 50mm still-life photography, close table-level framing, natural shallow focus and fine raw grain + near-black stone, cool steel, restrained warm light, precise action-oriented mood --ar 16:9"
+        },
+        {
+          "id": "12-open-garage-road",
+          "shotDescription": "Open garage door framing an idling luxury sedan and the wet road beyond, a clean visual transition from preparation to execution.",
+          "prompt": "An open concrete garage framing a dark luxury sedan ready at the threshold, wet coastal road visible beyond, headlights low and restrained, no driver visible + 4 AM darkness, light rain, cool garage practicals and faint palm-shadowed street lamps outside + raw shot on iPhone 15 Pro, centered wide composition, realistic low-light automotive photography, subtle sensor grain and authentic reflections + graphite black, blue-grey rain light, small warm highlights, immediate no-excuses execution mood --ar 16:9"
+        }
+      ]
+    },
+    {
+      "chapterId": "05-earned-success",
+      "shots": [
+        {
+          "id": "13-balcony-before-sunrise",
+          "shotDescription": "An empty luxury balcony above Miami just before sunrise, with the city still dark and the horizon beginning to change.",
+          "prompt": "An empty high-rise luxury balcony overlooking Miami and the dark Atlantic, one low chair and a closed notebook facing the horizon, no people + quiet moment before sunrise, city still illuminated below, heavy clouds opening to a thin distant band of light + realistic architectural lifestyle photography, shot on 28mm lens, wide layered composition, raw natural grain and true low-light exposure + deep navy and charcoal with a restrained silver-blue horizon, earned calm and long-view confidence --ar 16:9"
+        },
+        {
+          "id": "14-mansion-and-yacht",
+          "shotDescription": "A restrained wide view joining a modern waterfront home and docked yacht, presenting wealth as a quiet system rather than spectacle.",
+          "prompt": "A modern glass waterfront mansion with a luxury yacht secured at its private dock, dark pool, clean stone terraces and still bay arranged in one quiet frame, no people + late blue-hour night, warm interior lights kept dim, overcast sky and soft reflections on black water + realistic high-end architectural photography, 24mm lens from across the inlet, natural perspective, subtle 35mm grain and believable materials + near-black, deep navy, warm walnut and muted amber, composed sustainable success mood --ar 16:9"
+        },
+        {
+          "id": "15-road-into-dawn",
+          "shotDescription": "Final readable frame: a luxury sedan moving away along the coastal road as night gives way to dawn, preserving forward motion without fading to black.",
+          "prompt": "A dark luxury sedan moving away along an empty Miami coastal road, ocean on one side and modern towers receding on the other, tail lights small but visible + night transitioning into overcast dawn, wet pavement, fading street lamps and a pale horizon ahead + realistic rear tracking photograph, raw shot on iPhone 15 Pro through a windshield, natural road vibration, authentic grain and reflections + charcoal foreground shifting into steel-blue dawn with restrained red tail lights, resolved persevering forward-motion mood --ar 16:9"
+        }
+      ]
+    }
+  ],
+  "castTags": "",
+  "topicDirection": "Use objects, vehicles, architecture, roads, water, weather, and environmental evidence to express money, discipline, pressure, execution, and earned success. No people, faces, bodies, hands, crowds, drivers, or human silhouettes; keep vehicle cabins and building interiors visibly unoccupied.",
+  "storyBeats": {
+    "single": "one decisive wealth-psychology lesson",
+    "opening": "the desired destination and the invisible bridge toward it",
+    "early": "private discipline and delayed gratification",
+    "middle": "pressure, failure, adjustment, and persistence",
+    "late": "decisive execution and compounding momentum",
+    "final": "earned success, stewardship, and continued forward motion"
+  },
+  "sentimentRules": [
+    {
+      "match": "\\b(?:money|wealth|rich|fortune|abundance|prosperity)\\b",
+      "phrase": "restrained ambition, stewardship, and earned material confidence"
+    },
+    {
+      "match": "\\b(?:discipline|habit|routine|standard|consisten\\w*|delay\\w* gratification)\\b",
+      "phrase": "private discipline, controlled restraint, and patient certainty"
+    },
+    {
+      "match": "\\b(?:fail\\w*|loss|lost|reject\\w*|setback|pressure|pain|hardship|struggle)\\b",
+      "phrase": "pressure-tested resilience and unsentimental recovery"
+    },
+    {
+      "match": "\\b(?:persist\\w*|persever\\w*|continue|keep going|refuse to quit|endure)\\b",
+      "phrase": "unyielding forward motion through uncertainty"
+    },
+    {
+      "match": "\\b(?:execute|execution|action|decide|decision|move|momentum|work)\\b",
+      "phrase": "decisive action, precision, and compounding momentum"
+    },
+    {
+      "match": "\\b(?:success|win|victory|achieve\\w*|goal|purpose|vision|future)\\b",
+      "phrase": "earned confidence, long-range purpose, and quiet arrival"
+    }
+  ],
+  "fallbackSentiment": "dark focused ambition, disciplined patience, and controlled forward pressure",
+  "cast": {
+    "mode": "none"
+  },
+  "personSignal": "\\b(?:i|me|my|you|your|we|our|they|them|person|people|human|man|woman|worker|founder|entrepreneur|leader)\\b",
+  "subjectTypePerson": "an unoccupied object or environment that symbolizes the person's action without depicting them",
+  "subjectTypeOther": "one clearly recognizable luxury object, vehicle, architectural space, road, marina, or atmospheric environment",
+  "continuityTemplate": "Scene {{sceneNumber}} of {{total}}. Keep the same dark luxury-photography world while changing the dominant object, location, camera distance, and lighting pattern from neighboring scenes.",
+  "sceneDirectionRules": [
+    {
+      "match": "\\b(?:bridge|gap|cross|other side|destination)\\b",
+      "visualAction": "An empty rain-soaked Miami causeway leads toward a distant illuminated skyline, turning the road into a literal bridge between ambition and outcome.",
+      "shotPlan": "Low road-level 24mm establishing view with wet asphalt dominant in foreground, skyline small in the distance, and a caption-safe field of dark sky."
+    },
+    {
+      "match": "\\b(?:desire|dream|vision|imagine|future)\\b",
+      "visualAction": "A dark performance car waits alone at the threshold of an open concrete garage with a wet coastal road visible beyond.",
+      "shotPlan": "Centered wide frame from inside the garage, vehicle in midground and road forming a clear leading line outward."
+    },
+    {
+      "match": "\\b(?:time|patient|patience|delay\\w* gratification|compound)\\b",
+      "visualAction": "An unbranded mechanical watch, closed ledger, and one restrained gold bar sit widely separated on a dark mahogany desk.",
+      "shotPlan": "Close 50mm object still life with narrow side light, shallow natural focus, and generous negative space for captions."
+    },
+    {
+      "match": "\\b(?:discipline|standard|routine|habit|private|unseen|nobody sees)\\b",
+      "visualAction": "A glass mega-mansion stands dark except for one illuminated upper room, with an empty infinity pool mirroring the isolated light.",
+      "shotPlan": "Wide architectural exterior with the single lit room in the upper third and reflective pool carrying the visual line downward."
+    },
+    {
+      "match": "\\b(?:night|late|alone|silence|applause|motivation)\\b",
+      "visualAction": "An empty high-rise balcony workspace overlooks city lights, with a closed laptop and unbranded notebook aligned on a stone table.",
+      "shotPlan": "Medium-wide iPhone-style composition placing the table off-center and leaving deep skyline space around it."
+    },
+    {
+      "match": "\\b(?:failure|fail\\w*|setback|reject\\w*|pressure|hardship|struggle)\\b",
+      "visualAction": "A partially completed glass tower rises through rain, exposed floors and cranes making unfinished progress visible.",
+      "shotPlan": "Wide 28mm rooftop view with strong vertical lines, low storm clouds, and one third of the frame reserved as quiet sky."
+    },
+    {
+      "match": "\\b(?:persist\\w*|persever\\w*|keep going|continue|endure|quit)\\b",
+      "visualAction": "A dark Porsche drives through heavy rain on an empty elevated highway, controlled spray trailing behind as lane lines pull forward.",
+      "shotPlan": "Low parallel tracking shot on 35mm with the car crisp, restrained environmental blur, and roadway depth clearly readable."
+    },
+    {
+      "match": "\\b(?:scar|worn|lesson|learn|information|adjust)\\b",
+      "visualAction": "A scratched unbranded mechanical watch rests on wet black stone, its worn surfaces and rain droplets carrying the history.",
+      "shotPlan": "85mm macro detail with side light, shallow focus, and dark marina reflections softened in the background."
+    },
+    {
+      "match": "\\b(?:execute|execution|decide|decision|commit|action)\\b",
+      "visualAction": "A matte black performance car commits to a sweeping empty highway exit ramp while wet guardrails trace the curve.",
+      "shotPlan": "Elevated 35mm panning view with the car at the decision point and the road arc occupying most of the horizontal frame."
+    },
+    {
+      "match": "\\b(?:plan|task|next step|priority|focus|precision)\\b",
+      "visualAction": "Unbranded car keys, a steel watch, and a plain task card marked only by one empty square sit on a black stone counter.",
+      "shotPlan": "Tight table-level 50mm still life with objects clearly separated and no readable writing."
+    },
+    {
+      "match": "\\b(?:momentum|move|start|begin|go|speed)\\b",
+      "visualAction": "An open concrete garage frames a dark luxury sedan ready at the threshold, with the wet road and faint palm shadows beyond.",
+      "shotPlan": "Centered wide iPhone-style view using the garage opening as a natural frame and the road as a leading line."
+    },
+    {
+      "match": "\\b(?:success|achieve\\w*|arrive|earned|reward|wealth|rich)\\b",
+      "visualAction": "A modern waterfront mansion and secured yacht share one quiet composition across black water, lit with restrained warm practicals.",
+      "shotPlan": "Wide 24mm architectural view from across the inlet, layered with water foreground, property midground, and dark sky."
+    },
+    {
+      "match": "\\b(?:identity|become|character|capable|keep it|steward)\\b",
+      "visualAction": "An empty high-rise balcony faces the Atlantic before sunrise, with one low chair and closed notebook oriented toward the changing horizon.",
+      "shotPlan": "Wide 28mm layered composition with the balcony as foreground structure and a thin horizon band carrying the resolution."
+    }
+  ],
+  "fallbackVisualAction": "Translate the narration into one empty, believable luxury environment or object-led scene: a dark performance car, glass residence, yacht marina, high-rise balcony, mechanical watch, wet highway, or coastal city architecture. Show environmental evidence of effort and progress without depicting a person.",
+  "fallbackShots": [
+    "Low 24mm wide view with wet pavement or dark water forming a leading line and a small architectural destination in the distance.",
+    "Medium-wide 35mm environmental view with one vehicle or structure dominant and a calm dark caption zone.",
+    "Close 50mm or 85mm object study with one supporting object, practical side light, and no readable text.",
+    "Elevated wide view using roads, terraces, marina lines, or balcony rails to create controlled forward movement."
+  ],
+  "negatives": "person, people, human, face, facial features, skin, body, hands, fingers, arms, legs, driver, passenger, pedestrian, worker, crowd, portrait, silhouette, reflection of a person, visible occupant, fashion model, readable license plate"
+}

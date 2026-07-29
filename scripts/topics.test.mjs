@@ -57,6 +57,32 @@ test("neutral imposes no cast, so a non-people topic stays clean", async () => {
   assert.deepEqual(neutral.sceneDirectionRules, []);
 });
 
+test("money success topic ships a complete face-free five-chapter prompt module", async () => {
+  const topic = await resolveTopic("money-success-mindset");
+  assert.equal(topic.cast.mode, "none");
+  assert.equal(topic.recommendedProfile, "luxury-night-photographic");
+  assert.equal(topic.titleOptions.length, 3);
+  assert.equal(topic.contentBlueprint.chapters.length, 5);
+  assert.equal(topic.promptCatalog.length, 5);
+  assert.match(topic.negatives, /person|face|driver/i);
+
+  const shots = topic.promptCatalog.flatMap((chapter) => chapter.shots);
+  assert.equal(shots.length, 15);
+  for (const shot of shots) {
+    assert.ok(shot.shotDescription.trim(), `${shot.id} needs a shot description`);
+    assert.match(
+      shot.prompt,
+      /^.+ \+ .+ \+ .+ \+ .+ --ar 16:9$/,
+      `${shot.id} must use the production prompt format`,
+    );
+    assert.doesNotMatch(
+      shot.prompt,
+      /\b(?:cartoon|anime|illustration|3d render|cgi|cyberpunk)\b/i,
+      `${shot.id} leaked a forbidden visual medium`,
+    );
+  }
+});
+
 // The whole point of the split: the same look profile, driven by a different topic, must not
 // smuggle a romantic couple into a script that has nothing to do with one.
 test("a cast-less topic leaves no cast text or unresolved variables in any style", async () => {
