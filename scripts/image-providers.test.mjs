@@ -101,7 +101,7 @@ assert.doesNotMatch(anime.stylePrompt, /Japanese animated|Ghibli/i);
 const photographic = styles.find((style) => style.id === "photographic");
 const flatVector = styles.find((style) => style.id === "flat-vector");
 const inkLine = styles.find((style) => style.id === "ink-line");
-for (const style of [photographic, flatVector, inkLine]) {
+for (const style of [flatVector, inkLine]) {
   assert.match(style.sceneTemplate, /\{\{line\}\}/i);
   assert.match(style.sceneTemplate, /\{\{sentiment\}\}/i);
   assert.match(style.sceneTemplate, /\{\{storyBeat\}\}/i);
@@ -110,9 +110,29 @@ for (const style of [photographic, flatVector, inkLine]) {
   assert.match(style.sceneTemplate, /\{\{castPlan\}\}/i);
   assert.match(style.sceneTemplate, /\{\{continuity\}\}/i);
 }
-assert.match(photographic.stylePrompt, /cinematic editorial photography/i);
-assert.match(photographic.stylePrompt, /painter's sunset palette/i);
-assert.match(photographic.stylePrompt, /medium-long or wide/i);
+
+// Photographic is deliberately the one unpeopled look: retro film stills of places and objects.
+// It keeps the narration, the emotion, and the scene-to-scene variety, but drops every cast and
+// staging variable, because a topic pack's direction ("close over-the-shoulder detail built
+// around the cup, hands") is exactly what this style must not receive.
+assert.match(photographic.sceneTemplate, /\{\{line\}\}/i);
+assert.match(photographic.sceneTemplate, /\{\{sentiment\}\}/i);
+assert.match(photographic.sceneTemplate, /\{\{storyBeat\}\}/i);
+assert.match(photographic.sceneTemplate, /\{\{continuity\}\}/i);
+for (const variable of ["castPlan", "castBrief", "castTags", "visualAction", "shotPlan", "topicDirection"]) {
+  assert.doesNotMatch(
+    photographic.sceneTemplate,
+    new RegExp(`\\{\\{${variable}\\}\\}`),
+    `photographic must not take {{${variable}}}; it would stage people`,
+  );
+}
+assert.match(photographic.sceneTemplate, /no people in it/i);
+assert.match(photographic.sceneTemplate, /no visible face, no visible hands/i);
+assert.match(photographic.stylePrompt, /old grainy 35mm camera/i);
+assert.match(photographic.stylePrompt, /sunrise and sunset over the ocean/i);
+assert.match(photographic.stylePrompt, /balloons, roses, wrapped gifts, coffee cups, candles/i);
+assert.match(photographic.negativeExtra, /portrait, face/i);
+assert.match(photographic.negativeExtra, /hands, fingers/i);
 assert.match(flatVector.stylePrompt, /rough brush-shaped geometry/i);
 assert.match(inkLine.stylePrompt, /broad dry-brush ink masses/i);
 

@@ -81,10 +81,11 @@ prompt. Pass `--force-references` only when you want to redesign the applicable 
 Reference generation is reported separately from scene progress. An eight-line script therefore
 shows **Images 1/8 … 8/8** even when a provider also creates reference assets.
 
-Photographic, Flat Vector, Ink Line Art, Anime, Illustrated Monologue, Living Storybook, and
-FLUX.2 all translate each narration line into sentiment, story position, a concrete action, a
-shot plan, and a cast plan. Their visual media differ, but the default eight-scene rhythm is five
-alternating solo woman/man scenes and three shared turning points.
+Flat Vector, Ink Line Art, Anime, Illustrated Monologue, Living Storybook, and FLUX.2 all
+translate each narration line into sentiment, story position, a concrete action, a shot plan, and
+a cast plan. Their visual media differ, but the default eight-scene rhythm is five alternating
+solo woman/man scenes and three shared turning points. Photographic sits outside that rhythm: it
+takes no cast or action direction and renders every line as an unpeopled retro film still.
 
 ## Topic is separate from style
 

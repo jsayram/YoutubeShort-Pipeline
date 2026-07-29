@@ -59,7 +59,9 @@ test("a cast-less topic leaves no cast text or unresolved variables in any style
 
 test("the same style produces different cast handling per topic", async () => {
   const [romance, neutral] = await Promise.all([resolveTopic("romance"), resolveTopic("neutral")]);
-  const template = promptDocument.providers.photographic.sceneTemplate;
+  // Storybook rather than photographic: photographic is the one profile that deliberately takes
+  // no cast variables, so it cannot show a per-topic cast difference.
+  const template = promptDocument.providers.storybook.sceneTemplate;
   const withCast = buildScenePrompts(lines, template, romance)[0].prompt;
   const withoutCast = buildScenePrompts(lines, template, neutral)[0].prompt;
   assert.match(withCast, /young adult figures|young adult woman|young adult man|No people anywhere/i);

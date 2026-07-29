@@ -1,10 +1,10 @@
 [
   {
     "id": "photographic",
-    "label": "Photographic",
+    "label": "Photographic (retro film, no people)",
     "provider": "comfyui",
     "promptProfile": "photographic",
-    "summary": "Distant cinematic editorial photography with warm sunrise/sunset color, deep shadows, grain, and restrained red-orange-green tones.",
+    "summary": "Grainy retro film stills with no people: sunrise and sunset landscapes shot through leaves and flowers, ocean horizons, candles, roses, coffee, balloons, and quiet rooms.",
     "match": [
       "realvis",
       "juggernaut",

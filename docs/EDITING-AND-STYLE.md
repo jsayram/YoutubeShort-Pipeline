@@ -60,16 +60,25 @@ provider. Prompt settings have three layers:
 | Video override | `content/prompt-overrides.json` | only the selected video |
 | Scene edit | `content/image-prompts.json` plus `content/prompt-state.json` | only that scene in that video |
 
-**Photographic**, **Flat vector**, **Ink line art**, **Anime**, and the two **Illustrated
-monologue** providers share story-aware direction and the same solo/shared cast rhythm while
-retaining their medium. Every content provider constrains a two-person relationship scene to one
-adult man and one adult woman while solo scenes can feature either one. Photographic uses
-nostalgic 35mm editorial warmth; Flat vector uses rough brush-shaped, screen-printed geometry; Ink
+**Flat vector**, **Ink line art**, **Anime**, and the two **Illustrated monologue** providers share
+story-aware direction and the same solo/shared cast rhythm while retaining their medium. Those
+providers constrain a two-person relationship scene to one adult man and one adult woman while solo
+scenes can feature either one. Flat vector uses rough brush-shaped, screen-printed geometry; Ink
 uses broad dry-brush masses and restrained color washes; and Anime/Illustrated Monologue use rough
 oil-and-gouache relationship art. All carry the same palette and staging direction: mostly
 medium-long or wide scenes, deep reds and burnt oranges, muted golds and yellows, restrained moss
 and olive greens, and low sunrise, sunset, or amber interior light. The living variant adds
 motion-ready hair, fabric, grass, water, smoke, and dust.
+
+**Photographic** is the exception, and the only unpeopled look. It renders each line as a grainy
+retro film still of a place or a still life: sunrise and sunset over the ocean, a horizon seen
+through leaves and flowers, candles, roses, coffee, balloons, a wrapped gift, an unmade bed by a
+window. Faces and hands are pushed into the negative prompt, and a figure may appear only as a
+tiny backlit silhouette on the horizon. Because of that it takes no cast, action, or shot
+variables from the topic pack — a topic direction like "close over-the-shoulder detail built
+around the cup and hands" is exactly what this style has to refuse. It keeps the narration line,
+the sentiment, the story position, and the scene-to-scene continuity rule, and lets the objects
+carry the feeling.
 
 The FLUX.2 local-first and Animagine dark-storybook choices also own automatic reference prompts.
 FLUX.2 generates two separate loose-painted contemporary character anchors plus a rough
@@ -110,8 +119,9 @@ terms, and `{{subjectType}}` for the inferred actor or object. Story-aware templ
 - `{{castPlan}}`: a solo woman, solo man, or rare shared two-person turning point.
 - `{{continuity}}`: preserve identity while changing pose, setting, lighting, and framing.
 
-Photographic, Flat Vector, Ink Line Art, Anime, both Illustrated Monologue profiles, and FLUX.2
-use the story-aware variables. Their common relationship beats have explicit visual
+Flat Vector, Ink Line Art, Anime, both Illustrated Monologue profiles, and FLUX.2 use the
+story-aware variables; Photographic deliberately takes only `{{line}}`, `{{keywords}}`,
+`{{sentiment}}`, `{{storyBeat}}`, and `{{continuity}}`. Their common relationship beats have explicit visual
 interpretations—for example, a coffee-order close detail, post-argument distance across a room,
 or one partner awake beside the sleeping other—and a fallback still requires a physical action
 and varied shot. Most scenes alternate a solo recurring woman and man, while the opening, a
