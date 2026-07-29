@@ -1,6 +1,6 @@
-# YouTube Short pipeline agent guide
+# YouTube pipeline agent guide
 
-This repository turns a script or topic into a vertical YouTube Short. It coordinates three
+This repository turns a script or topic into a long-form, 16:9 YouTube video. It coordinates three
 external tools:
 
 - The selected provider creates still visual assets: local ComfyUI, local-first FLUX.2 Klein with
@@ -15,7 +15,7 @@ running local application. HyperFrames is invoked through its versioned `npx` CL
 Animation is authored in GSAP against the HyperFrames contract. The motion rules, ease vocabulary,
 and the list of seek-safe properties live in the project's `design.md`.
 
-## When asked to create a new short
+## When asked to create a new video
 
 1. Run `npm run doctor`.
 2. Run `npm run new -- <slug>`.
@@ -27,10 +27,12 @@ and the list of seek-safe properties live in the project's `design.md`.
    - `videos/<slug>/content/narration.txt`
    - `videos/<slug>/content/image-prompts.json`
    - `videos/<slug>/video.json`
-4. Keep a 60-second script near 125 to 145 spoken words only when its scene count and configured
-   pauses still fit that runtime. The default three-second pause adds three seconds between every
-   pair of lines, so use about six scenes by default. Write `narration.txt` with one spoken beat per
-   line — the line breaks become the clip boundaries.
+4. The default project targets a 10-minute (600-second) runtime, around 1,300 to 1,600 spoken
+   words at the same 125-to-145-words-per-minute pace, but scale that to whatever `duration` is
+   actually set to. The default three-second pause adds three seconds between every pair of lines,
+   so account for that when checking the script still fits the target runtime. Scene count follows
+   narration line count — there is no fixed scene target. Write `narration.txt` with one spoken
+   beat per line — the line breaks become the clip boundaries.
 5. Run `npm run images -- --project <slug>`.
 6. Run `npm run story -- --project <slug> --dry-run` to confirm the line split, then
    `npm run story -- --project <slug>`.
@@ -73,7 +75,7 @@ approved behavior, persistence model, compatibility constraints, and acceptance 
   words** toggle. Leave them absent when the option is off; when it is on, use the shared
   `scripts/caption-overlay.mjs` layer rather than creating a second caption style.
 - Preserve a readable final frame. Avoid blank or fade-to-black endings.
-- Keep important text inside mobile safe margins and use large type.
+- Keep important text inside screen-safe margins and use large type.
 
 ## Quality rules
 
