@@ -19,11 +19,12 @@ ChatGPT Codex or Claude Code
 Install and run the released Voicebox app. The pipeline talks to the documented local service at
 `http://127.0.0.1:17493`:
 
-1. `POST /stories` opens a story named after the video.
-2. `POST /generate` speaks one script line, then the run polls `GET /history/{id}` until it lands.
-3. `GET /history/{id}/export-audio` downloads the complete line for final-word and tail checks.
-4. `POST /stories/{id}/items` places the accepted clip on the review timeline.
-5. `PUT /stories/{id}/items/times` mirrors the pipeline's measured audible pauses in Voicebox.
+1. `POST /generate` speaks one script line, then the run polls `GET /history/{id}` until it lands.
+2. `GET /history/{id}/export-audio` downloads an immutable candidate for final-word and tail checks.
+3. `content/narration-review.json` persists every candidate and the selected take per stable line.
+4. After approval, `POST /stories` opens a story named after the video.
+5. `POST /stories/{id}/items` places each selected generation on the story timeline.
+6. `PUT /stories/{id}/items/times` mirrors the pipeline's measured audible pauses in Voicebox.
 
 The final narration is assembled locally from the accepted line WAVs. That preserves every source
 sample and inserts only enough digital silence to make the measured speech-to-speech pause exact.

@@ -25,7 +25,7 @@ Edit:
 Keep generated images free of readable text. Add titles and labels in HTML so they stay sharp,
 editable, and correctly spelled.
 
-## 3. Generate images and voice
+## 3. Generate and review voice, then images
 
 Start the Voicebox app, then run:
 
@@ -33,11 +33,12 @@ Start the Voicebox app, then run:
 npm run assets -- --project topic-name
 ```
 
-This calls the project's selected image provider, then builds a Voicebox story from the narration.
-Each line becomes its own generation and its own item on the story timeline. The default target is three seconds of
-audible silence from the end of one spoken phrase to the beginning of the next. The story is saved
-in Voicebox under the `title` from `video.json`, so you can open the app to re-roll a weak line or
-review the story.
+The CLI keeps its automatic path. In Studio, narration runs first and **Review narration before
+images** is enabled by default. Each line receives an initial take and the pipeline pauses until
+every current line has a passing selected take. Regenerations are retained as playable history.
+Approval assembles the selected takes, creates the Voicebox story, and only then starts images.
+The default target is three seconds of audible silence from the end of one spoken phrase to the
+beginning of the next.
 
 In Studio, **Regenerate existing images** works the same for newly created and imported projects:
 it forwards a forced scene render to the selected backend while preserving stable character/style

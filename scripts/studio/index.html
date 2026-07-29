@@ -154,6 +154,41 @@
       .project-assets .grid {
         margin-bottom: 0;
       }
+      .narration-review {
+        margin: 18px 0;
+      }
+      .review-line {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px;
+        margin-top: 12px;
+        background: var(--bg);
+      }
+      .review-line textarea {
+        min-height: 76px;
+      }
+      .review-takes {
+        display: grid;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .review-take {
+        display: grid;
+        grid-template-columns: auto minmax(180px, 1fr) auto;
+        align-items: center;
+        gap: 10px;
+        padding: 9px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .review-take audio {
+        width: 100%;
+      }
+      .review-take.stale {
+        opacity: 0.58;
+      }
+      .qa-ok { color: var(--ok); }
+      .qa-bad { color: var(--bad); }
       @media (max-width: 620px) {
         .service-grid {
           grid-template-columns: 1fr;
@@ -729,10 +764,18 @@ Start a recording and talk about your day."></textarea>
 
         <div class="opts">
           <label id="fastwrap" class="hidden"><input type="checkbox" id="opt-fast" /> Fast mode</label>
+          <label title="Uses headless LM Studio to interpret each script line before image generation">
+            <input type="checkbox" id="opt-enrich" checked />
+            Smarter scene prompts
+          </label>
           <label><input type="checkbox" id="opt-render" /> Render to MP4 when the check passes</label>
           <label title="Adds phrase captions with the spoken word highlighted">
             <input type="checkbox" id="opt-captions" />
             Highlight spoken words
+          </label>
+          <label title="Pauses before image generation so every spoken line can be heard and re-rolled">
+            <input type="checkbox" id="opt-review-narration" checked />
+            Review narration before images
           </label>
           <label><input type="checkbox" id="opt-force" /> Regenerate existing images</label>
           <label>
@@ -748,6 +791,20 @@ Start a recording and talk about your day."></textarea>
           <span class="err" id="err"></span>
         </div>
       </div>
+
+      <section class="card narration-review hidden" id="narration-review">
+        <div class="section-head">
+          <div>
+            <label>Narration review</label>
+            <div class="sub" id="narration-review-summary"></div>
+          </div>
+        </div>
+        <div id="narration-review-lines"></div>
+        <div class="actions" style="margin-top: 16px">
+          <button id="approve-narration">Approve narration and generate images</button>
+          <span class="err" id="narration-review-error"></span>
+        </div>
+      </section>
 
       <section class="card project-assets hidden" id="project-assets">
         <div class="section-head">
@@ -800,6 +857,7 @@ Start a recording and talk about your day."></textarea>
         script: "Script and prompts",
         images: "Images",
         voice: "Narration",
+        review: "Narration review",
         captions: "Caption timing",
         compose: "Composition",
         check: "Validation",
@@ -943,7 +1001,7 @@ Start a recording and talk about your day."></textarea>
         }
 
         if (event.type === "audio") {
-          const host = extra("voice");
+          const host = extra(stageNodes.has("voice") ? "voice" : "review");
           if (!host) return;
           host.innerHTML =
             `<audio controls src="${event.url}"></audio>` +
@@ -961,6 +1019,17 @@ Start a recording and talk about your day."></textarea>
             `${Number(event.spokenDuration).toFixed(1)}s · ` +
               `${(Number(event.pauseMs ?? 0) / 1000).toFixed(2)}s pauses`,
           );
+          return;
+        }
+
+        if (event.type === "narration-review") {
+          renderNarrationReview(event.slug, event.review);
+          return;
+        }
+
+        if (event.type === "paused" && event.reason === "narration-review") {
+          setRunning(false);
+          $("narration-review").scrollIntoView({ behavior: "smooth", block: "start" });
           return;
         }
 
@@ -1079,8 +1148,10 @@ Start a recording and talk about your day."></textarea>
             topic: $("topic").value || undefined,
             gapMs: Math.round(Number($("pause").value || 0) * 1000),
             captions: $("opt-captions").checked,
+            reviewNarration: $("opt-review-narration").checked,
             fast: $("opt-fast").checked,
             render: $("opt-render").checked,
+            enrichWithLLM: $("opt-enrich").checked,
             force: $("opt-force").checked,
             keepPrompts: $("opt-keep").checked,
             doctor: !$("opt-nodoctor").checked,
@@ -1104,6 +1175,136 @@ Start a recording and talk about your day."></textarea>
       $("cancel").addEventListener("click", () => {
         fetch("/api/cancel", { method: "POST" });
       });
+
+      let narrationReviewSlug = null;
+
+      function renderNarrationReview(slug, review) {
+        if (!review || review.status === "approved") {
+          $("narration-review").classList.add("hidden");
+          return;
+        }
+        narrationReviewSlug = slug;
+        const panel = $("narration-review");
+        panel.classList.remove("hidden");
+        $("narration-review-error").textContent = "";
+        const valid = review.validation?.valid === true;
+        $("narration-review-summary").textContent =
+          `${review.lines.length} lines · ${review.settings.profile} · ` +
+          `${review.settings.engine} ${review.settings.modelSize}` +
+          (valid ? " · ready to approve" : " · choose a passing take for every line");
+        $("approve-narration").disabled = !valid;
+        $("narration-review-lines").innerHTML = review.lines.map((line) => {
+          const takes = line.takes.map((take, takeIndex) => {
+            const matching = take.text === line.text;
+            const selected = take.id === line.selectedTakeId;
+            const status = take.qa?.passed ? "Passed QA" : `QA failed: ${take.qa?.reason || "unknown"}`;
+            return `
+              <div class="review-take ${matching ? "" : "stale"}">
+                <input type="radio" name="take-${line.index}" value="${escapeHtml(take.id)}"
+                  data-select-take data-line-index="${line.index}"
+                  ${selected ? "checked" : ""} ${!matching || !take.qa?.passed ? "disabled" : ""} />
+                <div>
+                  <audio controls preload="metadata" src="${escapeHtml(take.audioUrl)}"></audio>
+                  <div class="sub">${matching ? `Take ${takeIndex + 1}` : `Earlier wording: “${escapeHtml(take.text)}”`}</div>
+                </div>
+                <div class="${take.qa?.passed ? "qa-ok" : "qa-bad"}">
+                  ${take.durationMs ? `${(take.durationMs / 1000).toFixed(2)}s · ` : ""}${escapeHtml(status)}
+                </div>
+              </div>`;
+          }).join("");
+          return `
+            <article class="review-line" data-review-line="${line.index}">
+              <label>Line ${escapeHtml(line.key)}</label>
+              <textarea data-review-text>${escapeHtml(line.text)}</textarea>
+              <div class="review-takes">${takes || `<div class="qa-bad">No take generated.</div>`}</div>
+              <div class="actions">
+                <button class="ghost compact" data-save-line>Save edit and regenerate</button>
+                <button class="ghost compact" data-regenerate-line>Regenerate</button>
+                <span class="sub" data-line-status></span>
+              </div>
+            </article>`;
+        }).join("");
+      }
+
+      async function reviewRequest(route, method, body, statusNode) {
+        if (statusNode) statusNode.textContent = "Working…";
+        $("narration-review-error").textContent = "";
+        const response = await fetch(route, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = data.error ?? "The narration action failed.";
+          $("narration-review-error").textContent = message;
+          if (statusNode) statusNode.textContent = message;
+          return null;
+        }
+        if (data.review) renderNarrationReview(body.slug, data.review);
+        return data;
+      }
+
+      $("narration-review-lines").addEventListener("click", async (event) => {
+        const card = event.target.closest("[data-review-line]");
+        if (!card) return;
+        const lineIndex = Number(card.dataset.reviewLine);
+        const status = card.querySelector("[data-line-status]");
+        if (event.target.matches("[data-save-line]")) {
+          event.target.disabled = true;
+          await reviewRequest("/api/narration-review/line", "PUT", {
+            slug: narrationReviewSlug,
+            lineIndex,
+            text: card.querySelector("[data-review-text]").value,
+          }, status);
+        } else if (event.target.matches("[data-regenerate-line]")) {
+          event.target.disabled = true;
+          await reviewRequest("/api/narration-review/regenerate", "POST", {
+            slug: narrationReviewSlug,
+            lineIndex,
+          }, status);
+        }
+      });
+
+      $("narration-review-lines").addEventListener("change", async (event) => {
+        if (!event.target.matches("[data-select-take]")) return;
+        await reviewRequest("/api/narration-review/select", "POST", {
+          slug: narrationReviewSlug,
+          lineIndex: Number(event.target.dataset.lineIndex),
+          takeId: event.target.value,
+        });
+      });
+
+      $("approve-narration").addEventListener("click", async () => {
+        const button = $("approve-narration");
+        button.disabled = true;
+        const data = await reviewRequest("/api/narration-review/approve", "POST", {
+          slug: narrationReviewSlug,
+        });
+        if (data) {
+          $("narration-review").classList.add("hidden");
+          setRunning(true);
+        } else {
+          button.disabled = false;
+        }
+      });
+
+      async function loadNarrationReview(slug) {
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+          $("narration-review").classList.add("hidden");
+          return;
+        }
+        const response = await fetch(
+          `/api/narration-review?slug=${encodeURIComponent(slug)}&v=${Date.now()}`,
+          { cache: "no-store" },
+        ).catch(() => null);
+        if (!response?.ok) {
+          $("narration-review").classList.add("hidden");
+          return;
+        }
+        const data = await response.json();
+        renderNarrationReview(slug, data.review);
+      }
 
       // Derive a slug from the title unless one was typed.
       $("title").addEventListener("input", () => {
@@ -1602,6 +1803,8 @@ Start a recording and talk about your day."></textarea>
       function applyProjectSettings(slug) {
         const project = projectSettings.get(slug);
         $("opt-captions").checked = project?.captionsEnabled === true;
+        $("opt-review-narration").checked = project ? project.reviewNarration !== false : true;
+        $("opt-enrich").checked = project ? project.enrichWithLLM === true : true;
         if (!styles.length) return false;
         if (project?.styleId && styles.some((style) => style.id === project.styleId)) {
           $("style").value = project.styleId;
@@ -1612,6 +1815,7 @@ Start a recording and talk about your day."></textarea>
         describeTopic();
         describeStyle();
         loadPromptEditor();
+        loadNarrationReview(slug);
         return true;
       }
 
@@ -1676,6 +1880,8 @@ Start a recording and talk about your day."></textarea>
         $("slug").dataset.touched = "1";
         if (data.title) $("title").value = data.title;
         $("opt-captions").checked = data.captionsEnabled === true;
+        $("opt-review-narration").checked = data.reviewNarration !== false;
+        $("opt-enrich").checked = data.enrichWithLLM === true;
         if (data.styleId && styles.some((style) => style.id === data.styleId)) {
           $("style").value = data.styleId;
           describeStyle();

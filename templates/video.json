@@ -17,6 +17,7 @@
     "minTailQuietMs": 20,
     "qaTranscribe": true,
     "qaModel": "tiny.en",
+    "reviewBeforeImages": true,
     "storyDescription": null
   },
   "captions": {
@@ -30,6 +31,7 @@
   },
   "imageGen": {
     "provider": "comfyui",
+    "enrichWithLLM": true,
     "checkpoint": "RealVisXL_V5.0_fp16.safetensors",
     "vae": "sdxl_vae_fp16_fix.safetensors",
     "steps": 30,

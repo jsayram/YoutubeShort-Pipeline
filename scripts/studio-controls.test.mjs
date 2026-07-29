@@ -46,3 +46,30 @@ test("refresh has a visible status action and a separate confirmed full restart"
   assert.match(studio, /consecutive >= 3/);
   assert.match(studio, /const voicebox = await waitForVoiceboxStable\(45000\)/);
 });
+
+test("local LLM enrichment stays an optional provider-independent overlay", async () => {
+  const [html, studio, dispatcher, local, flux, cloudflare, gemini, template] =
+    await Promise.all([
+      read("scripts/studio/index.html"),
+      read("scripts/studio.mjs"),
+      read("scripts/generate-images.mjs"),
+      read("scripts/generate-images-local.mjs"),
+      read("scripts/generate-images-flux2-local.mjs"),
+      read("scripts/generate-images-cloudflare.mjs"),
+      read("scripts/generate-images-gemini.mjs"),
+      read("templates/video.json"),
+    ]);
+
+  assert.match(html, /id="opt-enrich" checked/);
+  assert.match(html, /enrichWithLLM:\s*\$\("opt-enrich"\)\.checked/);
+  assert.match(studio, /preparedConfig\.imageGen\.enrichWithLLM = options\.enrichWithLLM !== false/);
+  assert.match(studio, /name:\s*`\$\{localLlm\.name\} prompt director`/);
+  assert.equal(JSON.parse(template).imageGen.enrichWithLLM, true);
+
+  assert.match(dispatcher, /config\.imageGen\?\.enrichWithLLM === true/);
+  assert.match(dispatcher, /IMAGE_PROMPTS_FILE:\s*promptOverlay/);
+  assert.match(dispatcher, /Continuing with the provider's normal prompts/);
+  for (const backend of [local, flux, cloudflare, gemini]) {
+    assert.match(backend, /process\.env\.IMAGE_PROMPTS_FILE/);
+  }
+});

@@ -66,6 +66,12 @@ against. The default is three seconds of audible silence between beats. The curr
 animating through that pause, and the next image finishes its 0.5-second entrance before its voice
 begins. Change the pause in Studio or with `voicebox.gapMs` in `video.json`.
 
+Studio enables **Review narration before images** by default. It keeps every generated take under
+the video project, pauses before image generation, and resumes only after every current line has a
+passing selected take. Editing a line preserves its earlier takes as history, rebuilds that scene's
+base prompt, and immediately generates a take for the revised wording. Turn the toggle off for the
+non-interactive first-passing-take workflow.
+
 Active-word captions are optional and off by default. Turn on **Highlight spoken words** in
 Studio to align the narration, show short phrase groups, and highlight the current word in gold
 inside the HyperFrames composition. The captions disappear during silent pauses. The saved setting
@@ -123,6 +129,18 @@ for the complete narration beat, `{{keywords}}` for its extracted visual terms, 
 `{{continuity}}`. Those values turn a line into an emotional event, a physical action, a solo or
 shared cast decision, and a varied camera plan instead of passing a loose bag of words to the
 image model.
+
+**Smarter scene prompts** is a separate, removable layer above that system. When enabled, the
+image dispatcher asks headless LM Studio (`LMSTUDIO_MODEL`, default `qwen/qwen3.5-4b`) to turn each
+script line into a more concrete, neighbor-aware scene before handing it to whichever provider is
+selected. It never edits `templates/prompt.json` or the video's saved
+`content/image-prompts.json`; the enriched result is written to
+`content/image-prompts.enriched.json` and supplied only to that image run. Turn the toggle off and
+the pipeline immediately uses the original provider prompts. If LM Studio is stopped, missing its
+model, or cannot run inference, generation continues with the original prompts instead of failing.
+Studio shows LM Studio and the configured model in **Local services**. The standalone
+`npm run enrich -- --project <slug>` command remains available when a permanent, reviewable prompt
+rewrite is wanted.
 
 Every content provider uses the same story-aware scene interpretation and solo/shared cast
 rhythm. Across the pipeline, a two-person relationship scene is constrained to exactly one adult

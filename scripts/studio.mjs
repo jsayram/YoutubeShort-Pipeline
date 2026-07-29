@@ -28,6 +28,15 @@ import {
   saveScenePrompts,
 } from "./prompt-profiles.mjs";
 import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
+import { localLlmStatus } from "./local-llm.mjs";
+import {
+  editNarrationLine,
+  generateNarrationTake,
+  loadNarrationReview,
+  saveReviewContinuation,
+  selectNarrationTake,
+  validateReview,
+} from "./narration-review.mjs";
 
 await loadEnv();
 
@@ -149,13 +158,14 @@ function stageList(options) {
     { id: "doctor", label: "Environment check", status: "pending" },
     { id: "scaffold", label: "Project", status: "pending" },
     { id: "script", label: "Script and prompts", status: "pending" },
-    { id: "images", label: "Images", status: "pending" },
     { id: "voice", label: "Narration", status: "pending" },
+    { id: "review", label: "Narration review", status: "pending" },
+    { id: "images", label: "Images", status: "pending" },
     { id: "compose", label: "Composition", status: "pending" },
     { id: "check", label: "Validation", status: "pending" },
   ];
   if (options.captions) {
-    stages.splice(5, 0, { id: "captions", label: "Caption timing", status: "pending" });
+    stages.splice(6, 0, { id: "captions", label: "Caption timing", status: "pending" });
   }
   if (options.render) stages.push({ id: "render", label: "Render", status: "pending" });
   return stages;
@@ -212,34 +222,60 @@ async function startRun({ slug, title, scriptText, options }) {
     }
     await runStage("script", node, prepareArgs);
     await fs.rm(scriptFile, { force: true });
+    const preparedConfigPath = path.join(projectDir, "video.json");
+    const preparedConfig = await readJson(preparedConfigPath);
+    preparedConfig.imageGen ??= {};
+    preparedConfig.imageGen.enrichWithLLM = options.enrichWithLLM !== false;
+    preparedConfig.voicebox ??= {};
+    preparedConfig.voicebox.reviewBeforeImages = options.reviewNarration !== false;
+    await writeJson(preparedConfigPath, preparedConfig);
     await emitPrompts(slug);
 
+    if (options.skipVoice) setStage("voice", "skipped");
+    else {
+      const voiceArgs = [
+        script("narration-review-cli.mjs"),
+        "prepare",
+        "--project",
+        slug,
+      ];
+      if (options.reviewNarration === false) voiceArgs.push("--auto-approve");
+      await runStage("voice", node, voiceArgs);
+      if (options.reviewNarration !== false) {
+        setStage("review", "waiting", "Choose a take for every line, then approve narration.");
+        const review = await saveReviewContinuation(slug, options);
+        emit({ type: "narration-review", slug, review: publicReviewState(slug, review) });
+        emit({ type: "paused", reason: "narration-review", slug });
+        return;
+      }
+      setStage("review", "skipped");
+      await emitTiming(slug);
+    }
+
+    await finishPipeline(slug, options);
+    emit({ type: "done", slug });
+  } catch (error) {
+    if (!current?.resetting) {
+      emit({ type: "error", message: String(error.message ?? error) });
+    }
+  } finally {
+    if (current) current.done = true;
+  }
+}
+
+async function finishPipeline(slug, options) {
+    const projectDir = videoDir(slug);
     if (options.skipImages) setStage("images", "skipped");
     else {
       const imageArgs = [script("generate-images.mjs"), "--project", slug];
       if (options.force) imageArgs.push("--force");
       await runStage("images", node, imageArgs, {
         onLine: (line) => {
-          // generate-images-local logs "[3/7] 03-topics — 12.4s" as each still finishes.
           const match = line.match(/^\[(\d+)\/(\d+)\]\s+(\S+)\s+[—-]/);
           if (match) void emitImage(slug, match[3], Number(match[1]), Number(match[2]));
         },
       });
       await emitImages(slug);
-    }
-
-    if (options.skipVoice) setStage("voice", "skipped");
-    else {
-      const voiceArgs = [
-        script("generate-story.mjs"),
-        "--project",
-        slug,
-        "--gap",
-        String(gapMs),
-      ];
-      if (options.resume) voiceArgs.push("--resume");
-      await runStage("voice", node, voiceArgs);
-      await emitTiming(slug);
     }
 
     if (options.captions) {
@@ -281,14 +317,64 @@ async function startRun({ slug, title, scriptText, options }) {
       await emitVideo(slug);
     }
 
+}
+
+async function resumeAfterNarrationReview(slug, options) {
+  current = {
+    id: String(Date.now()),
+    slug,
+    stages: [
+      { id: "review", label: "Assemble narration", status: "pending" },
+      { id: "images", label: "Images", status: "pending" },
+      ...(options.captions
+        ? [{ id: "captions", label: "Caption timing", status: "pending" }]
+        : []),
+      { id: "compose", label: "Composition", status: "pending" },
+      { id: "check", label: "Validation", status: "pending" },
+      ...(options.render ? [{ id: "render", label: "Render", status: "pending" }] : []),
+    ],
+    events: [],
+    child: null,
+    done: false,
+  };
+  emit({ type: "run", runId: current.id, slug, stages: current.stages });
+  try {
+    await runStage("review", node, [
+      script("narration-review-cli.mjs"),
+      "approve",
+      "--project",
+      slug,
+    ]);
+    await emitTiming(slug);
+    await finishPipeline(slug, options);
     emit({ type: "done", slug });
   } catch (error) {
-    if (!current?.resetting) {
-      emit({ type: "error", message: String(error.message ?? error) });
-    }
+    emit({ type: "error", message: String(error.message ?? error) });
   } finally {
     if (current) current.done = true;
   }
+}
+
+function publicReviewState(slug, state) {
+  if (!state) return null;
+  return {
+    ...state,
+    settings: {
+      profile: state.settings?.profile,
+      engine: state.settings?.engine,
+      modelSize: state.settings?.modelSize,
+      language: state.settings?.language,
+      gapMs: state.settings?.gapMs,
+    },
+    lines: state.lines.map((line) => ({
+      ...line,
+      takes: line.takes.map((take) => ({
+        ...take,
+        audioUrl: `/${["media", slug, ...take.audio.split("/")].map(encodeURIComponent).join("/")}`,
+      })),
+    })),
+    validation: validateReview(state),
+  };
 }
 
 // Render on its own, for a project whose media is already built.
@@ -431,12 +517,14 @@ async function fetchJson(url, timeoutMs = 1800) {
 }
 
 async function serviceSnapshot() {
-  const [comfyStats, comfyQueue, voiceHealth, template] = await Promise.all([
+  const [comfyStats, comfyQueue, voiceHealth, localLlm, template] =
+    await Promise.all([
     fetchJson(`${comfyUrl}/system_stats`),
     fetchJson(`${comfyUrl}/queue`),
     fetchJson(`${voiceboxUrl}/health`),
+    localLlmStatus(),
     readJson(path.join(repoRoot, "templates", "video.json")).catch(() => null),
-  ]);
+    ]);
 
   const device = comfyStats?.devices?.[0] ?? null;
   const runningJobs = comfyQueue?.queue_running?.length ?? 0;
@@ -498,6 +586,19 @@ async function serviceSnapshot() {
         // `open -a` launches a closed app and foregrounds an already-running one, which covers
         // both the "it is not started" and "I closed the window" cases.
         action: voiceRunning ? "Open Voicebox" : "Launch Voicebox",
+      },
+      {
+        id: "local-llm",
+        name: `${localLlm.name} prompt director`,
+        status: localLlm.reachable && localLlm.modelReady ? "running" : "offline",
+        kind: "service",
+        detail: localLlm.reachable
+          ? localLlm.modelReady
+            ? `${localLlm.model} ready · optional scene enrichment`
+            : `${localLlm.name} is running, but ${localLlm.model} is unavailable`
+          : `Not reachable at ${localLlm.baseUrl}`,
+        url: null,
+        action: null,
       },
       {
         id: "hyperframes",
@@ -913,6 +1014,8 @@ const server = http.createServer(async (request, response) => {
           duration: config.duration,
           rendered,
           captionsEnabled: config.captions?.enabled === true,
+          reviewNarration: config.voicebox?.reviewBeforeImages !== false,
+          enrichWithLLM: config.imageGen?.enrichWithLLM === true,
           styleId: config.imageGen?.style ?? null,
           topicId: config.topic ?? null,
         });
@@ -987,6 +1090,8 @@ const server = http.createServer(async (request, response) => {
           hasComposition,
           script: await readNarration(source),
           captionsEnabled: config?.captions?.enabled === true,
+          reviewNarration: config?.voicebox?.reviewBeforeImages !== false,
+          enrichWithLLM: config?.imageGen?.enrichWithLLM === true,
           styleId: config?.imageGen?.style ?? null,
           topicId: config?.topic ?? null,
         });
@@ -1020,6 +1125,8 @@ const server = http.createServer(async (request, response) => {
         hasComposition,
         from: source,
         captionsEnabled: imported?.captions?.enabled === true,
+        reviewNarration: imported?.voicebox?.reviewBeforeImages !== false,
+        enrichWithLLM: imported?.imageGen?.enrichWithLLM === true,
         styleId: imported?.imageGen?.style ?? null,
         topicId: imported?.topic ?? null,
         // Hand the project's narration back so the script box shows what this video actually
@@ -1333,6 +1440,84 @@ const server = http.createServer(async (request, response) => {
         images,
         references,
       });
+      return;
+    }
+
+    if (route === "/api/narration-review" && request.method === "GET") {
+      const slug = String(url.searchParams.get("slug") ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await loadNarrationReview(slug);
+      if (!state) {
+        sendJson(response, 404, { error: "This project has no narration review yet." });
+        return;
+      }
+      sendJson(response, 200, { review: publicReviewState(slug, state) });
+      return;
+    }
+
+    if (route === "/api/narration-review/line" && request.method === "PUT") {
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      await editNarrationLine(slug, Number(body.lineIndex), body.text);
+      const result = await generateNarrationTake(slug, Number(body.lineIndex));
+      sendJson(response, 200, { review: publicReviewState(slug, result.state) });
+      return;
+    }
+
+    if (route === "/api/narration-review/regenerate" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const result = await generateNarrationTake(slug, Number(body.lineIndex));
+      sendJson(response, 200, { review: publicReviewState(slug, result.state) });
+      return;
+    }
+
+    if (route === "/api/narration-review/select" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await selectNarrationTake(
+        slug,
+        Number(body.lineIndex),
+        String(body.takeId ?? ""),
+      );
+      sendJson(response, 200, { review: publicReviewState(slug, state) });
+      return;
+    }
+
+    if (route === "/api/narration-review/approve" && request.method === "POST") {
+      if (current && !current.done) {
+        sendJson(response, 409, { error: "A pipeline stage is already running." });
+        return;
+      }
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await loadNarrationReview(slug);
+      const validation = validateReview(state);
+      if (!validation.valid) {
+        sendJson(response, 400, { error: validation.errors.join(" ") });
+        return;
+      }
+      sendJson(response, 200, { started: true });
+      void resumeAfterNarrationReview(slug, state.studioOptions ?? {});
       return;
     }
 

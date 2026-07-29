@@ -50,6 +50,12 @@ and the list of seek-safe properties live in the project's `design.md`.
     delivers it to `iCloud Drive/YoutubeShortPipeline/ready`. After publishing, the user moves it
     to the sibling `published` folder.
 
+## Approved upcoming work
+
+The per-line Voicebox review checkpoint is planned but not yet implemented. Before changing
+Studio's narration or stage ordering, read `docs/NARRATION-REVIEW-CHECKPOINT.md`; it contains the
+approved behavior, persistence model, compatibility constraints, and acceptance criteria.
+
 ## Editing rules
 
 - Change narration in `content/narration.txt`, then regenerate voice. Rewriting a line invalidates

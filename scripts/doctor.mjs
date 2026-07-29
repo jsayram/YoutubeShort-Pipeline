@@ -1,5 +1,6 @@
 import path from "node:path";
 import { commandOutput, loadEnv, readJson, repoRoot } from "./lib.mjs";
+import { localLlmStatus } from "./local-llm.mjs";
 
 await loadEnv();
 const failures = [];
@@ -15,6 +16,18 @@ for (const command of ["ffmpeg", "ffprobe"]) {
   } catch {
     failures.push(`${command} is not available.`);
   }
+}
+
+// The local prompt director is optional. If it is unavailable, image generation safely uses the
+// provider's normal prompts, so Doctor reports the condition without blocking the pipeline.
+const localLlm = await localLlmStatus();
+if (localLlm.reachable && localLlm.modelReady) {
+  console.log(`✓ ${localLlm.name} at ${localLlm.baseUrl} (model ${localLlm.model})`);
+} else {
+  console.log(
+    `⚠ ${localLlm.name} prompt enrichment is unavailable at ${localLlm.baseUrl} ` +
+      `(optional; expected model ${localLlm.model})`,
+  );
 }
 
 const templateConfig = await readJson(path.join(repoRoot, "templates", "video.json"));

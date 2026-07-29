@@ -1,5 +1,6 @@
 import path from "node:path";
-import { parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
+import { loadEnv, parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
+import { localLlmStatus } from "./local-llm.mjs";
 
 // Dispatcher. `imageGen.provider` in video.json decides which backend renders the stills:
 //   "comfyui" — local ComfyUI over HTTP. Offline, no key, no quota. The default.
@@ -8,10 +9,12 @@ import { parseArgs, readJson, repoRoot, run, videoDir } from "./lib.mjs";
 //   "flux2-local" — FLUX.2 Klein through ComfyUI, with optional Cloudflare fallback.
 //   "cloudflare-flux2" — FLUX.2 Klein through Cloudflare Workers AI.
 
+await loadEnv();
 const { flags } = parseArgs();
 if (!flags.project) throw new Error("Pass --project <slug>.");
 
-const config = await readJson(path.join(videoDir(flags.project), "video.json"));
+const projectPath = videoDir(flags.project);
+const config = await readJson(path.join(projectPath, "video.json"));
 const provider = flags.provider ?? config.imageGen?.provider ?? "comfyui";
 
 const backends = {
@@ -38,4 +41,46 @@ const forwarded = process.argv.slice(2).filter((argument, index, all) => {
 });
 
 console.log(`Image provider: ${provider}`);
-await run(process.execPath, [path.join(repoRoot, "scripts", script), ...forwarded]);
+
+const enrichedRelativePath = path.join("content", "image-prompts.enriched.json");
+const enrichedPath = path.join(projectPath, enrichedRelativePath);
+let promptOverlay = null;
+
+if (config.imageGen?.enrichWithLLM === true) {
+  const llm = await localLlmStatus();
+
+  if (llm.reachable && llm.modelReady) {
+    console.log(
+      `LLM prompt enrichment is on (${llm.name} · ${llm.model}). ` +
+        "Building a temporary scene overlay…",
+    );
+    try {
+      await run(process.execPath, [
+        path.join(repoRoot, "scripts", "enrich-prompts.mjs"),
+        "--project",
+        flags.project,
+        "--output",
+        enrichedRelativePath,
+      ]);
+      promptOverlay = enrichedPath;
+    } catch {
+      console.log(
+        `⚠ ${llm.name} could not complete enrichment. ` +
+          "Continuing with the provider's normal prompts.",
+      );
+    }
+  } else {
+    console.log(
+      `⚠ LLM prompt enrichment is on, but ${llm.name} or model "${llm.model}" is unavailable. ` +
+        "Using the provider's normal prompts.",
+    );
+  }
+} else {
+  console.log("LLM prompt enrichment is off. Using the provider's normal prompts.");
+}
+
+await run(process.execPath, [path.join(repoRoot, "scripts", script), ...forwarded], {
+  // The provider-built prompt file is never touched. Backends read this optional overlay only
+  // for this child process, so cancelling or disabling the feature needs no cleanup.
+  env: promptOverlay ? { IMAGE_PROMPTS_FILE: promptOverlay } : {},
+});

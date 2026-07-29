@@ -15,7 +15,10 @@ const { flags } = parseArgs();
 const slug = flags.project;
 const projectDir = videoDir(slug);
 const config = await readJson(path.join(projectDir, "video.json"));
-const prompts = await readJson(path.join(projectDir, "content", "image-prompts.json"));
+const promptsFile = process.env.IMAGE_PROMPTS_FILE
+  ? path.resolve(process.env.IMAGE_PROMPTS_FILE)
+  : path.join(projectDir, "content", "image-prompts.json");
+const prompts = await readJson(promptsFile);
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) throw new Error("GEMINI_API_KEY is missing. Copy .env.example to .env and add the key.");

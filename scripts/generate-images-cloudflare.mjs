@@ -27,7 +27,10 @@ if (!accountId || !apiToken) {
 
 const projectDir = videoDir(flags.project);
 const config = await readJson(path.join(projectDir, "video.json"));
-const prompts = await readJson(path.join(projectDir, "content", "image-prompts.json"));
+const promptsFile = process.env.IMAGE_PROMPTS_FILE
+  ? path.resolve(process.env.IMAGE_PROMPTS_FILE)
+  : path.join(projectDir, "content", "image-prompts.json");
+const prompts = await readJson(promptsFile);
 const gen = config.imageGen ?? {};
 const { references, scenes } = splitImageItems(prompts, gen);
 const releaseLock = await installGenerationLock(projectDir, flags.project);
