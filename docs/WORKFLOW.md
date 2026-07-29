@@ -86,12 +86,34 @@ FLUX.2 all translate each narration line into sentiment, story position, a concr
 shot plan, and a cast plan. Their visual media differ, but the default eight-scene rhythm is five
 alternating solo woman/man scenes and three shared turning points.
 
+## Topic is separate from style
+
+Style decides how a video looks; **topic** decides what its scenes are about. They are chosen
+independently, so the same engine and look can serve romance today and crypto, coding, or animals
+later. Topics live in `templates/topics/*.json` and are picked with the Topic dropdown in Studio
+or `--topic <id>` on `npm run script`. The choice is saved to `video.json` so a later CLI run
+builds the same prompts.
+
+Two ship today. `romance` carries the recurring woman/man cast, the relationship arc, and the
+scene rules for suitcases, coffee orders, and rain; it is the default, so existing projects are
+unaffected. `neutral` imposes no cast and no emotional arc, reading each line literally, and is
+the starting point for a new topic: copy it, and add sentiment and scene-direction rules.
+
+Cast rules used to be hardcoded across every style, which meant a script about Bitcoin still got
+"one adult woman and one adult man" in every scene. That vocabulary now lives only in the topic
+pack.
+
 **Simple (script-driven)** is the one style that skips all of that scaffolding. Its scene template
 passes through the narration line and most of its significant words, with no fixed shot plan, cast
 rule, or palette, so composition and art direction come from the model's own reading of the script.
 It works with whatever SDXL checkpoint is already installed. Use it when a project's narration is
 distinctive enough that you would rather the model interpret it freely than force it through the
 story-aware scaffolding above.
+
+**Flat line-art poetry (webtoon, mood sky)** runs on Illustrious XL through ComfyUI rather than
+FLUX.2. That is deliberate: FLUX zeroes its negative conditioning and runs at guidance 1, so a
+style's negative prompt never reaches the model there. This look depends on suppressing panel
+borders, speech bubbles, and lettering, which needs SDXL's real classifier-free guidance.
 
 Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
 generated once more. If the retry contains the verified final word but merely ends without enough

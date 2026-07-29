@@ -303,7 +303,34 @@ function wordsApproximatelyMatch(actual, expected) {
   if (!actual || !expected) return false;
   if (actual === expected) return true;
   const allowance = expected.length >= 8 ? 2 : expected.length >= 5 ? 1 : 0;
-  return levenshtein(actual, expected) <= allowance;
+  if (levenshtein(actual, expected) <= allowance) return true;
+  // Homophones ("piece"/"peace", "night"/"knight") spell far enough apart to fail the edit-distance
+  // check above, but Voicebox said the right word: Whisper transcribed what it sounded like, not
+  // what the script wrote. A Soundex match catches that class of false rejection without loosening
+  // the stricter check above, which still does the real job of catching a truncated or wrong word.
+  return soundex(actual) === soundex(expected);
+}
+
+const SOUNDEX_CODES = {
+  b: "1", f: "1", p: "1", v: "1",
+  c: "2", g: "2", j: "2", k: "2", q: "2", s: "2", x: "2", z: "2",
+  d: "3", t: "3",
+  l: "4",
+  m: "5", n: "5",
+  r: "6",
+};
+
+function soundex(word) {
+  const letters = String(word ?? "").toLowerCase().replace(/[^a-z]/g, "");
+  if (!letters) return "";
+  let code = letters[0];
+  let lastDigit = SOUNDEX_CODES[letters[0]] ?? "";
+  for (let index = 1; index < letters.length && code.length < 4; index += 1) {
+    const digit = SOUNDEX_CODES[letters[index]] ?? "";
+    if (digit && digit !== lastDigit) code += digit;
+    lastDigit = digit;
+  }
+  return (code + "000").slice(0, 4);
 }
 
 function levenshtein(left, right) {

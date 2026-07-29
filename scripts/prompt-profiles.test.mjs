@@ -14,6 +14,7 @@ import {
   saveProjectPromptOverride,
   saveScenePrompts,
 } from "./prompt-profiles.mjs";
+import { resolveTopic } from "./topics.mjs";
 
 const breakupLines = [
   "She stopped asking if I made it home.",
@@ -26,9 +27,13 @@ const breakupLines = [
   "She only missed me when I started leaving.",
 ];
 const livePromptDocument = await loadPromptDocument();
+// These assertions describe romance behavior specifically, so they pass the romance pack
+// explicitly rather than relying on whatever the default topic happens to be.
+const romanceTopic = await resolveTopic("romance");
 const animagineScenes = buildScenePrompts(
   breakupLines,
   livePromptDocument.providers["animagine-dark-storybook"].sceneTemplate,
+  romanceTopic,
 );
 for (const [index, scene] of animagineScenes.entries()) {
   assert.ok(scene.prompt.includes(breakupLines[index].replace(/[,.!?;:]+$/, "")));
@@ -37,7 +42,7 @@ for (const [index, scene] of animagineScenes.entries()) {
 }
 assert.match(
   animagineScenes[0].prompt,
-  /exactly one adult woman and one adult man/i,
+  /two young adult figures at medium distance, silhouetted/i,
 );
 assert.match(animagineScenes[0].prompt, /dark home doorway/i);
 assert.match(animagineScenes[1].prompt, /late workplace light/i);
@@ -69,6 +74,7 @@ const interpreted = buildScenePrompts(
     "{{castPlan}}",
     "{{continuity}}",
   ].join(" | "),
+  romanceTopic,
 );
 assert.equal(new Set(interpreted.map((scene) => scene.prompt)).size, relationshipLines.length);
 assert.match(interpreted[0].prompt, /ordinary weekday place/i);
@@ -83,14 +89,17 @@ assert.match(interpreted[7].prompt, /joined hands/i);
 assert.match(interpreted[7].prompt, /resolution and emotional choice/i);
 assert.deepEqual(
   interpreted.map((scene) => scene.castMode),
-  ["pair", "solo-a", "solo-b", "solo-a", "pair", "solo-a", "solo-b", "pair"],
+  // Object-only stills sit between the figure scenes so the video is not people in every frame,
+  // which is what kept pulling an anime checkpoint toward rendered faces.
+  ["pair", "object", "solo-a", "object", "pair", "solo-b", "object", "pair"],
 );
-assert.match(interpreted[1].prompt, /Solo-woman scene/i);
-assert.match(interpreted[2].prompt, /Solo-man scene/i);
+assert.match(interpreted[1].prompt, /No people anywhere in this frame/i);
+assert.match(interpreted[2].prompt, /One young adult woman alone at medium distance/i);
+assert.match(interpreted[5].prompt, /One young adult man alone at medium distance/i);
 for (const scene of interpreted.filter((item) => item.castMode === "pair")) {
   assert.match(
     scene.prompt,
-    /exactly two complete adults.+one recurring adult woman.+one recurring adult man/i,
+    /two young adult figures together at medium distance.+solid flat silhouettes/i,
   );
 }
 for (const [index, line] of relationshipLines.entries()) {

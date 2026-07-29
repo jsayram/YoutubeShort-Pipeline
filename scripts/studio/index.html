@@ -619,6 +619,14 @@
             <div class="hint" id="stylehint"></div>
           </div>
           <div>
+            <label for="topic">Topic</label>
+            <select id="topic"></select>
+            <div class="hint" id="topichint"></div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
             <label for="pause">Pause between verses</label>
             <input id="pause" type="number" min="0" max="10" step="0.25" value="3" />
             <div class="hint">
@@ -1068,6 +1076,7 @@ Start a recording and talk about your day."></textarea>
           options: {
             profile: $("voice").value || undefined,
             style: $("style").value || undefined,
+            topic: $("topic").value || undefined,
             gapMs: Math.round(Number($("pause").value || 0) * 1000),
             captions: $("opt-captions").checked,
             fast: $("opt-fast").checked,
@@ -1597,6 +1606,10 @@ Start a recording and talk about your day."></textarea>
         if (project?.styleId && styles.some((style) => style.id === project.styleId)) {
           $("style").value = project.styleId;
         }
+        if (project?.topicId && topics.some((topic) => topic.id === project.topicId)) {
+          $("topic").value = project.topicId;
+        }
+        describeTopic();
         describeStyle();
         loadPromptEditor();
         return true;
@@ -1806,6 +1819,33 @@ Start a recording and talk about your day."></textarea>
         }
         hint.textContent = bits.join(" · ");
       }
+
+      // Topic decides what the scenes are about, independently of which model renders them.
+      // Swapping it is how the same engines and looks serve a different subject entirely.
+      let topics = [];
+
+      function describeTopic() {
+        const topic = topics.find((entry) => entry.id === $("topic").value);
+        $("topichint").textContent = topic ? (topic.summary ?? "") : "";
+      }
+
+      fetch("/api/topics")
+        .then((response) => response.json())
+        .then((data) => {
+          topics = data.topics;
+          $("topic").innerHTML = topics
+            .map(
+              (topic) =>
+                `<option value="${escapeHtml(topic.id)}"${
+                  topic.id === data.default ? " selected" : ""
+                }>${escapeHtml(topic.label)}</option>`,
+            )
+            .join("");
+          describeTopic();
+        })
+        .catch(() => {});
+
+      $("topic").addEventListener("change", describeTopic);
 
       fetch("/api/providers")
         .then((response) => response.json())

@@ -21,7 +21,7 @@
     "render": "node scripts/render-video.mjs",
     "deliver": "node scripts/deliver-video.mjs",
     "verify": "node scripts/verify-video.mjs",
-    "check:scripts": "node --check scripts/lib.mjs && node --check scripts/doctor.mjs && node --check scripts/new-video.mjs && node --check scripts/generate-images.mjs && node --check scripts/generate-images-local.mjs && node --check scripts/generate-images-flux2.mjs && node --check scripts/generate-images-flux2-local.mjs && node --check scripts/generate-images-cloudflare.mjs && node --check scripts/image-worker-common.mjs && node --check scripts/generate-images-gemini.mjs && node --check scripts/voicebox-profile.mjs && node --check scripts/narration-audio.mjs && node --check scripts/validate-narration.mjs && node --check scripts/generate-voice.mjs && node --check scripts/generate-story.mjs && node --check scripts/pipeline.mjs && node --check scripts/render-video.mjs && node --check scripts/deliver-video.mjs && node --check scripts/verify-video.mjs && node --check scripts/prompt-profiles.mjs && node --check scripts/prepare-script.mjs && node --check scripts/compose-video.mjs && node --check scripts/caption-overlay.mjs && node --check scripts/compose-slideshow.mjs && node --check scripts/compose-living-storybook.mjs && node --check scripts/studio.mjs && node --check scripts/align-words.mjs && node --check scripts/word-alignment.mjs && node --check scripts/image-styles.mjs && node --check scripts/compose-monologue.mjs && node --check scripts/studio-controls.test.mjs",
+    "check:scripts": "node --check scripts/lib.mjs && node --check scripts/doctor.mjs && node --check scripts/new-video.mjs && node --check scripts/generate-images.mjs && node --check scripts/generate-images-local.mjs && node --check scripts/generate-images-flux2.mjs && node --check scripts/generate-images-flux2-local.mjs && node --check scripts/generate-images-cloudflare.mjs && node --check scripts/image-worker-common.mjs && node --check scripts/generate-images-gemini.mjs && node --check scripts/voicebox-profile.mjs && node --check scripts/narration-audio.mjs && node --check scripts/validate-narration.mjs && node --check scripts/generate-voice.mjs && node --check scripts/generate-story.mjs && node --check scripts/pipeline.mjs && node --check scripts/render-video.mjs && node --check scripts/deliver-video.mjs && node --check scripts/verify-video.mjs && node --check scripts/prompt-profiles.mjs && node --check scripts/topics.mjs && node --check scripts/topics.test.mjs && node --check scripts/prepare-script.mjs && node --check scripts/compose-video.mjs && node --check scripts/caption-overlay.mjs && node --check scripts/compose-slideshow.mjs && node --check scripts/compose-living-storybook.mjs && node --check scripts/studio.mjs && node --check scripts/align-words.mjs && node --check scripts/word-alignment.mjs && node --check scripts/image-styles.mjs && node --check scripts/compose-monologue.mjs && node --check scripts/studio-controls.test.mjs",
     "test:prompts": "node scripts/prompt-profiles.test.mjs",
     "test:images": "node scripts/image-providers.test.mjs",
     "test:audio": "node --test scripts/narration-audio.test.mjs",
@@ -32,7 +32,9 @@
     "images:flux2": "node scripts/generate-images-flux2.mjs",
     "images:cloudflare": "node scripts/generate-images-cloudflare.mjs",
     "align": "node scripts/align-words.mjs",
-    "compose:monologue": "node scripts/compose-monologue.mjs"
+    "compose:monologue": "node scripts/compose-monologue.mjs",
+    "test:topics": "node --test scripts/topics.test.mjs",
+    "test": "npm run check:scripts && npm run test:prompts && npm run test:topics && npm run test:images && npm run test:audio && npm run test:captions && npm run test:studio"
   },
   "dependencies": {
     "@google/genai": "2.13.0"

@@ -524,6 +524,11 @@ for (const [index, item] of ordered.entries()) {
       finalPath,
     ]);
   } else {
+    // Same light grain-and-vignette look the FLUX backends use (image-worker-common.mjs), kept
+    // inline here since this file already duplicates its own copies of shared helpers like
+    // seedFor rather than importing them.
+    const paperGrain = "noise=alls=14:allf=t+u,vignette=PI/5,eq=saturation=0.92:contrast=1.03";
+    const filter = gen.postProcess === "paper-grain" ? `${framing},${paperGrain}` : framing;
     await run("ffmpeg", [
       "-y",
       "-loglevel",
@@ -531,7 +536,7 @@ for (const [index, item] of ordered.entries()) {
       "-i",
       rawPath,
       "-vf",
-      framing,
+      filter,
       finalPath,
     ]);
   }

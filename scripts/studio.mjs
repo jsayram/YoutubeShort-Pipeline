@@ -16,6 +16,7 @@ import {
   writeJson,
 } from "./lib.mjs";
 import { loadStyles, resolveStyles } from "./image-styles.mjs";
+import { DEFAULT_TOPIC_ID, loadTopics } from "./topics.mjs";
 import {
   listPromptBackups,
   promoteProviderDefault,
@@ -39,6 +40,9 @@ const { flags } = parseArgs();
 const port = Number(flags.port ?? process.env.STUDIO_PORT ?? 4300);
 const studioDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "studio");
 const videosRoot = path.join(repoRoot, "videos");
+// One place to change when a style is retired. These ids were previously inlined at four call
+// sites, so deleting the style they named silently broke Studio.
+const DEFAULTS = { style: "flux2-storybook", promptStyle: "photographic", topic: DEFAULT_TOPIC_ID };
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -201,6 +205,7 @@ async function startRun({ slug, title, scriptText, options }) {
       const chosen = voices.find((voice) => voice.name === options.profile);
       if (chosen?.engine) prepareArgs.push("--engine", chosen.engine);
     }
+    if (options.topic) prepareArgs.push("--topic", options.topic);
     if (options.style) {
       prepareArgs.push("--style", options.style);
       if (options.fast) prepareArgs.push("--fast");
@@ -909,6 +914,7 @@ const server = http.createServer(async (request, response) => {
           rendered,
           captionsEnabled: config.captions?.enabled === true,
           styleId: config.imageGen?.style ?? null,
+          topicId: config.topic ?? null,
         });
       }
       sendJson(response, 200, { projects });
@@ -982,6 +988,7 @@ const server = http.createServer(async (request, response) => {
           script: await readNarration(source),
           captionsEnabled: config?.captions?.enabled === true,
           styleId: config?.imageGen?.style ?? null,
+          topicId: config?.topic ?? null,
         });
         return;
       }
@@ -1014,6 +1021,7 @@ const server = http.createServer(async (request, response) => {
         from: source,
         captionsEnabled: imported?.captions?.enabled === true,
         styleId: imported?.imageGen?.style ?? null,
+        topicId: imported?.topic ?? null,
         // Hand the project's narration back so the script box shows what this video actually
         // says, rather than leaving the previous project's text sitting there.
         script: await readNarration(destination),
@@ -1062,14 +1070,28 @@ const server = http.createServer(async (request, response) => {
         })),
         speedLora,
         speedSampling,
-        default: "flux2-storybook",
+        default: DEFAULTS.style,
+      });
+      return;
+    }
+
+    if (route === "/api/topics") {
+      const topics = await loadTopics();
+      sendJson(response, 200, {
+        topics: topics.map((topic) => ({
+          id: topic.id,
+          label: topic.label,
+          summary: topic.summary ?? null,
+          hasCast: (topic.cast?.mode ?? "none") !== "none",
+        })),
+        default: DEFAULTS.topic,
       });
       return;
     }
 
     if (route === "/api/prompt-editor" && request.method === "GET") {
       const slug = String(url.searchParams.get("slug") ?? "").trim();
-      const styleId = String(url.searchParams.get("style") ?? "photographic").trim();
+      const styleId = String(url.searchParams.get("style") ?? DEFAULTS.promptStyle).trim();
       if (slug && !validSlug(slug)) {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
@@ -1224,7 +1246,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (route === "/api/prompt-editor/default/backups" && request.method === "GET") {
-      const styleId = String(url.searchParams.get("style") ?? "photographic").trim();
+      const styleId = String(url.searchParams.get("style") ?? DEFAULTS.promptStyle).trim();
       const profileId = await promptProfileIdFor(styleId);
       const backups = await listPromptBackups({ profileId });
       sendJson(response, 200, { backups: backups.map(({ name }) => name) });

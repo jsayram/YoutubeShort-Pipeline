@@ -1,0 +1,33 @@
+{
+  "id": "neutral",
+  "label": "Neutral (no fixed cast)",
+  "summary": "No recurring characters and no emotional arc imposed on the script. Each scene is read literally from its own line, so the same engines and looks can serve crypto, coding, finance, animals, or anything else. Use this as the starting point for a new topic pack.",
+  "castTags": "",
+  "topicDirection": "",
+  "storyBeats": {
+    "single": "standalone beat",
+    "opening": "opening",
+    "early": "development",
+    "middle": "turning point",
+    "late": "reflection",
+    "final": "conclusion"
+  },
+  "sentimentRules": [],
+  "fallbackSentiment": "clear and matter-of-fact, matching whatever the line itself conveys",
+  "cast": {
+    "mode": "none"
+  },
+  "personSignal": "\\b(?:i|me|my|you|your|we|our|they|them|person|people|human|man|woman)\\b",
+  "subjectTypePerson": "one human figure, full body",
+  "subjectTypeOther": "one clearly recognizable subject drawn from the line",
+  "continuityTemplate": "Scene {{sceneNumber}} of {{total}}. Change the subject, composition, camera distance, and lighting from neighboring scenes.",
+  "sceneDirectionRules": [],
+  "fallbackVisualAction": "Show the literal subject of the narration line as the main element of the frame; do not invent a story beyond what the line states.",
+  "fallbackShots": [
+    "Wide environmental view establishing the setting.",
+    "Medium view centered on the single main subject.",
+    "Close detail view of the most concrete object in the line.",
+    "High or low angle that makes the subject's scale readable."
+  ],
+  "negatives": ""
+}

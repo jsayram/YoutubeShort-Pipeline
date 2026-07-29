@@ -5,8 +5,10 @@ import { applyStyle, loadStyles, resolveStyles } from "./image-styles.mjs";
 import {
   loadPromptState,
   regenerateProjectScenePrompts,
+  resolveCastAge,
   resolveProjectPromptProfile,
 } from "./prompt-profiles.mjs";
+import { DEFAULT_TOPIC_ID, resolveTopic } from "./topics.mjs";
 
 await loadEnv();
 
@@ -60,6 +62,15 @@ const selectedStyle = localStyles.find((style) => style.id === selectedStyleId);
 const profileId = selectedStyle?.promptProfile ?? selectedStyleId;
 const { effective: effectivePromptProfile, projectOverride } =
   await resolveProjectPromptProfile({ profileId, projectPath: projectDir });
+// Topic is independent of both the engine and the look: it decides what the scenes are about,
+// so the same style can serve romance today and crypto or animals later. It sticks to the
+// project so a later CLI run builds the same prompts as the Studio run that created it.
+const selectedTopicId = String(flags.topic ?? config.topic ?? DEFAULT_TOPIC_ID);
+const topic = await resolveTopic(selectedTopicId);
+config.topic = topic.id;
+// Age comes from the whole script, so the recurring cast never changes age between scenes.
+const castAge = resolveCastAge(lines.join(" "), topic);
+
 const promptState = await loadPromptState(projectDir);
 const hasTrackedEdits =
   promptState.provider === profileId && (promptState.editedSceneIds?.length ?? 0) > 0;
@@ -78,6 +89,7 @@ if (
   const regenerated = await regenerateProjectScenePrompts({
     profileId,
     projectPath: projectDir,
+    topicId: topic.id,
     preserveEdited: keep,
   });
   console.log(
@@ -88,6 +100,7 @@ if (
   console.log(
     `Prompt profile: ${profileId} (${projectOverride ? "video override" : "provider default"}).`,
   );
+  console.log(`Topic: ${topic.id} (${topic.label})${castAge ? ` · cast: ${castAge.descriptor}` : ""}.`);
   console.log(`Wrote ${lines.length} image prompt(s).`);
 }
 
@@ -137,7 +150,17 @@ if (flags.style) {
   // A video's override is deliberately applied after the provider preset. This makes it local
   // to this project; it cannot leak into future videos unless the user explicitly promotes it.
   config.imageGen.styleSuffix = effectivePromptProfile.stylePrompt;
-  config.imageGen.negativeExtra = effectivePromptProfile.negativePrompt;
+  // The look supplies negatives about medium and rendering; the topic supplies negatives about
+  // cast. Joining them here is what lets one look serve any topic.
+  config.imageGen.negativeExtra = [
+    effectivePromptProfile.negativePrompt,
+    topic.negatives,
+    castAge?.negatives,
+    topic.cast?.age?.safetyNegatives,
+  ]
+    .filter((part) => part && part.trim())
+    .map((part) => part.replaceAll("{{age}}", castAge?.descriptor ?? ""))
+    .join(", ");
   const bits = [style.label, style.checkpoint].filter(Boolean);
   if (config.imageGen.loras?.length) {
     bits.push(`loras: ${config.imageGen.loras.map((lora) => lora.name).join(", ")}`);

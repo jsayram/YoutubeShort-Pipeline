@@ -8,6 +8,7 @@ import {
   analyzeVoiceClip,
   ensureVoiceClipQuietTail,
   probeAudioDuration,
+  transcriptEndsWith,
 } from "./narration-audio.mjs";
 
 test("quiet-tail repair preserves speech and appends enough silence", async () => {
@@ -42,4 +43,11 @@ test("quiet-tail repair preserves speech and appends enough silence", async () =
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }
+});
+
+test("final-word check tolerates homophones Whisper spells differently", () => {
+  assert.ok(transcriptEndsWith({ words: [{ text: "peace" }] }, "piece"));
+  assert.ok(transcriptEndsWith({ words: [{ text: "knight" }] }, "night"));
+  assert.ok(transcriptEndsWith({ words: [{ text: "piece" }] }, "piece"));
+  assert.ok(!transcriptEndsWith({ words: [{ text: "xyzzy" }] }, "piece"));
 });

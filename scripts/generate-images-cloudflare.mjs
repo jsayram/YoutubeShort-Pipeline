@@ -1,16 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { loadEnv, parseArgs, readJson, run, videoDir } from "./lib.mjs";
 import {
-  loadEnv,
-  parseArgs,
-  readJson,
-  run,
-  scrubTextNouns,
-  splitNegations,
-  stripQuotedText,
-  videoDir,
-} from "./lib.mjs";
-import {
+  buildFluxPrompt,
   finishImageRun,
   installGenerationLock,
   promptWithReferences,
@@ -60,9 +52,7 @@ await fs.mkdir(outputDir, { recursive: true });
 await fs.mkdir(referenceDir, { recursive: true });
 
 function cleanPrompt(item) {
-  const source = splitNegations(stripQuotedText(item.prompt));
-  const style = splitNegations(gen.styleSuffix ?? "");
-  return scrubTextNouns([source.positive, style.positive].filter(Boolean).join(". "));
+  return buildFluxPrompt(item, gen.styleSuffix);
 }
 
 async function cloudflareImage({ prompt, width, height, seed, referenceFiles = [] }) {

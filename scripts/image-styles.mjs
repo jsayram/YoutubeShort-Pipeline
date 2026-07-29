@@ -12,13 +12,22 @@ export async function loadStyles() {
     readJson(path.join(repoRoot, "templates", "prompt.json")),
   ]);
   const profiles = prompts.providers ?? {};
+  // A style whose prompt profile has been deleted is reported as broken rather than thrown on.
+  // Retiring one style must not take the whole catalogue down with it — otherwise Studio cannot
+  // list *any* provider and the only way back is to hand-repair JSON.
   return styles.map((style) => {
     const profileId = style.promptProfile ?? style.id;
     const profile = profiles[profileId];
     if (!profile) {
-      throw new Error(
-        `Image style "${style.id}" references missing prompt profile "${profileId}".`,
-      );
+      return {
+        ...style,
+        promptProfile: profileId,
+        sceneTemplate: "",
+        stylePrompt: "",
+        negativeExtra: "",
+        broken: true,
+        reason: `Prompt profile "${profileId}" is missing from templates/prompt.json.`,
+      };
     }
     return {
       ...style,
@@ -62,13 +71,16 @@ export async function comfyModels(baseUrl) {
   };
 }
 
+// Fragments are a priority list, not a set: `["animagine", "illustrious"]` means "animagine if it
+// is installed, otherwise illustrious". Iterate fragments rather than files, because iterating
+// files makes the winner depend on whatever order ComfyUI happens to list its directory in — so
+// merely installing a new checkpoint could silently repoint an existing style at a different model.
 function firstMatch(files, fragments) {
-  const wanted = (fragments ?? []).filter(Boolean);
-  if (!wanted.length) return null;
-  return (
-    files.find((file) => wanted.some((piece) => file.toLowerCase().includes(piece.toLowerCase()))) ??
-    null
-  );
+  for (const piece of (fragments ?? []).filter(Boolean)) {
+    const hit = files.find((file) => file.toLowerCase().includes(piece.toLowerCase()));
+    if (hit) return hit;
+  }
+  return null;
 }
 
 // Step-reduction LoRAs are orthogonal to style: they make any preset faster without changing
@@ -82,6 +94,12 @@ export async function resolveStyles(baseUrl) {
   const speedLora = models ? firstMatch(models.loras, SPEED_FRAGMENTS) : null;
 
   const resolved = styles.map((style) => {
+    // A style missing its prompt profile can never render; surface it as unavailable with the
+    // reason instead of letting it look selectable.
+    if (style.broken) {
+      return { ...style, available: false, checkpoint: null, loras: [] };
+    }
+
     if (style.provider === "cloudflare-flux2") {
       const configured = Boolean(
         process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN,

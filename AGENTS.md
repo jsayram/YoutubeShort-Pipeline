@@ -79,6 +79,32 @@ and the list of seek-safe properties live in the project's `design.md`.
 - Use hard cuts for energy, push transitions for progression, and crossfades only for related ideas.
 - Inspect a contact sheet before rendering.
 
+## Three independent axes
+
+A video is defined by three choices that must stay separable. Keep them apart when adding
+anything; collapsing them is what previously made every look assume a romantic couple.
+
+| Axis | Answers | Lives in |
+|---|---|---|
+| Engine | which model renders it | `templates/image-styles.json` + `scripts/generate-images-*.mjs` |
+| Look | how it is drawn | `templates/prompt.json` |
+| Topic | what it is about | `templates/topics/*.json` |
+
+- A **look profile** describes medium, palette, and rendering only. It must not name a cast,
+  a relationship, or a subject. Its negative prompt covers medium and lettering, never cast.
+- A **topic pack** owns cast, sentiment vocabulary, story beats, scene-direction rules, and
+  cast negatives. `cast.mode: "none"` means no people are assumed; `{{castPlan}}`,
+  `{{castBrief}}`, `{{castTags}}`, and `{{topicDirection}}` then resolve to nothing and
+  `buildScenePrompt` tidies the gap.
+- Adding a topic is a new JSON file in `templates/topics/`, nothing else. Start from
+  `neutral.json`.
+- Retiring a style is a JSON edit; retiring an engine is one line in `generate-images.mjs`
+  plus its backend script. `loadStyles` reports a style whose profile was deleted as `broken`
+  rather than throwing, so one retirement cannot take the catalogue down.
+- Default ids live in `DEFAULTS` in `scripts/studio.mjs`. Do not inline a style id anywhere else.
+- Run `npm test` after touching any of the three; `scripts/topics.test.mjs` asserts that a
+  cast-less topic leaves no cast text in any look.
+
 ## Integration boundaries
 
 - Never put API keys in notes, prompts, commits, or generated manifests.

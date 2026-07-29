@@ -1,7 +1,27 @@
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
-import { commandOutput, run, writeJson } from "./lib.mjs";
+import { commandOutput, run, scrubTextNouns, splitNegations, stripQuotedText, writeJson } from "./lib.mjs";
+
+// FLUX's ComfyUI workflow zeroes out its "negative" conditioning (ConditioningZeroOut) rather
+// than encoding real negative text, and both local and Cloudflare FLUX.2 run at guidance 1, where
+// classifier-free guidance collapses to the positive prediction alone. So a profile's
+// negativePrompt field, and anything phrased as a negation in the positive text, never reaches
+// the model here — unlike comfyui/SDXL's real CFG negative or Gemini's own hard-requirement
+// string. FLUX also renders text unusually well, so a narration line that reads like dialogue
+// (quoted lyrics, a spoken line) tempts it into drawing a literal speech bubble or comic panel
+// instead of an illustration. This has to be stated as a positive instruction FLUX actually reads.
+const FLUX_NO_TEXT_REQUIREMENT =
+  "Hard requirement: this is one single silent illustrated scene with no readable text, letters, " +
+  "numbers, captions, dialogue, or speech bubbles anywhere in it, and it is not a comic strip or " +
+  "multi-panel layout. Every surface that could carry writing is left blank.";
+
+export function buildFluxPrompt(item, styleSuffix) {
+  const source = splitNegations(stripQuotedText(item.prompt));
+  const style = splitNegations(styleSuffix ?? "");
+  const cleaned = scrubTextNouns([source.positive, style.positive].filter(Boolean).join(". "));
+  return [cleaned, FLUX_NO_TEXT_REQUIREMENT].filter(Boolean).join("\n\n");
+}
 
 // The salt defaults to 0 so a plain re-run still reproduces the same image. Forced
 // regeneration passes a fresh random salt (see resolveSeedSalt) so the hash lands elsewhere.

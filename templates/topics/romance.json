@@ -1,0 +1,202 @@
+{
+  "id": "romance",
+  "label": "Romance / heartbreak",
+  "summary": "Two recurring adults across a relationship arc: meeting, deepening, a turning point, and a final emotional choice. Scenes stay grounded in ordinary domestic places and imply the absent partner rather than always showing both people.",
+  "castTags": "{{age}} characters",
+  "topicDirection": "Both recurring characters are {{age}}s, {{ageDetail}}. Show expressive faces, natural hands, and body language, and never default to a static couple portrait or two people standing face-to-face.",
+  "storyBeats": {
+    "single": "standalone emotional beat",
+    "opening": "opening and first encounter",
+    "early": "connection deepening",
+    "middle": "turning point and emotional complication",
+    "late": "reflection leading toward resolution",
+    "final": "resolution and emotional choice"
+  },
+  "sentimentRules": [
+    {
+      "match": "\\b(?:fought|fight|argument|argued|angry|hurt|betray|blame)\\b",
+      "phrase": "hurt and tension softening into vulnerable reconciliation"
+    },
+    {
+      "match": "\\b(?:left|leave|leaving|goodbye|gone|lost|missing|grief|grieving)\\b",
+      "phrase": "grief, distance, and aching absence"
+    },
+    {
+      "match": "\\b(?:alone|lonely|empty|silence|forgotten)\\b",
+      "phrase": "quiet loneliness and inward reflection"
+    },
+    {
+      "match": "\\b(?:laughed|laugh|smiled|smile|joy|happy)\\b",
+      "phrase": "unforced joy, surprise, and growing affection"
+    },
+    {
+      "match": "\\b(?:love|loved|home|stay|stayed|choose|choice|lucky|together)\\b",
+      "phrase": "tender intimacy, safety, and deliberate commitment"
+    },
+    {
+      "match": "\\b(?:remember|memory|noticed|realized|thought|thinking)\\b",
+      "phrase": "gentle realization and affectionate reflection"
+    }
+  ],
+  "fallbackSentiment": "restrained warmth and emotionally honest reflection",
+  "cast": {
+    "mode": "recurring-pair",
+    "pairAtTurningPointRatio": 0.57,
+    "pairPlan": "Two {{age}} figures together at medium distance, filling roughly a third of the frame height, shown facing each other, seen from behind holding hands, or walking side by side. Read them as solid flat silhouettes and posture, with faces turned away, shadowed, or left unrendered.",
+    "soloAPlan": "One {{age}} woman alone at medium distance, filling roughly a third of the frame height, seen from behind or in profile as a solid flat silhouette with her face turned away or unrendered. The absent partner is implied only by an empty chair, a second cup, or a long shadow.",
+    "soloBPlan": "One {{age}} man alone at medium distance, filling roughly a third of the frame height, seen from behind or in profile as a solid flat silhouette with his face turned away or unrendered. The absent partner is implied only by an empty chair, a second cup, or a long shadow.",
+    "pairBrief": "Two {{age}} figures at medium distance, silhouetted, faces not shown.",
+    "soloABrief": "One {{age}} woman at medium distance, silhouetted, face not shown.",
+    "soloBBrief": "One {{age}} man at medium distance, silhouetted, face not shown.",
+    "soloALabel": "woman",
+    "soloBLabel": "man",
+    "age": {
+      "default": {
+        "descriptor": "young adult",
+        "detail": "in their early-to-mid twenties, youthful unlined faces, contemporary casual clothing",
+        "negatives": "middle-aged, elderly, old man, old woman, grey hair, greying hair, wrinkled skin, aged face, weathered skin"
+      },
+      "overrideRules": [
+        {
+          "match": "\\b(?:old|older|elderly|aged|ageing|aging|grey[- ]hair\\w*|gray[- ]hair\\w*|wrinkl\\w*|decades|grandmother|grandfather|grandparents?|retired|retirement|a lifetime|golden years|fifty years|forty years|thirty years)\\b",
+          "descriptor": "older adult",
+          "detail": "later in life, lined faces, grey or greying hair, settled bearing",
+          "negatives": ""
+        }
+      ],
+      "safetyNegatives": "child, children, kid, teenager, teen, adolescent, minor, underage, schoolgirl, schoolboy, school uniform, infant, toddler, loli, shota"
+    },
+    "objectPlan": "No people anywhere in this frame. Show only the room, objects, and landscape the narration names, arranged as a quiet still life that carries the feeling on its own.",
+    "objectBrief": "No people; objects and setting only."
+  },
+  "keywordStripPattern": "\\bleaves?\\b(?=\\s+(?:me|you|us|them|him|her|it)\\b)",
+  "personSignal": "\\b(?:i|me|my|mine|you|your|yours|we|our|ours|he|him|his|she|her|hers|they|them|their|person|people|human|man|woman|boy|girl|child|ghost|thief|lover|friend)\\b",
+  "subjectTypePerson": "one human figure, full body",
+  "subjectTypeOther": "one clearly recognizable non-human subject",
+  "continuityTemplate": "Scene {{sceneNumber}} of {{total}}, with its own distinct location, camera distance, and light.",
+  "sceneDirectionRules": [
+    {
+      "match": "\\bstopped asking\\b.*\\bmade it home\\b|\\bmade it home\\b",
+      "visualAction": "A lone {{age}} arrives at a dark home doorway with keys still in hand and checks a silent phone that never received the familiar check-in.",
+      "shotPlan": "Wide night interior with the doorway, keys, and unlit phone clearly separated."
+    },
+    {
+      "match": "\\bjob\\b.*\\bexhausted her\\b|\\bexhausted her\\b",
+      "visualAction": "An exhausted {{age}} woman sits alone beneath a late workplace light, shoulders collapsed beside unfinished work and a clock.",
+      "shotPlan": "Side view at a desk with one figure, the clock, and long work shadows."
+    },
+    {
+      "match": "\\brepl(?:y|ies)\\b.*\\bhours\\b|\\bentire days\\b",
+      "visualAction": "A lone {{age}} waits beside a silent phone while daylight, darkness, and calendar pages imply hours becoming entire days.",
+      "shotPlan": "High-angle table scene built around the phone, calendar, and changing window light."
+    },
+    {
+      "match": "\\bkept shrinking\\b|\\bnotice me again\\b",
+      "visualAction": "One {{age}} curls inward on a small chair in an oversized room, surrounded by empty space and a distant turned-away shadow.",
+      "shotPlan": "Very wide composition that makes the figure visually small without changing their anatomy."
+    },
+    {
+      "match": "\\bstopped reaching\\b",
+      "visualAction": "A hand withdraws from a face-down phone as the lone {{age}} turns away from an empty chair.",
+      "shotPlan": "Close side composition focused on the retreating hand, phone, and empty chair."
+    },
+    {
+      "match": "\\btexted instantly\\b|\\bseemed distant\\b",
+      "visualAction": "The phone suddenly lights after the {{age}} has turned away; the notification is unreadable, but the startled pause is clear.",
+      "shotPlan": "Over-the-shoulder night view with the glowing phone low in frame and no readable screen text."
+    },
+    {
+      "match": "\\bunderstood\\b.*\\bbecome\\b|\\bwhat we had become\\b",
+      "visualAction": "A lone {{age}} studies a reflection split by a doorway, with two empty chairs revealing the relationship's distance.",
+      "shotPlan": "Still symmetrical interior broken by the doorway and reflection, with the person off-center."
+    },
+    {
+      "match": "\\bmissed me\\b.*\\bleaving\\b|\\bstarted leaving\\b",
+      "visualAction": "One {{age}} crosses a doorway carrying a small bag while an outstretched hand appears only after distance has opened between them.",
+      "shotPlan": "Deep hallway view with the leaving figure moving away and the late-reaching hand in foreground."
+    },
+    {
+      "match": "\\bmet\\b|\\bfirst encounter\\b",
+      "visualAction": "Two {{age}}s cross paths in an unmistakably ordinary weekday place such as a small shop, bus stop, or office lobby; one pauses and glances back while a mundane Tuesday detail grounds the meeting.",
+      "shotPlan": "Wide establishing view with both people separated in depth, everyday surroundings visible, and the meeting happening through movement rather than a posed face-to-face portrait."
+    },
+    {
+      "match": "\\b(?:laughed|laughing|laugh)\\b",
+      "visualAction": "Feature the solo {{age}} {{featured}} smiling and losing their train of thought as laughter comes from just outside the frame; imply the unseen partner through one hand at the edge, a shifted chair, or a cast shadow.",
+      "shotPlan": "Lively medium side view with one expressive face and suspended conversational gesture prominent; keep the unseen partner outside the composition."
+    },
+    {
+      "match": "\\b(?:stayed up|up too late|talking all night|talked all night)\\b",
+      "visualAction": "Show the solo {{age}} {{featured}} seated on a sofa or floor late at night, leaning toward someone just beyond the frame in deep conversation; two cooling mugs, an empty foreground seat, a dim lamp, and a late clock imply the relationship.",
+      "shotPlan": "Intimate interior three-quarter view with one complete figure in warm lamplight, an empty conversational space in the foreground, and nighttime darkness around them."
+    },
+    {
+      "match": "\\bcoffee\\b|\\btea\\b",
+      "and": "\\border\\b|\\bcup\\b|\\bdrink\\b",
+      "visualAction": "Feature the solo {{age}} {{featured}} receiving their familiar coffee order before asking; only the unseen partner's hand enters the frame to place the cup as recognition and unspoken affection register.",
+      "shotPlan": "Close over-the-shoulder detail built around the cup, hands, and small surprised expression; use a caf\u00e9 counter or kitchen table, not a seaside landscape."
+    },
+    {
+      "match": "\\b(?:fought|fight|argument|argued|making up|made up|forgive|forgave)\\b",
+      "visualAction": "After a small argument, the pair begin on opposite sides of a room with guarded posture, then bridge the distance through a tentative touch that feels like returning home.",
+      "shotPlan": "Wide interior composition using negative space between them, a doorway or table dividing the frame, and joined hands becoming the focal point."
+    },
+    {
+      "match": "\\b(?:fall asleep|fell asleep|asleep|sleeping)\\b",
+      "visualAction": "Feature the solo {{age}} {{featured}} awake at the bedside with a tender, grateful expression; imply the sleeping partner only as a softly abstracted blanket shape, hand, or shadow rather than a second complete figure.",
+      "shotPlan": "Quiet intimate bedroom view from above or beside the bed, with one readable face, blanket folds, and soft shadow carrying the absent partner's presence."
+    },
+    {
+      "match": "\\bfireworks?\\b|\\bquietly wanting\\b|\\bwanting to stay\\b",
+      "visualAction": "Instead of spectacle, show the solo {{age}} {{featured}} setting down keys and a coat by the door, choosing not to leave; an empty lit chair, second mug, or familiar shadow quietly implies the loved one.",
+      "shotPlan": "Restrained domestic wide shot with one complete person, the doorway and set-down keys visible, warm evening light, and no fireworks or grand romantic pose."
+    },
+    {
+      "match": "\\b(?:choose|choice)\\b.*\\bstay\\b|\\bso i stay\\b|\\bdecide\\b.*\\bstay\\b|\\bevery single day\\b",
+      "visualAction": "At morning light, the pair deliberately move further into their shared home together, one reaching back for the other's hand as the open doorway remains behind them.",
+      "shotPlan": "Resolved rear three-quarter view with forward movement, joined hands, warm light ahead, and a noticeably different angle from every earlier scene."
+    },
+    {
+      "match": "\\b(?:suitcase|packed|depart|goodbye|left me|walked away)\\b",
+      "visualAction": "A departing {{age}} carries a suitcase through a doorway while the person left behind reaches out but stops short, making the emotional distance physical.",
+      "shotPlan": "Deep hallway or station composition with the figures moving in opposite directions and strong distance between foreground and background."
+    },
+    {
+      "match": "\\b(?:rain|storm|umbrella)\\b",
+      "visualAction": "The emotion becomes physical through rain: one {{age}} hesitates beneath an umbrella while the other crosses the wet street toward or away from them.",
+      "shotPlan": "Vertical exterior view with reflections, diagonal movement, and the umbrella used as a clear story prop rather than decoration."
+    },
+    {
+      "match": "\\b(?:photo|photograph|memory|remember)\\b",
+      "visualAction": "A {{age}} handles a worn photograph or keepsake while the remembered relationship appears only through their expression, hands, and the empty place beside them.",
+      "shotPlan": "Close interior composition focused on hands and the keepsake, with an empty chair or unoccupied side of the frame carrying the absence."
+    }
+  ],
+  "fallbackShots": [
+    "Medium-wide vertical composition with clear foreground, midground, and background separation.",
+    "Medium composition with the subject placed off-centre and generous empty space above.",
+    "Low-angle medium view with a large simple sky or wall filling the upper frame.",
+    "Slightly high medium view looking down across the surface or floor into the space beyond."
+  ],
+  "negatives": "two {{age}} women together, female couple, two {{age}} men together, male couple, same-sex couple, same-gender pair, ambiguous two-person cast, static matched couple portrait, two people standing face-to-face by default, duplicate person, crowd",
+  "fallbackVisualActions": {
+    "pair": [
+      "Two figures stand close together at medium distance, seen from behind, looking out at the setting the narration describes.",
+      "Two figures walk side by side through the place the narration names, hands nearly touching, seen from behind.",
+      "Two figures face each other at medium distance in the setting the narration implies, heads slightly lowered.",
+      "Two figures sit together on a step, bench, or bed edge, seen from behind against an open background."
+    ],
+    "solo": [
+      "One figure stands at a window or doorway at medium distance, turned away, with the object the narration names nearby.",
+      "One figure sits on the edge of a bed, chair, or step, seen from behind, an empty space beside them.",
+      "One figure walks alone through the place the narration describes, seen from behind at medium distance.",
+      "One figure leans against a wall or railing in profile, holding the object the narration names."
+    ],
+    "object": [
+      "A still life of the object the narration names, resting on a table or windowsill in low directional light, no people present.",
+      "The empty room the narration describes, unmade bed or open doorway, morning light across the floor, no people present.",
+      "A close view of a small everyday object from the narration, alone on a plain surface with a long shadow, no people present.",
+      "The exterior place the narration implies, empty of people, under a wide gradient sky."
+    ]
+  }
+}
