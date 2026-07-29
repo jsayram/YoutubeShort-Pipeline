@@ -275,5 +275,56 @@
     "summary": "Cloud-generated painterly editorial scenes using the shared distant rough-brush sunset palette. Needs GEMINI_API_KEY and billing.",
     "download": "No download. Set GEMINI_API_KEY in .env with image-generation quota enabled.",
     "sampling": {}
+  },
+  {
+    "id": "simple",
+    "label": "Simple (script-driven)",
+    "provider": "comfyui",
+    "promptProfile": "simple",
+    "summary": "Minimal, unopinionated prompt built mostly from the script's own words. No fixed shot plan, cast rule, or art direction: composition and style are left to the model's own reading of each line. Works with whatever SDXL checkpoint is already installed.",
+    "match": [
+      "realvis",
+      "juggernaut",
+      "realistic",
+      "photon",
+      "animagine",
+      "illustrious",
+      "pony",
+      "anything",
+      "meina",
+      "noob",
+      "dreamshaper"
+    ],
+    "download": "Works with any installed SDXL checkpoint; no download needed if another style already runs.",
+    "sampling": {
+      "steps": 28,
+      "cfg": 6,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras"
+    }
+  },
+  {
+    "id": "flat-line-poetry",
+    "label": "Flat line-art poetry (webtoon, mood sky)",
+    "provider": "flux2-local",
+    "fallbackProvider": "cloudflare-flux2",
+    "promptProfile": "flat-line-poetry",
+    "postProcess": "paper-grain",
+    "summary": "Clean flat-color webtoon and graphic-novel line art: bold outlines, cel-shaded fills, and a smooth gradient sky that shifts warm or cool with the line's mood. A single silhouette figure per scene, paper grain added after generation. Matches quote-poetry Shorts (e.g. @WhisprsYT) rather than a painterly storybook look.",
+    "requiredModels": {
+      "diffusionModel": "flux-2-klein-4b.safetensors",
+      "textEncoder": "qwen_3_4b.safetensors",
+      "vae": "flux2-vae.safetensors"
+    },
+    "download": "Uses the same local FLUX.2 Klein install as the painted storybook style; no extra download needed.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 1,
+      "sampler": "euler",
+      "genWidth": 768,
+      "genHeight": 1344,
+      "outWidth": 1080,
+      "outHeight": 1920
+    }
   }
 ]

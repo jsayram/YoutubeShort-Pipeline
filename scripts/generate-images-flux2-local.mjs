@@ -15,6 +15,7 @@ import {
   installGenerationLock,
   promptWithReferences,
   referencesForScene,
+  resolveSeedSalt,
   seedFor,
   splitImageItems,
   writeExactImage,
@@ -30,6 +31,11 @@ const prompts = await readJson(path.join(projectDir, "content", "image-prompts.j
 const gen = config.imageGen ?? {};
 const { references, scenes } = splitImageItems(prompts, gen);
 const releaseLock = await installGenerationLock(projectDir, flags.project);
+
+const sceneSeedSalt = resolveSeedSalt(flags, flags.force);
+const referenceSeedSalt = resolveSeedSalt(flags, flags["force-references"]);
+if (sceneSeedSalt) console.log(`Forced regeneration: scene seed salt ${sceneSeedSalt}.`);
+if (referenceSeedSalt) console.log(`Forced regeneration: reference seed salt ${referenceSeedSalt}.`);
 
 const baseUrl = (process.env.COMFYUI_BASE_URL ?? "http://127.0.0.1:8188").replace(/\/$/, "");
 const diffusionModel =
@@ -235,7 +241,7 @@ try {
     const bytes = await generate({
       id: reference.id,
       prompt: cleanPrompt(reference),
-      seed: Number(reference.seed ?? seedFor(reference.id)),
+      seed: Number(reference.seed ?? seedFor(reference.id, referenceSeedSalt)),
       width: referenceWidth,
       height: referenceHeight,
       referenceHandles: [],
@@ -269,7 +275,7 @@ try {
     const itemStart = Date.now();
     const selectedReferences = referencesForScene(item, sharedReferences);
     const prompt = promptWithReferences(cleanPrompt(item), selectedReferences);
-    const seed = Number(item.seed ?? seedFor(item.id));
+    const seed = Number(item.seed ?? seedFor(item.id, sceneSeedSalt));
     const bytes = await generate({
       id: item.id,
       prompt,
@@ -283,6 +289,7 @@ try {
       finalPath,
       outWidth,
       outHeight,
+      postProcess: gen.postProcess ?? null,
     });
     console.log(
       `[${index + 1}/${scenes.length}] ${item.id} — ${((Date.now() - itemStart) / 1000).toFixed(1)}s`,

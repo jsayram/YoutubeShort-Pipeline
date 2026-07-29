@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
   loadEnv,
+  commandOutput,
   parseArgs,
   readJson,
   repoRoot,
@@ -277,7 +278,9 @@ async function startRun({ slug, title, scriptText, options }) {
 
     emit({ type: "done", slug });
   } catch (error) {
-    emit({ type: "error", message: String(error.message ?? error) });
+    if (!current?.resetting) {
+      emit({ type: "error", message: String(error.message ?? error) });
+    }
   } finally {
     if (current) current.done = true;
   }
@@ -386,6 +389,8 @@ async function emitVideo(slug) {
 // ---------------------------------------------------------------------------- voicebox
 
 const voiceboxUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
+const voiceboxPort = Number(new URL(voiceboxUrl).port || 17493);
+let serviceResetPromise = null;
 
 // Voicebox is the authority on which voices exist, so the picker reads them live rather than
 // keeping its own list that can drift out of date.
@@ -436,6 +441,7 @@ async function serviceSnapshot() {
 
   return {
     checkedAt: Date.now(),
+    resetting: Boolean(serviceResetPromise),
     services: [
       {
         id: "studio",
@@ -449,7 +455,11 @@ async function serviceSnapshot() {
       {
         id: "comfyui",
         name: "ComfyUI",
-        status: comfyRunning ? (runningJobs ? "busy" : "running") : "offline",
+        status: serviceResetPromise
+          ? "restarting"
+          : comfyRunning
+            ? (runningJobs ? "busy" : "running")
+            : "offline",
         kind: "service",
         detail: comfyRunning
           ? [
@@ -467,7 +477,7 @@ async function serviceSnapshot() {
       {
         id: "voicebox",
         name: "Voicebox",
-        status: voiceRunning ? "running" : "offline",
+        status: serviceResetPromise ? "restarting" : voiceRunning ? "running" : "offline",
         kind: "application",
         detail: voiceRunning
           ? [
@@ -495,6 +505,232 @@ async function serviceSnapshot() {
       },
     ],
   };
+}
+
+async function waitForJson(url, predicate, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const value = await fetchJson(url, 1200);
+    if (predicate(value)) return value;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return null;
+}
+
+async function listenerPids(portNumber) {
+  const output = await commandOutput("lsof", [
+    "-tiTCP:" + String(portNumber),
+    "-sTCP:LISTEN",
+  ]).catch(() => "");
+  return output
+    .split(/\s+/)
+    .map(Number)
+    .filter((pid) => Number.isInteger(pid) && pid > 1 && pid !== process.pid);
+}
+
+async function exactProcessPids(name) {
+  const output = await commandOutput("pgrep", ["-x", name]).catch(() => "");
+  return output
+    .split(/\s+/)
+    .map(Number)
+    .filter((pid) => Number.isInteger(pid) && pid > 1 && pid !== process.pid);
+}
+
+async function waitForNoProcesses(name, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!(await exactProcessPids(name)).length) return true;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return false;
+}
+
+async function waitForNoListener(portNumber, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!(await listenerPids(portNumber)).length) return true;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return false;
+}
+
+async function waitForVoiceboxStable(timeoutMs = 120000) {
+  const startedAt = Date.now();
+  let consecutive = 0;
+  while (Date.now() - startedAt < timeoutMs) {
+    const [health, profiles] = await Promise.all([
+      fetchJson(`${voiceboxUrl}/health`, 1800),
+      fetchJson(`${voiceboxUrl}/profiles`, 1800),
+    ]);
+    if (health?.status === "healthy" && Array.isArray(profiles)) {
+      consecutive += 1;
+      // A single health response can arrive before the profile/model layer is truly settled.
+      // Three complete checks make "ready" mean the app stayed ready, not merely opened a port.
+      if (consecutive >= 3) return { health, profiles };
+    } else {
+      consecutive = 0;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return null;
+}
+
+async function restartComfyUi() {
+  // First ask ComfyUI to abandon both the active prompt and anything queued. This also prevents
+  // a just-cancelled Studio worker from leaving a job that immediately starts after the restart.
+  await Promise.all([
+    fetch(`${comfyUrl}/interrupt`, { method: "POST" }).catch(() => null),
+    fetch(`${comfyUrl}/queue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clear: true }),
+    }).catch(() => null),
+  ]);
+
+  for (const pid of await listenerPids(8188)) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  }
+  await waitForJson(`${comfyUrl}/system_stats`, (value) => !value, 8000);
+
+  const comfyRoot = path.resolve(
+    String(process.env.COMFYUI_ROOT ?? path.join(process.env.HOME ?? "", "ComfyUI")),
+  );
+  const mainFile = path.join(comfyRoot, "main.py");
+  const configuredPython = process.env.COMFYUI_PYTHON;
+  const venvPython = path.join(comfyRoot, "venv", "bin", "python");
+  const python =
+    configuredPython ||
+    ((await fs.access(venvPython).then(() => true, () => false)) ? venvPython : "python3");
+  const exists = await fs.access(mainFile).then(() => true, () => false);
+  if (!exists) throw new Error(`Cannot restart ComfyUI because ${mainFile} does not exist.`);
+
+  const child = spawn(
+    python,
+    [
+      mainFile,
+      "--listen",
+      "127.0.0.1",
+      "--port",
+      "8188",
+      "--enable-cors-header",
+      `http://127.0.0.1:${port}`,
+    ],
+    { cwd: comfyRoot, detached: true, stdio: "ignore" },
+  );
+  child.unref();
+  const ready = await waitForJson(`${comfyUrl}/system_stats`, Boolean, 60000);
+  if (!ready) throw new Error("ComfyUI did not become ready after restarting.");
+}
+
+async function restartVoicebox() {
+  await run("osascript", ["-e", 'tell application "Voicebox" to quit'], {
+    stdio: "ignore",
+  }).catch(() => {});
+
+  // The API often disappears before the application process has finished quitting. Relaunching
+  // in that gap merely focuses the dying process and leaves the Voicebox window open with no
+  // server on port 17493. Wait for a real process exit, then escalate only if the app is stuck.
+  if (!(await waitForNoProcesses("voicebox", 15000))) {
+    for (const pid of await exactProcessPids("voicebox")) {
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+      }
+    }
+  }
+  if (!(await waitForNoProcesses("voicebox", 8000))) {
+    for (const pid of await exactProcessPids("voicebox")) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+      }
+    }
+  }
+  if (!(await waitForNoProcesses("voicebox", 3000))) {
+    throw new Error("The previous Voicebox process would not close.");
+  }
+
+  // Voicebox's server is a separate process and can outlive the app window. A surviving listener
+  // would make the newly opened app look healthy while it is actually talking to an orphan from
+  // the prior session, or prevent the new server from binding at all.
+  for (const pid of await listenerPids(voiceboxPort)) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
+  }
+  if (!(await waitForNoListener(voiceboxPort, 8000))) {
+    for (const pid of await listenerPids(voiceboxPort)) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+      }
+    }
+  }
+  if (!(await waitForNoListener(voiceboxPort, 3000))) {
+    throw new Error(`The previous Voicebox server would not release port ${voiceboxPort}.`);
+  }
+
+  await run("open", ["-na", "Voicebox"], { stdio: "ignore" });
+  const stable = await waitForVoiceboxStable();
+  if (!stable) {
+    throw new Error(
+      "Voicebox opened but its health and profile APIs did not remain stable after restarting.",
+    );
+  }
+}
+
+async function cancelRunForReset() {
+  const child = current?.child;
+  const cancelled = stopStageChild();
+  if (current && !current.done) {
+    current.resetting = true;
+    current.done = true;
+    emit({ type: "reset", message: "Pipeline cancelled for a full service restart." });
+  }
+  if (cancelled && child) {
+    await Promise.race([
+      new Promise((resolve) => child.once("exit", resolve)),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+  }
+  return cancelled;
+}
+
+async function resetAllServices() {
+  const cancelledRun = await cancelRunForReset();
+  const results = await Promise.allSettled([restartComfyUi(), restartVoicebox()]);
+  const failures = results
+    .map((result, index) =>
+      result.status === "rejected"
+        ? `${index === 0 ? "ComfyUI" : "Voicebox"}: ${result.reason?.message ?? result.reason}`
+        : null,
+    )
+    .filter(Boolean);
+  return {
+    cancelledRun,
+    restarted: {
+      comfyui: results[0].status === "fulfilled",
+      voicebox: results[1].status === "fulfilled",
+    },
+    failures,
+  };
+}
+
+function beginServiceReset() {
+  if (serviceResetPromise) return serviceResetPromise;
+  serviceResetPromise = resetAllServices().finally(() => {
+    serviceResetPromise = null;
+  });
+  return serviceResetPromise;
 }
 
 // ---------------------------------------------------------------------------- http
@@ -1000,6 +1236,15 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (route === "/api/services/reset" && request.method === "POST") {
+      // This endpoint is intentionally explicit and heavyweight. The ordinary status button only
+      // rereads health; this one cancels work and restarts both local model applications.
+      const result = await beginServiceReset();
+      result.snapshot = await serviceSnapshot();
+      sendJson(response, result.failures.length ? 503 : 200, result);
+      return;
+    }
+
     if (route === "/api/services/voicebox/open" && request.method === "POST") {
       try {
         await run("open", ["-a", "Voicebox"], { stdio: "ignore" });
@@ -1072,6 +1317,7 @@ const server = http.createServer(async (request, response) => {
     if (route === "/api/state") {
       sendJson(response, 200, {
         busy: Boolean(current && !current.done),
+        resetting: Boolean(serviceResetPromise),
         run: current
           ? { id: current.id, slug: current.slug, stages: current.stages, done: current.done }
           : null,
@@ -1084,6 +1330,12 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 409, { error: "A run is already in progress." });
         return;
       }
+      if (serviceResetPromise) {
+        sendJson(response, 409, {
+          error: "Local services are still restarting. Wait for Voicebox and ComfyUI to be ready.",
+        });
+        return;
+      }
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
       const scriptText = String(body.script ?? "").trim();
@@ -1093,6 +1345,17 @@ const server = http.createServer(async (request, response) => {
       }
       if (!scriptText) {
         sendJson(response, 400, { error: "Paste a script first." });
+        return;
+      }
+      // Opening the app window does not prove its model server is ready. Wait briefly for a
+      // manually launched Voicebox, and never begin the environment check in the half-started
+      // state that previously produced a false "Voicebox is not reachable" failure.
+      const voicebox = await waitForVoiceboxStable(45000);
+      if (!voicebox) {
+        sendJson(response, 503, {
+          error:
+            "Voicebox is open but not ready. Use Restart everything and wait until its status says running.",
+        });
         return;
       }
       sendJson(response, 200, { started: true });

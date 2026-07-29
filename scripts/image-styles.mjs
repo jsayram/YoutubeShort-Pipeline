@@ -205,10 +205,14 @@ export function applyStyle(imageGen, style, { fast = false, speedLora = null } =
   // different provider is selected so switching back to the original storybook style restores
   // the ordinary slideshow instead of inheriting the living treatment.
   next.compositionPreset = style.compositionPreset ?? null;
-  if (style.checkpoint) next.checkpoint = style.checkpoint;
-  if (style.diffusionModel) next.diffusionModel = style.diffusionModel;
-  if (style.textEncoder) next.textEncoder = style.textEncoder;
-  if (style.vae) next.vae = style.vae;
+  // Each of these belongs to one provider's model family (FLUX.2's diffusionModel/textEncoder/vae
+  // vs comfyui's checkpoint). Assign unconditionally so switching, say, FLUX.2 -> Animagine clears
+  // the old fields instead of leaving them in imageGen for the new provider to misread — ComfyUI's
+  // VAELoader does not care whose preset asked for it, it just loads whatever is still there.
+  next.checkpoint = style.checkpoint ?? null;
+  next.diffusionModel = style.diffusionModel ?? null;
+  next.textEncoder = style.textEncoder ?? null;
+  next.vae = style.vae ?? null;
   next.fallbackProvider = style.fallbackProvider ?? null;
   Object.assign(next, style.sampling ?? {});
   // Some looks are not 9:16. The storybook preset paints square art that the composition

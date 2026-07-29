@@ -3,13 +3,26 @@ import fsSync from "node:fs";
 import path from "node:path";
 import { commandOutput, run, writeJson } from "./lib.mjs";
 
-export function seedFor(id) {
+// The salt defaults to 0 so a plain re-run still reproduces the same image. Forced
+// regeneration passes a fresh random salt (see resolveSeedSalt) so the hash lands elsewhere.
+export function seedFor(id, salt = 0) {
+  const text = salt ? `${id}:${salt}` : id;
   let hash = 2166136261;
-  for (let index = 0; index < id.length; index += 1) {
-    hash ^= id.charCodeAt(index);
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
   return Math.abs(hash) % 2 ** 31;
+}
+
+// --force normally only bypasses the "already generated" skip check, which reproduces the
+// exact same image when the prompt hasn't changed too, since the seed is a stable hash of the
+// scene id. Pass an explicit --seed-salt to reproduce a specific forced batch; otherwise each
+// forced run gets its own random salt so it actually renders something new.
+export function resolveSeedSalt(flags, forced) {
+  if (!forced) return 0;
+  if (flags["seed-salt"] !== undefined) return Number(flags["seed-salt"]);
+  return Math.floor(Math.random() * 2 ** 31);
 }
 
 export function splitImageItems(prompts, imageGen) {
@@ -138,20 +151,36 @@ export function referencesForScene(scene, references) {
   ];
 }
 
+// Post-processing looks applied after scale/crop, keyed by imageGen.postProcess. Grain is a
+// deterministic overlay rather than something a diffusion model reproduces consistently on its
+// own: the reference clips this was matched against carry the same grain and vignette across
+// completely different scenes, which only a fixed filter pass (not model noise) explains.
+const POST_PROCESS_FILTERS = {
+  // Light paper grain and a soft vignette, no forced color curve: the mood-driven sky gradient
+  // is the prompt's job, and a fixed duotone push here would fight scenes that want a cool tone.
+  "paper-grain": "noise=alls=14:allf=t+u,vignette=PI/5,eq=saturation=0.92:contrast=1.03",
+};
+
 export async function writeExactImage({
   bytes,
   finalPath,
   outWidth,
   outHeight,
   fit = "cover",
+  postProcess = null,
 }) {
   await fs.mkdir(path.dirname(finalPath), { recursive: true });
   const temporary = `${finalPath}.${process.pid}.source`;
   await fs.writeFile(temporary, bytes);
-  const filter =
+  const crop =
     fit === "contain"
       ? `scale=${outWidth}:${outHeight}:force_original_aspect_ratio=decrease,pad=${outWidth}:${outHeight}:(ow-iw)/2:(oh-ih)/2:color=0x111014`
       : `scale=${outWidth}:${outHeight}:force_original_aspect_ratio=increase,crop=${outWidth}:${outHeight}`;
+  const postFilter = postProcess ? POST_PROCESS_FILTERS[postProcess] : null;
+  if (postProcess && !postFilter) {
+    throw new Error(`Unknown postProcess "${postProcess}". Use one of: ${Object.keys(POST_PROCESS_FILTERS).join(", ")}.`);
+  }
+  const filter = postFilter ? `${crop},${postFilter}` : crop;
   try {
     await run("ffmpeg", [
       "-y",

@@ -3,6 +3,7 @@
   "variables": {
     "{{line}}": "The complete narration beat.",
     "{{keywords}}": "Up to six visual keywords extracted from the narration beat.",
+    "{{keywordsAll}}": "Every significant word extracted from the narration beat, unclipped.",
     "{{subjectType}}": "A human-figure or non-human-subject hint inferred from the narration.",
     "{{sentiment}}": "The emotional meaning inferred from the complete narration beat.",
     "{{storyBeat}}": "The scene's role in the opening, development, turning point, reflection, or resolution.",
@@ -75,6 +76,20 @@
       "sceneTemplate": "Create a polished vertical editorial image that communicates this narration beat: {{line}} {{castPlan}} Use {{subjectType}} as the dominant subject and {{keywords}} as visual anchors. Make the idea immediately understandable through one supporting visual metaphor. Keep all important content inside the mobile-safe center, with depth for subtle parallax and a calm lower third for captions.",
       "stylePrompt": "Painterly vertical editorial storytelling with the texture of a rough oil-and-gouache plate. Prefer medium-long or wide environmental views, small figures inside spacious scenes, broad visible bristle strokes, dry-brush drag, palette-knife scumbling, rough paper or canvas grain, simplified mature forms, and deep cinematic space. Deep burnt umber and charcoal shadows with brick red, rust, ember orange, ochre, muted golden yellow, restrained moss and olive green, deep teal, navy, and warm cream. Sunrise, sunset, or amber interior light, glowing edges, long shadows, subdued saturation, aged film grain, strong silhouette, quiet negative space, and a calm lower third.",
       "negativePrompt": "two adult women together, female couple, two adult men together, male couple, same-sex couple, same-gender pair, ambiguous two-person cast, close-up portrait by default, clean cel shading, polished anime key art, cute rounded anime face, large glossy eyes, smooth digital gradient, pastel candy palette, bright primary palette, readable text, letters, captions, subtitles, logos, watermarks, interface screenshots, collage, multiple competing subjects, cluttered background"
+    },
+    "simple": {
+      "label": "Simple (script-driven)",
+      "format": "natural-language",
+      "sceneTemplate": "Depict the idea in this narration beat as one single, unified image filling the entire frame: {{line}} Render it as symbolic, non-literal imagery, objects, textures, and setting suggested by the line, rather than a photographed scene with people. Key elements from the line: {{keywordsAll}}.",
+      "stylePrompt": "Abstract, hand-cut paper collage: visible paper grain and fiber, deckled torn edges, layered matte paper shapes, muted natural pigment, soft directional light, restrained shadow. Purely symbolic and non-figurative: no realistic human faces, bodies, or portraits, no photographic rendering. One single unified composition filling the whole frame, never a diptych, split screen, before-and-after pair, grid, or multiple scenes collaged together.",
+      "negativePrompt": "photorealistic, photograph, realistic human face, realistic human body, portrait, person, human figure, character, couple, diptych, split image, two-panel, multi-panel, side-by-side panels, grid layout, collage of scenes, multiple scenes in one frame, mirrored duplicate, symmetrical duplicate, frame within frame, border, blurry, low quality, distorted anatomy, watermark, logo, text, letters"
+    },
+    "flat-line-poetry": {
+      "label": "Flat line-art poetry (webtoon, mood sky)",
+      "format": "natural-language",
+      "sceneTemplate": "Illustrate this narration beat as one flat-color line-art panel in a webtoon and graphic-novel style: {{line}} Show it through a single figure, or a pair only if the line clearly involves two people, seen from behind or in full silhouette rather than a visible face. Fill most of the upper frame with a smooth gradient sky whose color follows the mood: {{sentiment}}. Key elements from the line: {{keywordsAll}}.",
+      "stylePrompt": "Clean flat-color line art in a webtoon and graphic-novel illustration style: bold confident black outlines, smooth cel-shaded flat color fills, minimal surface detail, no painterly brush texture. Smooth vertical gradient sky filling most of the frame, shifting between warm sunset amber-orange and cool dusk teal-blue depending on the scene's mood. Figures shown small and distant, from behind or in full silhouette, standing or walking in a quiet open setting: a pier, a rooftop, a bridge, an empty street, a field. Restrained, slightly muted palette. Generous empty sky left clear above the figure.",
+      "negativePrompt": "photorealistic, photograph, realistic human face, detailed visible face, portrait, painterly brushwork, oil painting, gouache texture, visible brush strokes, watercolor, rough canvas texture, busy detailed background, cluttered composition, crowd, multiple unrelated figures, diptych, split image, multi-panel, grid layout, collage, text, letters, watermark, logo, blurry, low quality"
     }
   }
 }

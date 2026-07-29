@@ -15,6 +15,7 @@ import {
   installGenerationLock,
   promptWithReferences,
   referencesForScene,
+  resolveSeedSalt,
   seedFor,
   splitImageItems,
   writeExactImage,
@@ -38,6 +39,11 @@ const prompts = await readJson(path.join(projectDir, "content", "image-prompts.j
 const gen = config.imageGen ?? {};
 const { references, scenes } = splitImageItems(prompts, gen);
 const releaseLock = await installGenerationLock(projectDir, flags.project);
+
+const sceneSeedSalt = resolveSeedSalt(flags, flags.force);
+const referenceSeedSalt = resolveSeedSalt(flags, flags["force-references"]);
+if (sceneSeedSalt) console.log(`Forced regeneration: scene seed salt ${sceneSeedSalt}.`);
+if (referenceSeedSalt) console.log(`Forced regeneration: reference seed salt ${referenceSeedSalt}.`);
 const model = "@cf/black-forest-labs/flux-2-klein-4b";
 const endpoint =
   `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}` +
@@ -122,7 +128,7 @@ try {
       prompt: cleanPrompt(reference),
       width: referenceSize,
       height: referenceSize,
-      seed: Number(reference.seed ?? seedFor(reference.id)),
+      seed: Number(reference.seed ?? seedFor(reference.id, referenceSeedSalt)),
     });
     await writeExactImage({
       bytes,
@@ -154,7 +160,7 @@ try {
     }
     const itemStart = Date.now();
     const selectedReferences = referencesForScene(item, sharedReferences);
-    const seed = Number(item.seed ?? seedFor(item.id));
+    const seed = Number(item.seed ?? seedFor(item.id, sceneSeedSalt));
     const bytes = await cloudflareImage({
       prompt: promptWithReferences(cleanPrompt(item), selectedReferences),
       width: sceneWidth,
@@ -162,7 +168,7 @@ try {
       seed,
       referenceFiles: selectedReferences,
     });
-    await writeExactImage({ bytes, finalPath, outWidth, outHeight });
+    await writeExactImage({ bytes, finalPath, outWidth, outHeight, postProcess: gen.postProcess ?? null });
     console.log(
       `[${index + 1}/${scenes.length}] ${item.id} — ${((Date.now() - itemStart) / 1000).toFixed(1)}s`,
     );

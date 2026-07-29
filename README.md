@@ -79,6 +79,26 @@ Alignment runs against each Voicebox line separately, then fits those words into
 measured `speechStart`–`speechEnd` window. This preserves the exact three-second gaps instead of
 letting a speech engine compress the silence and make later captions progressively early.
 
+For an imported or existing project, **Regenerate existing images** is passed through to every
+image backend and replaces scene files instead of reusing them. Character and style reference
+images remain stable unless references are explicitly regenerated. Imported Gemini projects also
+remove an older PNG/JPG/WebP variant after the replacement succeeds, preventing the preview from
+showing the wrong extension.
+
+The Local services controls now separate lightweight reads from destructive recovery:
+
+- **Check status** rereads live health and queue state without stopping anything.
+- **Reload images** rereads the selected project's files from disk without rerunning generation.
+- **Restart everything…** asks for confirmation, cancels the current pipeline, stops browser
+  audio/video, clears ComfyUI's queue, and restarts ComfyUI and Voicebox.
+
+Refreshing or closing the browser during an active pipeline displays the browser's leave-page
+warning. Cancelling that warning leaves the run alone. Continuing the refresh triggers the same
+full local-service reset before the new page reconnects. Studio keeps **Run pipeline** disabled
+while that reset is active. Voicebox is considered ready only after its old application process
+has fully exited and its health and profile APIs pass several consecutive checks; the environment
+check also waits through a normal Voicebox startup instead of failing during model loading.
+
 The Studio's Content provider dropdown loads a matching prompt profile from
 `templates/prompt.json`. Open **Edit image prompts** beneath the dropdown to work at three safe
 levels:

@@ -52,15 +52,43 @@ if (provider === "comfyui" || provider === "local") {
 }
 
 const baseUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
-const health = await fetch(`${baseUrl}/health`).catch(() => null);
-if (health?.ok) {
-  const status = await health.json().catch(() => ({}));
+const voiceboxAppRunning = await commandOutput("pgrep", ["-x", "voicebox"]).then(
+  (output) => Boolean(output.trim()),
+  () => false,
+);
+const voiceboxDeadline = Date.now() + (voiceboxAppRunning ? 45000 : 1);
+let voicebox = null;
+let stableChecks = 0;
+do {
+  const [healthResponse, profilesResponse] = await Promise.all([
+    fetch(`${baseUrl}/health`).catch(() => null),
+    fetch(`${baseUrl}/profiles`).catch(() => null),
+  ]);
+  if (healthResponse?.ok && profilesResponse?.ok) {
+    const [status, profiles] = await Promise.all([
+      healthResponse.json().catch(() => ({})),
+      profilesResponse.json().catch(() => null),
+    ]);
+    if (status.status === "healthy" && Array.isArray(profiles)) {
+      stableChecks += 1;
+      voicebox = { status, profiles };
+      if (stableChecks >= 2) break;
+    } else {
+      stableChecks = 0;
+    }
+  } else {
+    stableChecks = 0;
+  }
+  if (Date.now() < voiceboxDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+} while (Date.now() < voiceboxDeadline);
+
+if (voicebox && stableChecks >= 2) {
+  const { status, profiles } = voicebox;
   console.log(`✓ Voicebox at ${baseUrl} (model ${status.model_size ?? "unknown"})`);
 
   const defaultProfile = templateConfig.voicebox.profile;
-  const profiles = await fetch(`${baseUrl}/profiles`)
-    .then((response) => response.json())
-    .catch(() => []);
   if (profiles.some((profile) => profile.name === defaultProfile)) {
     console.log(`✓ Voicebox profile "${defaultProfile}"`);
   } else {
@@ -69,7 +97,11 @@ if (health?.ok) {
     );
   }
 } else {
-  failures.push(`Voicebox is not reachable at ${baseUrl}. Start the application.`);
+  failures.push(
+    voiceboxAppRunning
+      ? `Voicebox is open but its server did not become stable at ${baseUrl}. Restart the application.`
+      : `Voicebox is not reachable at ${baseUrl}. Start the application.`,
+  );
 }
 
 if (failures.length) {
@@ -77,4 +109,3 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 }
-

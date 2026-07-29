@@ -184,14 +184,28 @@ if (!available.includes(checkpoint)) {
 }
 
 // A stable seed per prompt id keeps re-runs reproducible, which the render pipeline relies on.
-function seedFor(id) {
+// --force salts it (see resolveSeedSalt below) so a forced regeneration with an unchanged
+// prompt actually produces a different image instead of reproducing the old one bit for bit.
+function seedFor(id, salt = 0) {
+  const text = salt ? `${id}:${salt}` : id;
   let hash = 2166136261;
-  for (let index = 0; index < id.length; index += 1) {
-    hash ^= id.charCodeAt(index);
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
   return Math.abs(hash) % 2 ** 31;
 }
+
+function resolveSeedSalt(forced) {
+  if (!forced) return 0;
+  if (flags["seed-salt"] !== undefined) return Number(flags["seed-salt"]);
+  return Math.floor(Math.random() * 2 ** 31);
+}
+
+const sceneSeedSalt = resolveSeedSalt(flags.force);
+const referenceSeedSalt = resolveSeedSalt(flags["force-references"]);
+if (sceneSeedSalt) console.log(`Forced regeneration: scene seed salt ${sceneSeedSalt}.`);
+if (referenceSeedSalt) console.log(`Forced regeneration: reference seed salt ${referenceSeedSalt}.`);
 
 // Positive conditioning gets only what should appear. Everything the prompt asked *not* to see
 // is routed to the negative encoder, together with the standing no-lettering vocabulary — the
@@ -352,7 +366,10 @@ function workflowFor(item, referenceHandles = []) {
     sample: {
       class_type: "KSampler",
       inputs: {
-        seed: Number(item.seed ?? seedFor(item.id)),
+        seed: Number(
+          item.seed ??
+            seedFor(item.id, item.kind === "reference" ? referenceSeedSalt : sceneSeedSalt),
+        ),
         steps,
         cfg,
         sampler_name: sampler,
@@ -528,7 +545,7 @@ for (const [index, item] of ordered.entries()) {
     file: relativeFile,
     provider: "comfyui",
     checkpoint,
-    seed: Number(item.seed ?? seedFor(item.id)),
+    seed: Number(item.seed ?? seedFor(item.id, sceneSeedSalt)),
     steps,
     cfg,
     sampler,

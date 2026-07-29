@@ -39,6 +39,20 @@ audible silence from the end of one spoken phrase to the beginning of the next. 
 in Voicebox under the `title` from `video.json`, so you can open the app to re-roll a weak line or
 review the story.
 
+In Studio, **Regenerate existing images** works the same for newly created and imported projects:
+it forwards a forced scene render to the selected backend while preserving stable character/style
+references. Local (ComfyUI), FLUX.2, and Cloudflare backends normally derive each scene's seed
+from a hash of its id, so a forced re-render with an unchanged prompt used to reproduce the exact
+same image. Checking the box now also rolls a fresh random seed salt for the run, so a forced
+regeneration renders a genuinely new batch even when nothing else changed. Pass `--seed-salt <n>`
+on the CLI to pin that salt and reproduce a specific forced batch. **Check status** and **Reload
+images** are read-only refreshes. Use the separately
+confirmed **Restart everything…** action only when local state feels stale; it cancels the active
+pipeline, clears ComfyUI work, stops browser playback, and restarts ComfyUI and Voicebox. A browser
+reload during generation warns first and performs that reset only after the user chooses to leave.
+Studio does not enable a new pipeline until the restart is complete, and Voicebox must keep both
+its health and profile endpoints ready across repeated checks before the restart is accepted.
+
 Check the line split before spending time on generation:
 
 ```sh
@@ -71,6 +85,13 @@ Photographic, Flat Vector, Ink Line Art, Anime, Illustrated Monologue, Living St
 FLUX.2 all translate each narration line into sentiment, story position, a concrete action, a
 shot plan, and a cast plan. Their visual media differ, but the default eight-scene rhythm is five
 alternating solo woman/man scenes and three shared turning points.
+
+**Simple (script-driven)** is the one style that skips all of that scaffolding. Its scene template
+passes through the narration line and most of its significant words, with no fixed shot plan, cast
+rule, or palette, so composition and art direction come from the model's own reading of the script.
+It works with whatever SDXL checkpoint is already installed. Use it when a project's narration is
+distinctive enough that you would rather the model interpret it freely than force it through the
+story-aware scaffolding above.
 
 Every line must pass a final-word transcription and have a safe quiet boundary. An unsafe result is
 generated once more. If the retry contains the verified final word but merely ends without enough

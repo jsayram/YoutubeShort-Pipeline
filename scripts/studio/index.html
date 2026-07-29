@@ -140,6 +140,17 @@
         color: var(--muted);
         font-size: 11px;
       }
+      .service-controls {
+        display: flex;
+        justify-content: flex-end;
+        gap: 7px;
+        margin-bottom: 4px;
+      }
+      .reload-warning {
+        color: var(--bad);
+        font-size: 12px;
+        margin: 10px 0 0;
+      }
       .project-assets .grid {
         margin-bottom: 0;
       }
@@ -561,9 +572,16 @@
             <div class="sub">Live status and direct access to the tools behind the pipeline.</div>
           </div>
           <div style="text-align: right">
-            <button id="refresh-services" class="ghost compact">Refresh</button>
+            <div class="service-controls">
+              <button id="refresh-services" class="ghost compact">Check status</button>
+              <button id="restart-services" class="danger compact">Restart everything…</button>
+            </div>
             <div class="updated" id="services-updated"></div>
           </div>
+        </div>
+        <div class="reload-warning hidden" id="reload-warning">
+          A pipeline is running. Refreshing or closing this page will warn you first. If you
+          continue, the pipeline will be cancelled and ComfyUI and Voicebox will restart cleanly.
         </div>
         <div class="service-grid" id="services">
           <div class="service"><div class="service-detail">Checking local services…</div></div>
@@ -729,7 +747,7 @@ Start a recording and talk about your day."></textarea>
             <label>Saved project images</label>
             <div class="sub" id="project-assets-count"></div>
           </div>
-          <button id="refresh-assets" class="ghost compact">Refresh</button>
+          <button id="refresh-assets" class="ghost compact">Reload images</button>
         </div>
         <div class="hidden" id="reference-assets">
           <label>Character and style references</label>
@@ -764,6 +782,9 @@ Start a recording and talk about your day."></textarea>
       let started = new Map();
       let assetRefreshTimer = null;
       let activeRunSlug = null;
+      let pipelineBusy = false;
+      let servicesRestarting = false;
+      let reloadWasConfirmed = false;
 
       const LABELS = {
         doctor: "Environment check",
@@ -957,15 +978,63 @@ Start a recording and talk about your day."></textarea>
         if (event.type === "error") {
           $("err").textContent = event.message;
           setRunning(false);
+          return;
+        }
+
+        if (event.type === "reset") {
+          stopPlayback();
+          $("err").textContent = event.message;
+          activeRunSlug = null;
+          setRunning(false);
         }
       }
 
       // ------------------------------------------------------------------ controls
 
       function setRunning(busy) {
-        $("run").disabled = busy;
+        pipelineBusy = busy;
+        updateRunControls();
         $("cancel").disabled = !busy;
+        $("reload-warning").classList.toggle("hidden", !busy);
       }
+
+      function setServicesRestarting(restarting) {
+        servicesRestarting = restarting;
+        updateRunControls();
+      }
+
+      function updateRunControls() {
+        $("run").disabled = pipelineBusy || servicesRestarting;
+        $("run").textContent = servicesRestarting
+          ? "Services restarting…"
+          : pipelineBusy
+            ? "Pipeline running…"
+            : "Run pipeline";
+      }
+
+      function stopPlayback() {
+        for (const media of document.querySelectorAll("audio, video")) {
+          media.pause();
+          media.removeAttribute("src");
+          media.load();
+        }
+        $("final").classList.add("hidden");
+      }
+
+      // The browser owns the final confirmation UI for reloads. beforeunload warns, while
+      // pagehide runs only after the user actually chose to leave; that is the safe point to ask
+      // the local Studio server to cancel generation and restart its model services.
+      window.addEventListener("beforeunload", (event) => {
+        if (!pipelineBusy) return;
+        reloadWasConfirmed = true;
+        event.preventDefault();
+        event.returnValue = "";
+      });
+      window.addEventListener("pagehide", () => {
+        if (!pipelineBusy || !reloadWasConfirmed) return;
+        stopPlayback();
+        navigator.sendBeacon("/api/services/reset");
+      });
 
       // When the run stopped before rendering, offer it as a one-click follow-up rather than
       // rendering unasked.
@@ -990,6 +1059,8 @@ Start a recording and talk about your day."></textarea>
 
       $("run").addEventListener("click", async () => {
         $("err").textContent = "";
+        $("run").disabled = true;
+        $("run").textContent = "Checking Voicebox…";
         const body = {
           slug: $("slug").value.trim(),
           title: $("title").value.trim(),
@@ -1011,10 +1082,13 @@ Start a recording and talk about your day."></textarea>
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        if (!response.ok) $("err").textContent = (await response.json()).error;
-        else {
+        if (!response.ok) {
+          $("err").textContent = (await response.json()).error;
+          updateRunControls();
+        } else {
           activeRunSlug = body.slug;
           $("project-assets").classList.add("hidden");
+          setRunning(true);
         }
       });
 
@@ -1301,18 +1375,31 @@ Start a recording and talk about your day."></textarea>
       // button's progress text.
       let launchingVoicebox = false;
 
-      async function refreshServices() {
+      async function refreshServices(manual = false) {
         if (launchingVoicebox) return;
         const host = $("services");
-        const response = await fetch("/api/services").catch(() => null);
+        const button = $("refresh-services");
+        if (manual) {
+          button.disabled = true;
+          button.textContent = "Checking…";
+          $("services-updated").textContent = "Reading live service state…";
+        }
+        const response = await fetch(`/api/services?v=${Date.now()}`, {
+          cache: "no-store",
+        }).catch(() => null);
         if (!response?.ok) {
           host.innerHTML =
             `<div class="service" data-status="offline">` +
             `<div class="service-detail">The Studio could not read local service status.</div></div>`;
+          if (manual) {
+            button.disabled = false;
+            button.textContent = "Check status";
+          }
           return;
         }
 
         const data = await response.json();
+        setServicesRestarting(data.resetting === true);
         host.innerHTML = data.services
           .map((service) => {
             let action = "";
@@ -1342,6 +1429,10 @@ Start a recording and talk about your day."></textarea>
           })
           .join("");
         $("services-updated").textContent = `Updated ${new Date(data.checkedAt).toLocaleTimeString()}`;
+        if (manual) {
+          button.disabled = false;
+          button.textContent = "Check status";
+        }
 
         host.querySelector('[data-open-service="voicebox"]')?.addEventListener("click", async (event) => {
           const button = event.currentTarget;
@@ -1369,37 +1460,90 @@ Start a recording and talk about your day."></textarea>
         });
       }
 
-      $("refresh-services").addEventListener("click", refreshServices);
+      $("refresh-services").addEventListener("click", () => refreshServices(true));
+      $("restart-services").addEventListener("click", async () => {
+        const accepted = confirm(
+          "Restart everything?\n\nThis cancels any active pipeline, stops audio and video playback, clears ComfyUI's queue, and restarts both ComfyUI and Voicebox.",
+        );
+        if (!accepted) return;
+
+        const restart = $("restart-services");
+        const status = $("services-updated");
+        restart.disabled = true;
+        $("refresh-services").disabled = true;
+        restart.textContent = "Restarting…";
+        status.textContent = "Stopping playback and restarting local AI services…";
+        setServicesRestarting(true);
+        stopPlayback();
+
+        const response = await fetch("/api/services/reset", { method: "POST" }).catch(() => null);
+        const data = response ? await response.json().catch(() => ({})) : {};
+        if (!response?.ok) {
+          status.textContent =
+            data.failures?.join(" · ") ?? data.error ?? "The full restart did not finish.";
+          restart.disabled = false;
+          $("refresh-services").disabled = false;
+          restart.textContent = "Restart everything…";
+          setServicesRestarting(false);
+          await refreshServices();
+          return;
+        }
+
+        pipelineBusy = false;
+        window.location.reload();
+      });
       refreshServices();
       setInterval(refreshServices, 5000);
 
       // This view reads the files on disk rather than relying on the live run event stream.
       // It therefore recovers images that finished before a Studio restart or browser reload.
-      async function refreshProjectAssets() {
+      async function refreshProjectAssets(manual = false) {
         const slug = $("slug").value.trim();
         const panel = $("project-assets");
+        const button = $("refresh-assets");
+        if (manual) {
+          button.disabled = true;
+          button.textContent = "Reloading…";
+        }
         // During a run the Images stage is the one live gallery. The disk-backed gallery is
         // still useful before a run or after selecting another project, but showing both for
         // the active slug made every shot look duplicated.
         if (slug === activeRunSlug && stageNodes.has("images")) {
           panel.classList.add("hidden");
+          if (manual) {
+            button.disabled = false;
+            button.textContent = "Reload images";
+          }
           return;
         }
         if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
           panel.classList.add("hidden");
+          if (manual) {
+            button.disabled = false;
+            button.textContent = "Reload images";
+          }
           return;
         }
 
-        const response = await fetch(`/api/project-assets?slug=${encodeURIComponent(slug)}`).catch(
-          () => null,
-        );
+        const response = await fetch(
+          `/api/project-assets?slug=${encodeURIComponent(slug)}&v=${Date.now()}`,
+          { cache: "no-store" },
+        ).catch(() => null);
         if (!response?.ok) {
           panel.classList.add("hidden");
+          if (manual) {
+            button.disabled = false;
+            button.textContent = "Reload images";
+          }
           return;
         }
         const data = await response.json();
         if (!data.total) {
           panel.classList.add("hidden");
+          if (manual) {
+            button.disabled = false;
+            button.textContent = "Reload images";
+          }
           return;
         }
 
@@ -1425,6 +1569,10 @@ Start a recording and talk about your day."></textarea>
               `<span>${escapeHtml(image.id)}</span></div>`,
           )
           .join("");
+        if (manual) {
+          button.disabled = false;
+          button.textContent = "Reload images";
+        }
       }
 
       function scheduleAssetRefresh() {
@@ -1432,7 +1580,7 @@ Start a recording and talk about your day."></textarea>
         assetRefreshTimer = setTimeout(refreshProjectAssets, 250);
       }
 
-      $("refresh-assets").addEventListener("click", refreshProjectAssets);
+      $("refresh-assets").addEventListener("click", () => refreshProjectAssets(true));
       $("slug").addEventListener("input", scheduleAssetRefresh);
       $("slug").addEventListener("change", () => {
         refreshProjectAssets();
@@ -1690,7 +1838,10 @@ Start a recording and talk about your day."></textarea>
       // Rejoin a run that is already going when the page loads.
       fetch("/api/state")
         .then((response) => response.json())
-        .then((state) => setRunning(Boolean(state.busy)));
+        .then((state) => {
+          setServicesRestarting(Boolean(state.resetting));
+          setRunning(Boolean(state.busy));
+        });
     </script>
   </body>
 </html>

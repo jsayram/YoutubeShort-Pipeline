@@ -27,6 +27,7 @@ const ai = new GoogleGenAI({ apiKey });
 const outputDir = path.join(projectDir, "public", "generated");
 await fs.mkdir(outputDir, { recursive: true });
 const manifest = [];
+const generatedExtensions = ["png", "jpg", "jpeg", "webp"];
 
 function findImage(interaction) {
   const blocks = [];
@@ -53,7 +54,7 @@ function findImage(interaction) {
 for (const item of prompts) {
   if (!item.id || !item.prompt) throw new Error("Every image prompt needs an id and prompt.");
   if (!flags.force) {
-    for (const extension of ["jpg", "png"]) {
+    for (const extension of generatedExtensions) {
       const existingPath = path.join(outputDir, `${item.id}.${extension}`);
       try {
         await fs.access(existingPath);
@@ -108,6 +109,13 @@ for (const item of prompts) {
   const extension = image.mimeType.includes("png") ? "png" : "jpg";
   const outputPath = path.join(outputDir, `${item.id}.${extension}`);
   await fs.writeFile(outputPath, Buffer.from(image.data, "base64"));
+  // Imported projects can contain a different extension from the one Gemini returns. Remove the
+  // older variant only after the replacement has been written successfully; otherwise Studio's
+  // PNG-first preview could keep showing the stale imported file after a forced regeneration.
+  for (const oldExtension of generatedExtensions) {
+    if (oldExtension === extension) continue;
+    await fs.rm(path.join(outputDir, `${item.id}.${oldExtension}`), { force: true });
+  }
   manifest.push({
     id: item.id,
     file: `public/generated/${item.id}.${extension}`,

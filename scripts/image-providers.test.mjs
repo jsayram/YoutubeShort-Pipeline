@@ -114,7 +114,12 @@ assert.match(photographic.negativeExtra, /same-sex couple/i);
 assert.match(flatVector.stylePrompt, /rough brush-shaped geometry/i);
 assert.match(inkLine.stylePrompt, /broad dry-brush ink masses/i);
 
-for (const style of styles) {
+// "simple" and "flat-line-poetry" deliberately opt out of every shared invariant below: no
+// cast plan, no fixed sunset palette, no couple-continuity rule. They are checked separately
+// instead of joining this loop.
+for (const style of styles.filter(
+  (style) => style.id !== "simple" && style.id !== "flat-line-poetry",
+)) {
   assert.match(style.sceneTemplate, /\{\{cast(?:Plan|Brief)\}\}/i);
   assert.match(style.negativeExtra, /two adult women together/i);
   assert.match(style.negativeExtra, /two adult men together/i);
@@ -123,5 +128,24 @@ for (const style of styles) {
   assert.match(style.stylePrompt, /sunrise|sunset/i);
   assert.doesNotMatch(style.stylePrompt, /Japanese animated-film|Ghibli/i);
 }
+
+const simple = styles.find((style) => style.id === "simple");
+assert.equal(simple.provider, "comfyui");
+assert.match(simple.sceneTemplate, /\{\{line\}\}/i);
+assert.match(simple.sceneTemplate, /\{\{keywordsAll\}\}/i);
+assert.doesNotMatch(simple.sceneTemplate, /\{\{cast(?:Plan|Brief)\}\}/i);
+assert.doesNotMatch(simple.sceneTemplate, /\{\{shotPlan\}\}/i);
+assert.doesNotMatch(simple.negativeExtra, /two adult women together/i);
+
+const flatLinePoetry = styles.find((style) => style.id === "flat-line-poetry");
+assert.equal(flatLinePoetry.provider, "flux2-local");
+assert.equal(flatLinePoetry.fallbackProvider, "cloudflare-flux2");
+assert.equal(flatLinePoetry.postProcess, "paper-grain");
+assert.match(flatLinePoetry.sceneTemplate, /\{\{sentiment\}\}/i);
+assert.match(flatLinePoetry.sceneTemplate, /\{\{keywordsAll\}\}/i);
+assert.doesNotMatch(flatLinePoetry.sceneTemplate, /\{\{cast(?:Plan|Brief)\}\}/i);
+assert.match(flatLinePoetry.stylePrompt, /flat-color line art/i);
+assert.doesNotMatch(flatLinePoetry.stylePrompt, /brick red|rust/i);
+assert.match(flatLinePoetry.negativeExtra, /painterly brushwork/i);
 
 console.log("Story-aware photographic, vector, ink, anime, storybook, FLUX, and reference routing passed.");

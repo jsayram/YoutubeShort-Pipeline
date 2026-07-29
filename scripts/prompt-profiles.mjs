@@ -7,6 +7,7 @@ export const PROMPT_FIELDS = ["sceneTemplate", "stylePrompt", "negativePrompt"];
 export const PROMPT_VARIABLES = new Set([
   "{{line}}",
   "{{keywords}}",
+  "{{keywordsAll}}",
   "{{subjectType}}",
   "{{sentiment}}",
   "{{storyBeat}}",
@@ -390,6 +391,7 @@ export function buildScenePrompt(line, index, template, context = {}) {
   const prompt = template
     .replaceAll("{{line}}", promptLine)
     .replaceAll("{{keywords}}", words.slice(0, 6).join(", "))
+    .replaceAll("{{keywordsAll}}", words.join(", "))
     .replaceAll("{{subjectType}}", subjectType)
     .replaceAll("{{sentiment}}", sentimentFor(promptLine))
     .replaceAll("{{storyBeat}}", storyBeatFor(index, total))
