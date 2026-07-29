@@ -194,8 +194,8 @@ export const TEXT_NEGATIVES = [
 
 // Remove nouns that directly request lettering. Do not include containers such as a screen,
 // phone, book, record sleeve, sign, menu, chart, or interface here: those may be the story prop.
-const TEXT_NOUNS =
-  /\b(?:text|texts|lettering|letters|word|words|writing|written|typograph\w*|font|fonts|caption|captions|subtitle|subtitles|title|titles|label|labels|labell?ed|logo|logos|wordmark|watermark|numeral|numerals|digit|digits|html|headline|headlines)\b/i;
+const TEXT_NOUN_REPLACEMENT =
+  /\b(?:text|texts|lettering|letters|word|words|writing|written|typograph\w*|font|fonts|caption|captions|subtitle|subtitles|title|titles|label|labels|labell?ed|logo|logos|wordmark|watermark|numeral|numerals|digit|digits|html|headline|headlines)\b/gi;
 
 // Keep a text-bearing object while translating its written content into a simple image.
 export function makeWordlessVisualPrompt(text) {
@@ -222,12 +222,15 @@ export function makeWordlessVisualPrompt(text) {
 
 export function scrubTextNouns(text) {
   return String(text ?? "")
-    // Split on commas too, not just sentence ends. A tag-style prompt is one long comma list
-    // with no full stops, so sentence-only splitting would drop the entire prompt over a single
-    // offending tag. Splitting per clause keeps the removal surgical.
-    .split(/(?<=[.;,])\s+/)
-    .filter((clause) => clause.trim() && !TEXT_NOUNS.test(clause))
-    .join(" ")
+    // Preserve the surrounding scene instead of deleting an entire clause that happens to
+    // mention a logo or label. Losing that clause can remove the narration's primary prop too
+    // (for example, "a milkshake cup with a faded logo"). FLUX gets the concrete object while
+    // the lettering request becomes a harmless pictorial mark.
+    .replace(TEXT_NOUN_REPLACEMENT, "abstract pictorial mark")
+    .replace(
+      /(?:abstract pictorial mark)(?:\s+abstract pictorial mark)+/gi,
+      "abstract pictorial mark",
+    )
     .replace(/\s{2,}/g, " ")
     .trim();
 }

@@ -873,6 +873,10 @@ Start a recording and talk about your day."></textarea>
             <input type="checkbox" id="opt-review-narration" checked />
             Review narration before images
           </label>
+          <label id="regenerate-audio-wrap" class="hidden">
+            <input type="checkbox" id="opt-regenerate-audio" />
+            <span id="regenerate-audio-label">Regenerate narration audio</span>
+          </label>
           <label><input type="checkbox" id="opt-force" /> Regenerate existing images</label>
           <label>
             <input type="checkbox" id="opt-keep" />
@@ -1347,6 +1351,7 @@ Start a recording and talk about your day."></textarea>
             gapMs: Math.round(Number($("pause").value || 0) * 1000),
             captions: $("opt-captions").checked,
             reviewNarration: $("opt-review-narration").checked,
+            regenerateAudio: $("opt-regenerate-audio").checked,
             fast: $("opt-fast").checked,
             render: $("opt-render").checked,
             enrichWithLLM: $("opt-enrich").checked,
@@ -1559,9 +1564,16 @@ Start a recording and talk about your day."></textarea>
         imageReviewSlug = slug;
         const valid = review.validation?.valid === true;
         const approvedCount = review.lines.filter((line) => line.approved).length;
+        const batchApprovalReady =
+          approvedCount < review.lines.length &&
+          review.lines.every((line) => {
+            const selected = selectedImageTake(line);
+            return !line.generating && selected && selected.prompt === line.prompt;
+          });
         host.innerHTML = `
           <div class="image-review-summary">
             <b>${approvedCount}/${review.lines.length} images approved</b>
+            <div class="sub">Successful images are approved automatically. Regenerate only the scenes you want to change.</div>
             <div class="sub">${escapeHtml(formatProjectUsage(review.usage))}</div>
             <div class="sub">${escapeHtml(review.usage?.quotaNote ?? "")}</div>
           </div>
@@ -1620,6 +1632,10 @@ Start a recording and talk about your day."></textarea>
             }).join("")}
           </div>
           <div class="actions" style="margin-top:16px">
+            <button class="ghost" data-approve-all-images
+              ${batchApprovalReady ? "" : "disabled"}>
+              ${approvedCount === review.lines.length ? "All images approved ✓" : "Approve all images"}
+            </button>
             <button data-continue-images ${valid ? "" : "disabled"}>Continue to composition</button>
             <span class="err" data-image-review-error></span>
           </div>`;
@@ -1658,6 +1674,13 @@ Start a recording and talk about your day."></textarea>
           });
           if (data) setRunning(true);
           else event.target.disabled = false;
+          return;
+        }
+        if (event.target.matches("[data-approve-all-images]")) {
+          event.target.disabled = true;
+          await imageReviewRequest("/api/image-review/approve-all", {
+            slug: imageReviewSlug,
+          });
           return;
         }
         if (!card) return;
@@ -2240,6 +2263,8 @@ Start a recording and talk about your day."></textarea>
 
       function applyProjectSettings(slug) {
         const project = projectSettings.get(slug);
+        $("opt-regenerate-audio").checked = false;
+        $("opt-regenerate-audio").dataset.required = "false";
         if (project) {
           if (!("title" in savedFormState)) $("title").value = project.title ?? "";
           if (!("script" in savedFormState)) $("script").value = project.script ?? "";
@@ -2267,6 +2292,7 @@ Start a recording and talk about your day."></textarea>
         loadPromptEditor();
         loadNarrationReview(slug);
         loadImageReview(slug);
+        updateAudioRegenerationOption();
         return true;
       }
 
@@ -2398,12 +2424,48 @@ Start a recording and talk about your day."></textarea>
       // Voices come from Voicebox itself, so the list is whatever is actually installed.
       let voices = [];
 
+      function updateAudioRegenerationOption() {
+        const wrap = $("regenerate-audio-wrap");
+        const checkbox = $("opt-regenerate-audio");
+        const label = $("regenerate-audio-label");
+        const project = projectSettings.get($("slug").value.trim());
+        const builtVoice = project?.audioVoiceProfile ?? null;
+        const hasExistingAudio = project?.hasNarrationAudio === true || Boolean(builtVoice);
+        if (!project || !hasExistingAudio) {
+          wrap.classList.add("hidden");
+          checkbox.checked = false;
+          checkbox.disabled = true;
+          checkbox.dataset.required = "false";
+          label.textContent = "Regenerate narration audio";
+          return;
+        }
+
+        wrap.classList.remove("hidden");
+        const selectedVoice = $("voice").value;
+        const changed =
+          Boolean(builtVoice && selectedVoice) &&
+          builtVoice.toLowerCase() !== selectedVoice.toLowerCase();
+        const wasRequired = checkbox.dataset.required === "true";
+        checkbox.dataset.required = String(changed);
+        checkbox.disabled = changed;
+        if (changed) {
+          checkbox.checked = true;
+          label.textContent = `Regenerate narration audio — voice changed from ${builtVoice}`;
+          wrap.title = "Required so this run uses the newly selected voice.";
+        } else {
+          if (wasRequired) checkbox.checked = false;
+          label.textContent = "Regenerate narration audio";
+          wrap.title = "Build fresh narration takes even though the selected voice has not changed.";
+        }
+      }
+
       function describeVoice() {
         const voice = voices.find((entry) => entry.name === $("voice").value);
         const hint = $("voicehint");
         hint.classList.remove("bad");
         if (!voice) {
           hint.textContent = "";
+          updateAudioRegenerationOption();
           return;
         }
         const bits = [voice.cloned ? "cloned" : "preset"];
@@ -2413,6 +2475,7 @@ Start a recording and talk about your day."></textarea>
         hint.textContent = voice.description
           ? `${voice.description} · ${bits.join(" · ")}`
           : bits.join(" · ");
+        updateAudioRegenerationOption();
       }
 
       fetch("/api/voices")

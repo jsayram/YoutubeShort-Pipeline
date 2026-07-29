@@ -102,10 +102,13 @@ export function validateReview(state) {
   return { valid: errors.length === 0, errors };
 }
 
-export async function prepareNarrationReview(slug, { autoApprove = false } = {}) {
+export async function prepareNarrationReview(
+  slug,
+  { autoApprove = false, forceRegenerate = false } = {},
+) {
   const projectDir = videoDir(slug);
   const settings = await resolveSettings(projectDir);
-  let state = await syncReviewState(projectDir, settings);
+  let state = await syncReviewState(projectDir, settings, { forceRegenerate });
   state.status = "generating";
   state.reviewEnabled = !autoApprove;
   await saveState(projectDir, state);
@@ -328,19 +331,33 @@ export async function approveNarrationReview(slug) {
   return state;
 }
 
-async function syncReviewState(projectDir, settings) {
+export function voiceSettingsChanged(previous, current) {
+  if (!previous || !current) return false;
+  return [
+    "profileId",
+    "profile",
+    "engine",
+    "modelSize",
+    "language",
+    "personality",
+  ].some((field) => String(previous[field] ?? "") !== String(current[field] ?? ""));
+}
+
+async function syncReviewState(projectDir, settings, { forceRegenerate = false } = {}) {
   const narration = await fs.readFile(path.join(projectDir, "content", "narration.txt"), "utf8");
   const texts = narration.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (!texts.length) throw new Error("This project has no narration lines.");
   const existing = await readJson(reviewPath(projectDir)).catch(() => null);
+  const invalidateAudio =
+    forceRegenerate || voiceSettingsChanged(existing?.settings, settings);
   const lines = texts.map((text, index) => {
     const previous = existing?.lines?.find((line) => line.index === index);
     const line = {
       index,
       key: String(index + 1).padStart(2, "0"),
       text,
-      takes: previous?.takes ?? [],
-      selectedTakeId: previous?.selectedTakeId ?? null,
+      takes: invalidateAudio ? [] : previous?.takes ?? [],
+      selectedTakeId: invalidateAudio ? null : previous?.selectedTakeId ?? null,
       generating: false,
       approvalValid: false,
     };
@@ -354,8 +371,14 @@ async function syncReviewState(projectDir, settings) {
     reviewEnabled: existing?.reviewEnabled ?? true,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    approvedAt: existing?.approvedAt ?? null,
+    approvedAt: invalidateAudio ? null : existing?.approvedAt ?? null,
     settings,
+    audioInvalidatedAt: invalidateAudio ? new Date().toISOString() : null,
+    audioInvalidationReason: forceRegenerate
+      ? "manual-regeneration"
+      : invalidateAudio
+        ? "voice-settings-changed"
+        : null,
     lines,
   };
   await saveState(projectDir, state);

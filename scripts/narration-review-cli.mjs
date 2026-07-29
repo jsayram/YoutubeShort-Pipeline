@@ -12,6 +12,7 @@ const command = positionals[0] ?? "prepare";
 if (command === "prepare") {
   const state = await prepareNarrationReview(flags.project, {
     autoApprove: flags["auto-approve"] === true,
+    forceRegenerate: flags.regenerate === true,
   });
   console.log(
     state.status === "approved"

@@ -124,8 +124,13 @@ export function buildSystemPrompt(profile) {
     "- Find a creative visual metaphor that makes the viewer feel the line without reading it.",
     "- Preserve every concrete object explicitly named by the narration. Those objects are more " +
       "important than a generic cast or composition from the wider story.",
-    "- Each scene MUST differ from its neighbors: different primary object, different location, " +
-      "different time of day.",
+    "- Treat a sentence fragment, pronoun, omitted noun, or repeated action as a continuation of " +
+      "the preceding narration beat. Keep the established person, prop, and location unless the " +
+      "current line clearly introduces a replacement.",
+    "- Neighboring narration is context for resolving references only. Never import a prop, action, " +
+      "or location from the next line into the current scene.",
+    "- Vary camera distance, composition, and light between scenes when the story allows it. Preserve " +
+      "the same primary object or setting when adjacent narration beats deliberately continue it.",
     `- ${FORMAT_INSTRUCTIONS[format]}`,
     "- The image must be wordless. Never request readable text, captions, titles, labels, or " +
       "lettering. When the meaning involves a message, playlist, book, sign, or interface, keep " +
@@ -144,20 +149,32 @@ export function buildSystemPrompt(profile) {
 export function sceneConstraints(item) {
   const prompt = String(item.prompt ?? "");
   let requiredEvent =
-    prompt.match(/required visual event\s+([\s\S]*?),\s*shot design\s+/i)?.[1]?.trim() ?? "";
+    prompt.match(/required visual event:\s*([\s\S]*?)(?=\s+shot design:)/i)?.[1]?.trim() ??
+    prompt.match(/required visual event\s+([\s\S]*?),\s*shot design\s+/i)?.[1]?.trim() ??
+    "";
   const shotPlan =
-    prompt.match(/shot design\s+([\s\S]*?),\s*visual anchors\s+/i)?.[1]?.trim() ?? "";
+    prompt.match(
+      /shot design:\s*([\s\S]*?)(?=\s+(?:literal|visual) anchors(?:\s+that must remain visible)?:)/i,
+    )?.[1]?.trim() ??
+    prompt.match(/shot design\s+([\s\S]*?),\s*visual anchors\s+/i)?.[1]?.trim() ??
+    "";
   const emotionalTone =
-    prompt.match(/emotional interpretation\s+([^,]+)/i)?.[1]?.trim() ?? "";
+    prompt.match(/emotional interpretation:\s*([^.]+)\./i)?.[1]?.trim() ??
+    prompt.match(/emotional interpretation\s+([^,]+)/i)?.[1]?.trim() ??
+    "";
+  const castFromDraft =
+    prompt.match(
+      /emotional interpretation:[^.]+\.\s*([\s\S]*?)(?=\s*interpret the full sentence)/i,
+    )?.[1]?.trim() ?? "";
   const castRules = {
     object:
       "No people, faces, hands, silhouettes, or human figures. Express the beat only through the environment and objects.",
     pair:
-      "Exactly two recurring older adults. Keep both visually subordinate to the environment and preserve their established relationship staging.",
+      "Exactly two recurring people described by the draft scene. Preserve their established age, identity, and relationship staging.",
     "solo-a":
-      "Exactly one recurring older adult woman. The absent partner may be implied only through an object, empty place, or shadow.",
+      "Exactly one recurring woman described by the draft scene. The absent partner may be implied only through an object, empty place, or shadow.",
     "solo-b":
-      "Exactly one recurring older adult man. The absent partner may be implied only through an object, empty place, or shadow.",
+      "Exactly one recurring man described by the draft scene. The absent partner may be implied only through an object, empty place, or shadow.",
   };
   if (
     item.castMode === "object" &&
@@ -171,7 +188,7 @@ export function sceneConstraints(item) {
   return {
     castMode: String(item.castMode ?? ""),
     castRule:
-      castRules[item.castMode] ??
+      (castFromDraft || castRules[item.castMode]) ??
       "Preserve the exact people/no-people requirement and cast described by the existing scene plan.",
     requiredEvent,
     shotPlan,
@@ -250,11 +267,13 @@ export function buildUserPrompt(
     "",
     "Create ONE specific, concrete scene for the narration. " +
       "Name exact objects (material, color, condition), the specific room or place, " +
-      "and the quality of light. The narration and your concrete visual interpretation are " +
-      "authoritative. Preserve every physical object named in the narration. Use the draft " +
-      "context only when it strengthens that interpretation; you may replace its cast, action, " +
-      "location, or camera. Prefer a dominant still life over generic people when an object can " +
-      "carry the meaning. Keep the camera geometry physically coherent: show only properties " +
+      "and the quality of light. The narration and the draft's cast, required action, and shot plan " +
+      "are authoritative. Preserve every physical object named in the narration and preserve the " +
+      "draft people-versus-objects choice. Elaborate the draft into a coherent scene rather than " +
+      "replacing its cast, action, location, or camera. If this line is a sentence fragment, pronoun, " +
+      "or continuation, retain the subject established by the previous narration beat. Use the next " +
+      "line only to understand pacing; never borrow its prop, action, or setting. Keep the camera " +
+      "geometry physically coherent: show only properties " +
       "visible from that viewpoint and choose one supporting surface. Keep all visible surfaces " +
       "wordless; use a soft notification glow, small light pulse, or abstract pictorial mark " +
       "instead of a readable message or interface.",
@@ -294,7 +313,10 @@ export function buildAuthoritativePrompt({
       constraints.emotionalTone
         ? `emotional tone ${constraints.emotionalTone}`
         : null,
-      `authoritative concrete scene ${cleanScene}`,
+      constraints.castRule ? `required cast ${constraints.castRule}` : null,
+      constraints.requiredEvent ? `required visible action ${constraints.requiredEvent}` : null,
+      constraints.shotPlan ? `required shot design ${constraints.shotPlan}` : null,
+      `concrete scene details ${cleanScene}`,
       "wordless surfaces",
     ]
       .filter(Boolean)
@@ -306,7 +328,10 @@ export function buildAuthoritativePrompt({
     constraints.emotionalTone
       ? `Emotional tone: ${constraints.emotionalTone}`
       : null,
-    `Authoritative concrete scene execution: ${cleanScene}`,
+    constraints.castRule ? `Cast requirement: ${constraints.castRule}` : null,
+    constraints.requiredEvent ? `Required visible action: ${constraints.requiredEvent}` : null,
+    constraints.shotPlan ? `Required camera and composition: ${constraints.shotPlan}` : null,
+    `Concrete rendering details: ${cleanScene}`,
     "Keep every visible surface free of readable lettering; use a simple pictorial symbol when needed",
   ]
     .filter(Boolean)

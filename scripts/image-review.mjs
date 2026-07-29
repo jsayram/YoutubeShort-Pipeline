@@ -219,7 +219,9 @@ export async function prepareImageReview(slug, studioOptions = {}) {
       narration: narration[index] ?? "",
       prompt,
       selectedTakeId: take.id,
-      approved: false,
+      // A completed provider batch is usable by default. Review remains a pause point so the
+      // user can inspect or regenerate individual scenes without approving every card by hand.
+      approved: true,
       generating: false,
       error: null,
       takes: [...(prior?.takes ?? []), take],
@@ -228,7 +230,7 @@ export async function prepareImageReview(slug, studioOptions = {}) {
 
   const state = {
     version: 1,
-    status: "awaiting-review",
+    status: "ready-to-continue",
     createdAt: previous?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     provider: audit?.provider ?? manifest.find((entry) => entry.provider)?.provider ?? null,
@@ -335,9 +337,12 @@ export async function regenerateImageTake(slug, lineIndex, prompt) {
       take.prompt = line.prompt;
       line.takes.push(take);
       line.selectedTakeId = take.id;
+      // A successful regeneration replaces the selected image with a current-prompt take, so it
+      // is ready by default. The user can keep regenerating or choose another matching take.
+      line.approved = true;
       line.generating = false;
       line.error = null;
-      state.status = "awaiting-review";
+      state.status = "ready-to-continue";
       state.provider = audit?.provider ?? state.provider;
       state.usage = summarizeUsage(state.lines, audit);
       await saveState(projectDir, state);
@@ -382,9 +387,9 @@ export async function selectImageTake(slug, lineIndex, takeId) {
   });
   await writeJsonAtomic(manifestPath, manifest);
   line.selectedTakeId = take.id;
-  line.approved = false;
+  line.approved = true;
   line.error = null;
-  state.status = "awaiting-review";
+  state.status = validateImageReview(state).valid ? "ready-to-continue" : "awaiting-review";
   await saveState(projectDir, state);
   return state;
 }
@@ -403,6 +408,34 @@ export async function approveImage(slug, lineIndex) {
   line.approved = true;
   line.error = null;
   state.status = validateImageReview(state).valid ? "ready-to-continue" : "awaiting-review";
+  await saveState(projectDir, state);
+  return state;
+}
+
+export async function approveAllImages(slug) {
+  const projectDir = videoDir(slug);
+  const state = await loadImageReview(slug);
+  if (!state) throw new Error("This project has no image review.");
+
+  const errors = [];
+  for (const line of state.lines ?? []) {
+    if (line.generating) {
+      errors.push(`Image ${line.key} is still generating.`);
+      continue;
+    }
+    const selected = line.takes.find((take) => take.id === line.selectedTakeId);
+    if (!selected) errors.push(`Image ${line.key} has no selected take.`);
+    else if (selected.prompt !== line.prompt) {
+      errors.push(`Image ${line.key} was generated from an earlier prompt. Regenerate it first.`);
+    }
+  }
+  if (errors.length) throw new Error(errors.join(" "));
+
+  for (const line of state.lines) {
+    line.approved = true;
+    line.error = null;
+  }
+  state.status = "ready-to-continue";
   await saveState(projectDir, state);
   return state;
 }

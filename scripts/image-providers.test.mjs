@@ -20,10 +20,14 @@ assert.deepEqual(orphaned.map((style) => style.id), [], "style(s) reference a mi
 for (const required of [
   "flux2-storybook",
   "cloudflare-flux2-storybook",
+  "pastel-watercolor-ink",
+  "flux2-pastel-watercolor-ink",
+  "cloudflare-flux2-pastel-watercolor-ink",
   "drawthings-oil-gouache",
   "animagine-dark-storybook",
   "pixazo-sdxl-watercolor",
   "gemini",
+  "gemini-pastel-watercolor-ink",
 ]) {
   assert.ok(ids.includes(required), `Missing content provider ${required}.`);
 }
@@ -49,13 +53,43 @@ assert.match(flux.referencePrompts[2].prompt, /burnt umber/i);
 
 const pixazo = styles.find((style) => style.id === "pixazo-sdxl-watercolor");
 assert.equal(pixazo.provider, "pixazo-sdxl");
-assert.equal(pixazo.promptProfile, "flux2-storybook");
+assert.equal(pixazo.promptProfile, "pastel-watercolor-ink");
 assert.equal(pixazo.sampling.numSteps, 20);
 assert.equal(pixazo.sampling.guidanceScale, 5);
 assert.equal(pixazo.framing.genWidth, 1024);
 assert.equal(pixazo.framing.genHeight, 576);
-assert.match(pixazo.stylePrompt, /poetic comic-book illustration/i);
+assert.match(pixazo.stylePrompt, /editorial watercolor-and-ink storybook illustration/i);
+assert.match(pixazo.stylePrompt, /untouched white paper/i);
 assert.match(pixazo.negativeExtra, /text, letters, words, numbers/i);
+
+const watercolor = styles.find((style) => style.id === "pastel-watercolor-ink");
+const fluxWatercolor = styles.find((style) => style.id === "flux2-pastel-watercolor-ink");
+const cloudflareWatercolor = styles.find(
+  (style) => style.id === "cloudflare-flux2-pastel-watercolor-ink",
+);
+const geminiWatercolor = styles.find((style) => style.id === "gemini-pastel-watercolor-ink");
+for (const style of [watercolor, fluxWatercolor, cloudflareWatercolor, geminiWatercolor]) {
+  assert.equal(style.promptProfile, "pastel-watercolor-ink");
+  assert.match(style.stylePrompt, /bright white cold-pressed watercolor paper/i);
+  assert.match(style.stylePrompt, /transparent layered watercolor washes/i);
+  assert.match(style.stylePrompt, /blush pink, coral, peach/i);
+  assert.match(style.stylePrompt, /untouched white paper/i);
+  assert.doesNotMatch(style.stylePrompt, /couple|romance|relationship/i);
+  assert.match(style.sceneTemplate, /continue a prop or setting across adjacent beats/i);
+}
+assert.equal(watercolor.provider, "comfyui");
+assert.equal(fluxWatercolor.provider, "flux2-local");
+assert.equal(fluxWatercolor.fallbackProvider, "cloudflare-flux2");
+assert.equal(fluxWatercolor.sampling.guidance, 2.5);
+assert.equal(cloudflareWatercolor.provider, "cloudflare-flux2");
+assert.equal(cloudflareWatercolor.sampling.guidance, 2.5);
+assert.equal(geminiWatercolor.provider, "gemini");
+for (const style of [watercolor, fluxWatercolor, cloudflareWatercolor]) {
+  assert.equal(style.referencePrompts.length, 1);
+  assert.equal(style.referencePrompts[0].role, "style");
+  assert.match(style.referencePrompts[0].prompt, /abstract material study/i);
+  assert.doesNotMatch(style.referencePrompts[0].prompt, /couple|romance|relationship/i);
+}
 
 const storybook = styles.find((style) => style.id === "storybook");
 const livingStorybook = styles.find((style) => style.id === "living-storybook");

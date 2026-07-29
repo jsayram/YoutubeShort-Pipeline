@@ -234,6 +234,97 @@
     ]
   },
   {
+    "id": "pastel-watercolor-ink",
+    "label": "Pastel watercolor & ink (ComfyUI)",
+    "provider": "comfyui",
+    "promptProfile": "pastel-watercolor-ink",
+    "summary": "Luminous transparent watercolor washes, delicate graphite-and-ink contours, pastel sunset color, and generous bright white-paper negative space.",
+    "match": [
+      "illustrious",
+      "animagine",
+      "dreamshaper",
+      "pony"
+    ],
+    "prefersCheckpoint": [
+      "illustrious",
+      "animagine",
+      "dreamshaper"
+    ],
+    "download": "Needs an illustration-capable SDXL checkpoint. Illustrious XL is preferred; a watercolor SDXL LoRA can improve medium fidelity.",
+    "sampling": {
+      "steps": 30,
+      "cfg": 5.5,
+      "sampler": "dpmpp_2m",
+      "scheduler": "karras"
+    },
+    "framing": {
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "referencePrompts": [
+      {
+        "id": "pastel-watercolor-ink-material-reference-v1",
+        "role": "style",
+        "prompt": "A wordless abstract material study painted on bright white cold-pressed watercolor paper. Transparent overlapping watercolor blooms, granulation, wet-on-wet coral fading into peach, apricot, butter yellow, dusty rose, lavender, mauve, periwinkle, and soft ocean blue, restrained indigo accents, delicate loose graphite and sepia-ink contour fragments, feathered brush edges, pigment pooling, colorful translucent shadows, and broad untouched white-paper areas. Material, palette, and mark-making study only. No person, character, room, landscape, recognizable object, lettering, logo, panel, border, or collage."
+      }
+    ]
+  },
+  {
+    "id": "flux2-pastel-watercolor-ink",
+    "label": "FLUX.2 pastel watercolor & ink (local first)",
+    "provider": "flux2-local",
+    "fallbackProvider": "cloudflare-flux2",
+    "promptProfile": "pastel-watercolor-ink",
+    "summary": "The pastel watercolor-and-ink look through local FLUX.2 Klein first, with Cloudflare fallback and a cast-free material reference.",
+    "requiredModels": {
+      "diffusionModel": "flux-2-klein-4b.safetensors",
+      "textEncoder": "qwen_3_4b.safetensors",
+      "vae": "flux2-vae.safetensors"
+    },
+    "download": "Install the official FLUX.2 Klein 4B BF16 diffusion model, Qwen 3 4B text encoder, and FLUX.2 VAE. Cloudflare is used when the configured local model is unavailable.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 2.5,
+      "sampler": "euler",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "referencePrompts": [
+      {
+        "id": "pastel-watercolor-ink-material-reference-v1",
+        "role": "style",
+        "prompt": "A wordless abstract material study painted on bright white cold-pressed watercolor paper. Transparent overlapping watercolor blooms, granulation, wet-on-wet coral fading into peach, apricot, butter yellow, dusty rose, lavender, mauve, periwinkle, and soft ocean blue, restrained indigo accents, delicate loose graphite and sepia-ink contour fragments, feathered brush edges, pigment pooling, colorful translucent shadows, and broad untouched white-paper areas. Material, palette, and mark-making study only. No person, character, room, landscape, recognizable object, lettering, logo, panel, border, or collage."
+      }
+    ]
+  },
+  {
+    "id": "cloudflare-flux2-pastel-watercolor-ink",
+    "label": "FLUX.2 pastel watercolor & ink (Cloudflare)",
+    "provider": "cloudflare-flux2",
+    "promptProfile": "pastel-watercolor-ink",
+    "summary": "The same luminous pastel watercolor-and-ink treatment through Cloudflare Workers AI.",
+    "download": "No model download. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in .env.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 2.5,
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "referencePrompts": [
+      {
+        "id": "pastel-watercolor-ink-material-reference-v1",
+        "role": "style",
+        "prompt": "A wordless abstract material study painted on bright white cold-pressed watercolor paper. Transparent overlapping watercolor blooms, granulation, wet-on-wet coral fading into peach, apricot, butter yellow, dusty rose, lavender, mauve, periwinkle, and soft ocean blue, restrained indigo accents, delicate loose graphite and sepia-ink contour fragments, feathered brush edges, pigment pooling, colorful translucent shadows, and broad untouched white-paper areas. Material, palette, and mark-making study only. No person, character, room, landscape, recognizable object, lettering, logo, panel, border, or collage."
+      }
+    ]
+  },
+  {
     "id": "animagine-dark-storybook",
     "label": "Animagine dark faceless storybook",
     "provider": "comfyui",
@@ -396,8 +487,8 @@
     "id": "pixazo-sdxl-watercolor",
     "label": "Pixazo SDXL watercolor (free, experimental)",
     "provider": "pixazo-sdxl",
-    "promptProfile": "flux2-storybook",
-    "summary": "Pixazo's free-preview Stable Diffusion XL Base 1.0 engine using the same warm-dark paper-watercolor prompt as FLUX. Useful as a zero-cost alternative, but controlled testing showed weaker medium, lighting, and atmosphere adherence than local FLUX even when the main objects were correct.",
+    "promptProfile": "pastel-watercolor-ink",
+    "summary": "Pixazo's free-preview Stable Diffusion XL Base 1.0 engine using the luminous pastel watercolor-and-ink prompt. Useful as a zero-cost alternative, though medium fidelity may be weaker than FLUX or Gemini.",
     "download": "No local download. Set PIXAZO_API in .env. Pixazo currently documents this SDXL endpoint as free during preview with fair-use limits.",
     "sampling": {
       "numSteps": 20,
@@ -416,6 +507,15 @@
     "provider": "gemini",
     "promptProfile": "gemini",
     "summary": "Cloud-generated painterly editorial scenes using the shared distant rough-brush sunset palette. Needs GEMINI_API_KEY and billing.",
+    "download": "No download. Set GEMINI_API_KEY in .env with image-generation quota enabled.",
+    "sampling": {}
+  },
+  {
+    "id": "gemini-pastel-watercolor-ink",
+    "label": "Google Gemini pastel watercolor & ink",
+    "provider": "gemini",
+    "promptProfile": "pastel-watercolor-ink",
+    "summary": "Google image generation using the shared luminous watercolor washes, delicate ink contours, pastel sunset palette, and white-paper spacing.",
     "download": "No download. Set GEMINI_API_KEY in .env with image-generation quota enabled.",
     "sampling": {}
   },

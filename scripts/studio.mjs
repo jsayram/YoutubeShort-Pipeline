@@ -40,6 +40,7 @@ import {
   validateReview,
 } from "./narration-review.mjs";
 import {
+  approveAllImages,
   approveImage,
   approveImageReview,
   loadImageReview,
@@ -328,6 +329,7 @@ async function startRun({ slug, title, scriptText, options }) {
         "--project",
         slug,
       ];
+      if (options.regenerateAudio === true) voiceArgs.push("--regenerate");
       if (options.reviewNarration === false) voiceArgs.push("--auto-approve");
       await runStage("voice", node, voiceArgs);
       if (options.reviewNarration !== false) {
@@ -375,7 +377,7 @@ async function finishPipeline(slug, options) {
       setStage(
         "image-review",
         "waiting",
-        "Approve every image, then continue to composition.",
+        "Images are approved by default. Regenerate any scene you want, then continue.",
       );
       emit({ type: "image-review", slug, review: publicImageReviewState(slug, review) });
       emit({ type: "paused", reason: "image-review", slug });
@@ -1201,9 +1203,23 @@ const server = http.createServer(async (request, response) => {
           () => null,
         );
         if (!config) continue;
-        const rendered = await fs
-          .access(path.join(videosRoot, entry.name, "renders", `${entry.name}.mp4`))
-          .then(() => true, () => false);
+        const projectDir = path.join(videosRoot, entry.name);
+        const [rendered, timing, narrationReview, hasNarrationAudio] = await Promise.all([
+          fs
+            .access(path.join(projectDir, "renders", `${entry.name}.mp4`))
+            .then(() => true, () => false),
+          readJson(path.join(projectDir, "public", "audio", "narration.timing.json")).catch(
+            () => null,
+          ),
+          readJson(path.join(projectDir, "content", "narration-review.json")).catch(() => null),
+          fs
+            .access(path.join(projectDir, "public", "audio", "narration.wav"))
+            .then(() => true, () => false),
+        ]);
+        const builtVoiceProfile =
+          timing?.profile ?? narrationReview?.settings?.profile ?? null;
+        const builtVoiceEngine =
+          timing?.engine ?? narrationReview?.settings?.engine ?? null;
         projects.push({
           slug: entry.name,
           title: config.title,
@@ -1212,6 +1228,9 @@ const server = http.createServer(async (request, response) => {
           captionsEnabled: config.captions?.enabled === true,
           reviewNarration: config.voicebox?.reviewBeforeImages !== false,
           voiceProfile: config.voicebox?.profile ?? null,
+          audioVoiceProfile: builtVoiceProfile,
+          audioVoiceEngine: builtVoiceEngine,
+          hasNarrationAudio,
           pauseSeconds: Number(config.voicebox?.gapMs ?? 3000) / 1000,
           enrichWithLLM: config.imageGen?.enrichWithLLM === true,
           styleId: config.imageGen?.style ?? null,
@@ -1727,6 +1746,18 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       const state = await approveImage(slug, Number(body.lineIndex));
+      sendJson(response, 200, { review: publicImageReviewState(slug, state) });
+      return;
+    }
+
+    if (route === "/api/image-review/approve-all" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = String(body.slug ?? "").trim();
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      const state = await approveAllImages(slug);
       sendJson(response, 200, { review: publicImageReviewState(slug, state) });
       return;
     }

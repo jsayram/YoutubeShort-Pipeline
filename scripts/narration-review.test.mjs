@@ -9,6 +9,7 @@ import {
   resolveStudioScriptInput,
   selectNarrationTake,
   validateReview,
+  voiceSettingsChanged,
 } from "./narration-review.mjs";
 import { readJson, repoRoot, videoDir } from "./lib.mjs";
 
@@ -41,6 +42,30 @@ test("approval requires a passing selected take that speaks the current wording"
   state.lines[0].takes.push(take("current", "Current wording."));
   state.lines[0].selectedTakeId = "current";
   assert.equal(validateReview(state).valid, true);
+});
+
+test("voice generation settings invalidate old narration takes", () => {
+  const original = {
+    profileId: "voice-a",
+    profile: "Onyx",
+    engine: "kokoro",
+    modelSize: "1.7B",
+    language: "en",
+    personality: false,
+    gapMs: 3000,
+  };
+  assert.equal(voiceSettingsChanged(original, { ...original }), false);
+  assert.equal(voiceSettingsChanged(original, { ...original, gapMs: 500 }), false);
+  assert.equal(
+    voiceSettingsChanged(original, {
+      ...original,
+      profileId: "voice-b",
+      profile: "Serena",
+    }),
+    true,
+  );
+  assert.equal(voiceSettingsChanged(original, { ...original, engine: "qwen" }), true);
+  assert.equal(voiceSettingsChanged(original, { ...original, modelSize: "3B" }), true);
 });
 
 test("saved narration edits override the immutable Studio source on rerun", async (t) => {
@@ -154,13 +179,18 @@ test("editing persists new text, retains take history, rebuilds prompts, and rej
 });
 
 test("Studio orders narration before images and keeps refresh and automatic paths wired", async () => {
-  const [studio, html] = await Promise.all([
+  const [studio, html, reviewCli, reviewModule] = await Promise.all([
     fs.readFile(path.join(repoRoot, "scripts", "studio.mjs"), "utf8"),
     fs.readFile(path.join(repoRoot, "scripts", "studio", "index.html"), "utf8"),
+    fs.readFile(path.join(repoRoot, "scripts", "narration-review-cli.mjs"), "utf8"),
+    fs.readFile(path.join(repoRoot, "scripts", "narration-review.mjs"), "utf8"),
   ]);
   const stageBlock = studio.slice(studio.indexOf("function stageList"), studio.indexOf("async function startRun"));
   assert.ok(stageBlock.indexOf('id: "voice"') < stageBlock.indexOf('id: "images"'));
   assert.match(studio, /options\.reviewNarration === false\) voiceArgs\.push\("--auto-approve"\)/);
+  assert.match(studio, /options\.regenerateAudio === true\) voiceArgs\.push\("--regenerate"\)/);
+  assert.match(studio, /audioVoiceProfile:\s*builtVoiceProfile/);
+  assert.match(studio, /timing\?\.profile \?\? narrationReview\?\.settings\?\.profile/);
   assert.match(studio, /resolveStudioScriptInput\(projectDir, scriptText/);
   assert.match(studio, /preferNarration: exists/);
   assert.match(studio, /route === "\/api\/narration-review" && request\.method === "GET"/);
@@ -173,6 +203,12 @@ test("Studio orders narration before images and keeps refresh and automatic path
     /await emitPrompts\(slug\)/,
   );
   assert.match(html, /id="opt-review-narration" checked/);
+  assert.match(html, /id="opt-regenerate-audio"/);
+  assert.match(html, /voice changed from/);
+  assert.match(html, /regenerateAudio:\s*\$\("opt-regenerate-audio"\)\.checked/);
+  assert.match(reviewCli, /forceRegenerate:\s*flags\.regenerate === true/);
+  assert.match(reviewModule, /forceRegenerate \|\| voiceSettingsChanged/);
+  assert.match(reviewModule, /takes:\s*invalidateAudio \? \[\] : previous\?\.takes/);
   assert.match(html, /Approve narration and generate images/);
   assert.match(html, /loadNarrationReview\(slug\)/);
 });

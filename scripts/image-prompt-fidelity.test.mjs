@@ -42,6 +42,16 @@ test("wordless conversion preserves the phone and replaces message content with 
   );
 });
 
+test("wordless cleanup preserves a prop that shares a clause with a logo", () => {
+  const cleaned = scrubTextNouns(
+    "A cracked frosted-glass milkshake cup with a faded red logo sits on the pharmacy counter.",
+  );
+  assert.match(cleaned, /cracked frosted-glass milkshake cup/i);
+  assert.match(cleaned, /pharmacy counter/i);
+  assert.match(cleaned, /abstract pictorial mark/i);
+  assert.doesNotMatch(cleaned, /\blogo\b/i);
+});
+
 test("scene-required props and lighting override conflicting global negatives", () => {
   const positive = makeWordlessVisualPrompt(qwenScene);
   const negative = deconflictNegativePrompt(

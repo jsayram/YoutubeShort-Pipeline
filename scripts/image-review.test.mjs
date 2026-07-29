@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import {
+  approveAllImages,
   approveImage,
   editImagePrompt,
   loadImageReview,
@@ -74,12 +75,22 @@ test("image review retains takes, gates continuation, and keeps scene edits proj
   let state = await prepareImageReview(slug, { captions: false });
   assert.equal(state.lines.length, 1);
   assert.equal(state.lines[0].takes.length, 1);
-  assert.equal(state.lines[0].approved, false);
+  assert.equal(state.lines[0].approved, true);
   assert.equal(state.usage.requests, 1);
   assert.equal(state.usage.creditsUsed, null);
   assert.equal(state.lines[0].takes[0].usage.creditsUsed, null);
-  assert.equal(validateImageReview(state).valid, false);
+  assert.equal(validateImageReview(state).valid, true);
   await fs.access(path.join(projectDir, state.lines[0].takes[0].image));
+
+  // Batch approval remains available for older or manually unapproved review files.
+  state.lines[0].approved = false;
+  await fs.writeFile(
+    path.join(projectDir, "content", "image-review.json"),
+    `${JSON.stringify(state, null, 2)}\n`,
+  );
+  state = await approveAllImages(slug);
+  assert.equal(state.lines[0].approved, true);
+  assert.equal(validateImageReview(state).valid, true);
 
   state = await approveImage(slug, 0);
   assert.equal(validateImageReview(state).valid, true);
@@ -122,9 +133,12 @@ test("Studio pauses after images and exposes per-image approval and usage contro
   assert.match(studio, /reason: "image-review"/);
   assert.match(studio, /route === "\/api\/image-review\/regenerate"/);
   assert.match(studio, /route === "\/api\/image-review\/approve-image"/);
+  assert.match(studio, /route === "\/api\/image-review\/approve-all"/);
   assert.match(studio, /route === "\/api\/image-review\/continue"/);
   assert.match(html, /Regenerate this image/);
   assert.match(html, /Approve image/);
+  assert.match(html, /Approve all images/);
+  assert.match(html, /Successful images are approved automatically/);
   assert.match(html, /Continue to composition/);
   assert.match(html, /Generation details and exact provider prompt/);
   assert.match(html, /credit cost not reported/);

@@ -133,7 +133,7 @@ test("creative archetype enrichment treats narration as an emotional seed", () =
   assert.doesNotMatch(user, /Preserve every physical object/i);
 });
 
-test("authoritative enrichment lets the concrete Qwen scene replace a competing draft plan", () => {
+test("enrichment adds Qwen detail without discarding cast, action, or camera authority", () => {
   const item = {
     id: "01-playlist",
     castMode: "pair",
@@ -144,7 +144,7 @@ test("authoritative enrichment lets the concrete Qwen scene replace a competing 
       "unrelated generic relationship staging",
   };
   const constraints = sceneConstraints(item);
-  assert.match(constraints.castRule, /Exactly two recurring older adults/i);
+  assert.match(constraints.castRule, /Exactly two recurring people/i);
 
   const result = buildAuthoritativePrompt({
     item,
@@ -154,13 +154,43 @@ test("authoritative enrichment lets the concrete Qwen scene replace a competing 
       "rain-streaked window, dim amber glow, cold gray morning",
     format: "tags",
   });
-  assert.match(result, /authoritative concrete scene/i);
+  assert.match(result, /concrete scene details/i);
   assert.match(result, /cracked smartphone screen/i);
   assert.match(result, /old vinyl record sleeve/i);
   assert.match(result, /dim amber glow/i);
-  assert.doesNotMatch(result, /Exactly two recurring older adults/i);
-  assert.doesNotMatch(result, /Two figures stand together/i);
-  assert.doesNotMatch(result, /Medium-wide view/i);
+  assert.match(result, /Exactly two recurring people/i);
+  assert.match(result, /Two figures stand together/i);
+  assert.match(result, /Medium-wide view/i);
   assert.doesNotMatch(result, /unrelated generic relationship staging/i);
-  assert.ok(result.length < item.prompt.length + 200);
+});
+
+test("natural-language watercolor profile constraints survive enrichment", () => {
+  const item = {
+    id: "01-key",
+    castMode: "pair",
+    prompt:
+      "Story position: opening. Narration: I still have your spare key. " +
+      "Emotional interpretation: restrained longing. " +
+      "Two young adult figures together at medium distance, seen from behind holding hands. " +
+      "Interpret the full sentence as one readable story event. " +
+      "Required visual event: One woman touches the worn brass key while the second figure waits by the doorway. " +
+      "Shot design: Medium-wide horizontal composition with airy white space. " +
+      "Literal anchors that must remain visible: spare, key.",
+  };
+  const constraints = sceneConstraints(item);
+  assert.match(constraints.castRule, /Two young adult figures/i);
+  assert.match(constraints.requiredEvent, /touches the worn brass key/i);
+  assert.match(constraints.shotPlan, /Medium-wide horizontal composition/i);
+  assert.equal(constraints.emotionalTone, "restrained longing");
+
+  const result = buildAuthoritativePrompt({
+    item,
+    narration: "I still have your spare key.",
+    scene: "Peach window light washes across a white-paper entryway.",
+    format: "prose",
+  });
+  assert.match(result, /Two young adult figures/i);
+  assert.match(result, /touches the worn brass key/i);
+  assert.match(result, /airy white space/i);
+  assert.match(result, /Peach window light/i);
 });
