@@ -525,7 +525,8 @@ async function finishPostImagePipeline(slug, options) {
 
 }
 
-async function resumeAfterNarrationReview(slug, options) {
+async function resumeAfterNarrationReview(slug, options, jobId = null) {
+  let failed = false;
   current = {
     id: String(Date.now()),
     slug,
@@ -544,6 +545,7 @@ async function resumeAfterNarrationReview(slug, options) {
     events: [],
     child: null,
     done: false,
+    jobId,
   };
   emit({ type: "run", runId: current.id, slug, stages: current.stages });
   try {
@@ -561,16 +563,23 @@ async function resumeAfterNarrationReview(slug, options) {
     const paused = await finishPipeline(slug, options);
     if (!paused) emit({ type: "done", slug });
   } catch (error) {
+    failed = true;
     emit({ type: "error", message: String(error.message ?? error) });
   } finally {
     if (current) {
       current.done = true;
+      if (jobId) {
+        await transitionJob(slug, jobId, failed ? "failed" : "succeeded", {
+          ...(failed ? { error: { message: "Narration continuation failed." } } : {}),
+        }).catch(() => {});
+      }
       void persistCurrent();
     }
   }
 }
 
-async function resumeAfterImageReview(slug, options) {
+async function resumeAfterImageReview(slug, options, jobId = null) {
+  let failed = false;
   current = {
     id: String(Date.now()),
     slug,
@@ -587,6 +596,7 @@ async function resumeAfterImageReview(slug, options) {
     events: [],
     child: null,
     done: false,
+    jobId,
   };
   emit({ type: "run", runId: current.id, slug, stages: current.stages });
   try {
@@ -599,10 +609,16 @@ async function resumeAfterImageReview(slug, options) {
     await finishPostImagePipeline(slug, options);
     emit({ type: "done", slug });
   } catch (error) {
+    failed = true;
     emit({ type: "error", message: String(error.message ?? error) });
   } finally {
     if (current) {
       current.done = true;
+      if (jobId) {
+        await transitionJob(slug, jobId, failed ? "failed" : "succeeded", {
+          ...(failed ? { error: { message: "Post-image continuation failed." } } : {}),
+        }).catch(() => {});
+      }
       void persistCurrent();
     }
   }
@@ -646,7 +662,8 @@ function publicImageReviewState(slug, state) {
 }
 
 // Render on its own, for a project whose media is already built.
-async function startRender(slug) {
+async function startRender(slug, jobId = null) {
+  let failed = false;
   current = {
     id: String(Date.now()),
     slug,
@@ -654,6 +671,7 @@ async function startRender(slug) {
     events: [],
     child: null,
     done: false,
+    jobId,
   };
   emit({ type: "run", runId: current.id, slug, stages: current.stages });
   try {
@@ -661,10 +679,18 @@ async function startRender(slug) {
     await emitVideo(slug);
     emit({ type: "done", slug });
   } catch (error) {
+    failed = true;
     emit({ type: "error", message: String(error.message ?? error) });
   } finally {
     if (current) {
       current.done = true;
+      if (jobId) {
+        await transitionJob(slug, jobId, failed ? "failed" : "succeeded", {
+          ...(failed
+            ? { error: { message: "Render failed." } }
+            : { artifact: `renders/${slug}.mp4`, actual: { unit: "local render", amount: 1 } }),
+        }).catch(() => {});
+      }
       void persistCurrent();
     }
   }
@@ -1396,6 +1422,32 @@ async function planGenerationJobs(slug, body) {
       provider,
     );
     if (!local) {
+      for (const [index, reference] of (
+        provider === "cloudflare-flux2" ? style?.referencePrompts ?? [] : []
+      ).entries()) {
+        jobs.push(
+          await createJob(slug, {
+            kind: "image-reference",
+            provider,
+            model: style?.model ?? null,
+            item: {
+              type: "image-reference",
+              index,
+              sceneId: reference.id,
+              prompt: reference.prompt,
+            },
+            label: `Reference image ${index + 1} of ${style.referencePrompts.length}`,
+            destination: `Project references · ${reference.id}`,
+            estimate: { unit: "provider request", maximum: 1, costKnown: false },
+            warning:
+              "The provider does not expose a reliable account balance here. Cost is unknown.",
+            monetary: true,
+            remote: true,
+            requiresConfirmation: true,
+            dedupeKey: `run:${slug}:reference:${reference.id}:${provider}`,
+          }),
+        );
+      }
       for (const [index, text] of lines.entries()) {
         jobs.push(
           await createJob(slug, {
@@ -1495,6 +1547,7 @@ const server = http.createServer(async (request, response) => {
           });
           return;
         }
+        current = null;
       }
       mountedProject = slug;
       await persistCurrent();
@@ -1533,7 +1586,48 @@ const server = http.createServer(async (request, response) => {
       const body = await readBody(request);
       const slug = mountedSlug(body);
       if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      const pending = await findJob(slug, String(body.jobId ?? ""));
+      if (pending?.provider === "elevenlabs") {
+        const balance = await elevenLabsSubscription();
+        if (
+          balance.remaining !== null &&
+          Number(pending.estimate?.maximum ?? 0) > balance.remaining
+        ) {
+          sendJson(response, 409, {
+            error: "ElevenLabs included credits changed before submission. Nothing was generated.",
+          });
+          return;
+        }
+      }
       const job = await authorizeJob(slug, String(body.jobId ?? ""), body.acknowledgement);
+      sendJson(response, 200, { job });
+      return;
+    }
+
+    if (route === "/api/jobs/refresh" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      let job = await findJob(slug, String(body.jobId ?? ""));
+      if (!job || job.status !== "awaiting-confirmation") {
+        sendJson(response, 409, { error: "This job is no longer waiting for confirmation." });
+        return;
+      }
+      if (job.provider === "elevenlabs") {
+        const balance = await elevenLabsSubscription();
+        const maximum = Number(job.estimate?.maximum ?? 0);
+        if (balance.remaining !== null && maximum > balance.remaining) {
+          sendJson(response, 409, {
+            error:
+              `ElevenLabs included credits changed: ${maximum} required, ` +
+              `${balance.remaining} remaining. Paid overages are blocked.`,
+          });
+          return;
+        }
+        job = await transitionJob(slug, job.id, "awaiting-confirmation", {
+          estimate: { ...(job.estimate ?? {}), balance },
+        });
+      }
       sendJson(response, 200, { job });
       return;
     }
@@ -1601,6 +1695,19 @@ const server = http.createServer(async (request, response) => {
         const text = String(body.text ?? "").trim();
         const remote = provider === "elevenlabs";
         const balance = remote ? await elevenLabsSubscription() : null;
+        const usageEstimate = remote ? estimateElevenLabsUsage(text) : null;
+        if (
+          remote &&
+          balance?.remaining !== null &&
+          usageEstimate.maximum > balance.remaining
+        ) {
+          sendJson(response, 409, {
+            error:
+              `ElevenLabs included credits are insufficient: ${usageEstimate.maximum} required, ` +
+              `${balance.remaining} remaining. Paid overages are blocked.`,
+          });
+          return;
+        }
         job = await createJob(slug, {
           kind: "narration-line",
           provider,
@@ -1609,7 +1716,7 @@ const server = http.createServer(async (request, response) => {
           label: `Regenerate narration line ${lineIndex + 1}`,
           destination: `Narration review · line ${lineIndex + 1}`,
           estimate: remote
-            ? { ...estimateElevenLabsUsage(text), balance }
+            ? { ...usageEstimate, balance }
             : { unit: "local generation", maximum: 1 },
           warning: remote
             ? "This request consumes ElevenLabs included credits and cannot be undone."
@@ -1650,6 +1757,21 @@ const server = http.createServer(async (request, response) => {
           remote,
           requiresConfirmation: true,
           dedupeKey: `reroll:${slug}:image:${lineIndex}:${provider}:${Date.now()}`,
+        });
+      } else if (body.kind === "render") {
+        job = await createJob(slug, {
+          kind: "render",
+          provider: "hyperframes",
+          model: config.hyperframesVersion ?? null,
+          item: { type: "render", slug },
+          label: `Render ${slug}`,
+          destination: `renders/${slug}.mp4`,
+          estimate: { unit: "local render", maximum: 1 },
+          warning: "Rendering uses local compute time and writes the final MP4.",
+          monetary: false,
+          remote: false,
+          requiresConfirmation: true,
+          dedupeKey: `render:${slug}:${Date.now()}`,
         });
       } else {
         sendJson(response, 400, { error: "Unknown generation kind." });
@@ -2339,8 +2461,19 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       const approved = await approveImageReview(slug);
+      const continuation = await createJob(slug, {
+        kind: "pipeline-continuation",
+        provider: "pipeline",
+        label: "Continue after image approval",
+        destination: `videos/${slug}`,
+        estimate: { unit: "local pipeline continuation", maximum: 1 },
+        requiresConfirmation: false,
+        dedupeKey: `continue-images:${slug}`,
+      });
+      await transitionJob(slug, continuation.id, "submitted");
+      await transitionJob(slug, continuation.id, "running");
       sendJson(response, 200, { started: true });
-      void resumeAfterImageReview(slug, approved.studioOptions ?? {});
+      void resumeAfterImageReview(slug, approved.studioOptions ?? {}, continuation.id);
       return;
     }
 
@@ -2417,8 +2550,19 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: validation.errors.join(" ") });
         return;
       }
+      const continuation = await createJob(slug, {
+        kind: "pipeline-continuation",
+        provider: "pipeline",
+        label: "Continue after narration approval",
+        destination: `videos/${slug}`,
+        estimate: { unit: "local pipeline continuation", maximum: 1 },
+        requiresConfirmation: false,
+        dedupeKey: `continue-narration:${slug}`,
+      });
+      await transitionJob(slug, continuation.id, "submitted");
+      await transitionJob(slug, continuation.id, "running");
       sendJson(response, 200, { started: true });
-      void resumeAfterNarrationReview(slug, state.studioOptions ?? {});
+      void resumeAfterNarrationReview(slug, state.studioOptions ?? {}, continuation.id);
       return;
     }
 
@@ -2470,7 +2614,7 @@ const server = http.createServer(async (request, response) => {
       await validateAuthorizedJobs(slug, authorizationJobIds);
       const planned = (await listJobs(slug)).filter(
         (job) =>
-          ["narration-line", "image-scene"].includes(job.kind) &&
+          ["narration-line", "image-scene", "image-reference"].includes(job.kind) &&
           ["awaiting-confirmation", "authorized"].includes(job.status),
       );
       if (planned.some((job) => job.status !== "authorized")) {
@@ -2529,8 +2673,15 @@ const server = http.createServer(async (request, response) => {
         return;
       }
       if (!requireMounted(response, slug)) return;
+      const job = body.jobId ? await findJob(slug, String(body.jobId)) : null;
+      if (!job || job.kind !== "render" || job.status !== "authorized") {
+        sendJson(response, 409, { error: "Render requires a fresh compute authorization." });
+        return;
+      }
+      await transitionJob(slug, job.id, "submitted");
+      await transitionJob(slug, job.id, "running");
       sendJson(response, 200, { started: true });
-      void startRender(slug);
+      void startRender(slug, job.id);
       return;
     }
 

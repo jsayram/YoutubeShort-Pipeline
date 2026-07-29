@@ -1099,11 +1099,11 @@ Start a recording and talk about your day."></textarea>
       restoreFormState({ includeSelects: false });
       document.addEventListener("input", (event) => {
         if (savedFormIds.includes(event.target?.id)) persistFormState();
-        if (mountedProject && savedFormIds.includes(event.target?.id)) workspaceDirty = true;
+        if (mountedProject && event.target?.closest?.("#project-workspace")) workspaceDirty = true;
       });
       document.addEventListener("change", (event) => {
         if (savedFormIds.includes(event.target?.id)) persistFormState();
-        if (mountedProject && savedFormIds.includes(event.target?.id)) workspaceDirty = true;
+        if (mountedProject && event.target?.closest?.("#project-workspace")) workspaceDirty = true;
       });
 
       function formatEstimate(job) {
@@ -1137,8 +1137,19 @@ Start a recording and talk about your day."></textarea>
         $("job-list").innerHTML = jobs.length
           ? jobs.map((job) => {
               const active = !["succeeded", "failed", "cancelled"].includes(job.status);
+              const artifactUrl =
+                job.artifact && /\.[a-z0-9]{2,5}$/i.test(job.artifact)
+                  ? `/media/${encodeURIComponent(mountedProject)}/${String(job.artifact)
+                      .split("/")
+                      .map(encodeURIComponent)
+                      .join("/")}`
+                  : null;
               const artifact = job.artifact
-                ? `<div class="sub">Saved to ${escapeHtml(job.artifact)}</div>`
+                ? `<div class="sub">Saved to ${
+                    artifactUrl
+                      ? `<a class="dl" href="${escapeHtml(artifactUrl)}" target="_blank">${escapeHtml(job.artifact)}</a>`
+                      : escapeHtml(job.artifact)
+                  }</div>`
                 : "";
               const cancellable = ["planned", "awaiting-confirmation", "authorized"].includes(job.status);
               const reconcilable = job.status === "unknown";
@@ -1215,11 +1226,13 @@ Start a recording and talk about your day."></textarea>
         await loadProjects();
         const jobs = await refreshJobs();
         workspaceDirty = false;
-        const awaiting = jobs.find((job) => job.status === "awaiting-confirmation");
-        if (awaiting) {
+        const awaiting = jobs.filter((job) => job.status === "awaiting-confirmation");
+        if (awaiting.length) {
           $("mount-status").textContent =
             `Mounted: ${mountedProject} · a generation is waiting for confirmation`;
-          void authorizePlannedJob(awaiting);
+          for (const job of awaiting) {
+            if (!(await authorizePlannedJob(job))) break;
+          }
         }
         return true;
       }
@@ -1236,23 +1249,8 @@ Start a recording and talk about your day."></textarea>
             return;
           }
           if (choice === "SAVE") {
-            const saved = await fetch("/api/project/draft", {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                slug: mountedProject,
-                title: $("title").value,
-                script: $("script").value,
-                voiceRef: $("voice").value,
-                elevenlabsModel: $("elevenlabs-model").value,
-                elevenlabsStability: Number($("elevenlabs-stability").value),
-                style: $("style").value,
-                topic: $("topic").value,
-                pauseSeconds: Number($("pause").value || 3),
-              }),
-            });
-            if (!saved.ok) {
-              $("mount-status").textContent = (await saved.json()).error;
+            const saved = await saveAllProjectEdits();
+            if (!saved) {
               return;
             }
           }
@@ -1297,6 +1295,17 @@ Start a recording and talk about your day."></textarea>
       }
 
       async function authorizePlannedJob(job) {
+        const refresh = await fetch("/api/jobs/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug: mountedProject, jobId: job.id }),
+        });
+        const refreshed = await refresh.json().catch(() => ({}));
+        if (!refresh.ok) {
+          $("err").textContent = refreshed.error ?? "Could not refresh provider usage.";
+          return false;
+        }
+        job = refreshed.job;
         const approved = await confirmGeneration(job);
         if (!approved) {
           await fetch("/api/jobs/cancel", {
@@ -1347,6 +1356,9 @@ Start a recording and talk about your day."></textarea>
       );
       $("unmount-project").addEventListener("click", unmountProject);
       $("refresh-jobs").addEventListener("click", refreshJobs);
+      setInterval(() => {
+        if (mountedProject) void refreshJobs();
+      }, 2000);
       $("job-list").addEventListener("click", async (event) => {
         const jobId = event.target.dataset.cancelJob;
         const resolveId = event.target.dataset.resolveJob;
@@ -1696,10 +1708,21 @@ Start a recording and talk about your day."></textarea>
         button.addEventListener("click", async () => {
           button.disabled = true;
           $("err").textContent = "";
+          const planResponse = await fetch("/api/jobs/plan-item", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug, kind: "render", lineIndex: 0 }),
+          });
+          const plan = await planResponse.json().catch(() => ({}));
+          if (!planResponse.ok || !(await authorizePlannedJob(plan.job))) {
+            $("err").textContent = plan.error ?? "Render was not authorized.";
+            button.disabled = false;
+            return;
+          }
           const response = await fetch("/api/render", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ slug }),
+            body: JSON.stringify({ slug, jobId: plan.job.id }),
           });
           if (!response.ok) $("err").textContent = (await response.json()).error;
         });
@@ -2205,6 +2228,57 @@ Start a recording and talk about your day."></textarea>
         return Object.fromEntries(
           Object.entries(promptFieldIds).map(([field, id]) => [field, $(id).value]),
         );
+      }
+
+      async function saveAllProjectEdits() {
+        const requests = [
+          fetch("/api/project/draft", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              slug: mountedProject,
+              title: $("title").value,
+              script: $("script").value,
+              voiceRef: $("voice").value,
+              elevenlabsModel: $("elevenlabs-model").value,
+              elevenlabsStability: Number($("elevenlabs-stability").value),
+              style: $("style").value,
+              topic: $("topic").value,
+              pauseSeconds: Number($("pause").value || 3),
+            }),
+          }),
+        ];
+        if (promptData) {
+          requests.push(
+            fetch("/api/prompt-editor/project", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                slug: mountedProject,
+                style: $("style").value,
+                values: promptValues(),
+              }),
+            }),
+          );
+        }
+        if (document.querySelector(".scene-prompt")) {
+          requests.push(
+            fetch("/api/prompt-editor/scenes", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(scenePayload()),
+            }),
+          );
+        }
+        const responses = await Promise.all(requests);
+        const failed = responses.find((response) => !response.ok);
+        if (failed) {
+          const data = await failed.json().catch(() => ({}));
+          $("mount-status").textContent = data.error ?? "Could not save project edits.";
+          return false;
+        }
+        workspaceDirty = false;
+        return true;
       }
 
       function promptMessage(text, bad = false) {
@@ -2809,6 +2883,12 @@ Start a recording and talk about your day."></textarea>
           return;
         }
 
+        if (!(await mountProject(data.slug, false))) {
+          hint.textContent =
+            `Imported ${data.slug}, but it could not be mounted while another project has active work.`;
+          hint.classList.add("bad");
+          return;
+        }
         $("slug").value = data.slug;
         $("slug").dataset.touched = "1";
         if (data.title) $("title").value = data.title;
@@ -2839,7 +2919,7 @@ Start a recording and talk about your day."></textarea>
         hint.textContent = parts.join(" ");
         $("importpath").value = "";
         await loadProjects();
-        await mountProject(data.slug, false);
+        await loadPromptEditor();
       }
 
       // The native chooser runs server-side and returns a real absolute path, which a file

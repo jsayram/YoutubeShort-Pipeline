@@ -57,9 +57,10 @@ export async function skipAuthorizedRemoteImage(slug, provider, item, index, art
 }
 
 async function matchingImageJob(slug, provider, item, index, status) {
+  const expectedKind = item.kind === "reference" ? "image-reference" : "image-scene";
   return (await listJobs(slug)).find(
     (entry) =>
-      entry.kind === "image-scene" &&
+      entry.kind === expectedKind &&
       entry.provider === provider &&
       (
         (entry.item?.sceneId && entry.item.sceneId === item.id) ||

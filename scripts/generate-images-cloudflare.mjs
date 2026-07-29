@@ -156,21 +156,43 @@ try {
     const finalPath = path.join(referenceDir, `${reference.id}.png`);
     const exists = await fs.access(finalPath).then(() => true, () => false);
     if (exists && !flags["force-references"]) {
+      await skipAuthorizedRemoteImage(
+        flags.project,
+        "cloudflare-flux2",
+        reference,
+        index,
+        `assets/references/${reference.id}.png`,
+      );
       console.log(`[ref ${index + 1}/${references.length}] ${reference.id} — reused`);
       continue;
     }
-    const bytes = await cloudflareImage({
-      prompt: cleanPrompt(reference),
-      width: referenceSize,
-      height: referenceSize,
-      seed: Number(reference.seed ?? seedFor(reference.id, referenceSeedSalt)),
-    });
-    await writeExactImage({
-      bytes,
-      finalPath,
-      outWidth: referenceSize,
-      outHeight: referenceSize,
-    });
+    let referenceJob;
+    try {
+      referenceJob = await beginAuthorizedRemoteImage(
+        flags.project,
+        "cloudflare-flux2",
+        reference,
+        index,
+      );
+      const bytes = await cloudflareImage({
+        prompt: cleanPrompt(reference),
+        width: referenceSize,
+        height: referenceSize,
+        seed: Number(reference.seed ?? seedFor(reference.id, referenceSeedSalt)),
+      });
+      await writeExactImage({
+        bytes,
+        finalPath,
+        outWidth: referenceSize,
+        outHeight: referenceSize,
+      });
+      await finishRemoteImage(flags.project, referenceJob, {
+        artifact: `assets/references/${reference.id}.png`,
+      });
+    } catch (error) {
+      await failRemoteImage(flags.project, referenceJob, error);
+      throw error;
+    }
     console.log(`[ref ${index + 1}/${references.length}] ${reference.id} — generated`);
   }
 

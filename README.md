@@ -42,9 +42,13 @@ You need macOS, Node.js 22 or newer, FFmpeg, and the Voicebox app.
    ```
 
 4. Put the Google AI Studio key after `GEMINI_API_KEY=` in `.env`.
-   Gemini remains optional. For the recurring-free FLUX fallback, also set
-   `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; local FLUX does not need either value.
+   Gemini remains optional. To select Cloudflare FLUX explicitly, also set
+   `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; local FLUX does not need either value and
+   never falls back to Cloudflare automatically.
    Pixazo's free-preview SDXL Base provider is optional too; set `PIXAZO_API` to enable it.
+   ElevenLabs narration is optional; set `ELEVENLABS_API_KEY` with `voices_read`,
+   `text_to_speech`, and `user_read` permissions. Studio blocks paid overages and requires a
+   separate confirmation for every ElevenLabs line.
 5. Check the setup:
 
    ```sh
@@ -89,6 +93,11 @@ passing selected take. Editing a line preserves its earlier takes as history, re
 base prompt, and immediately generates a take for the revised wording. Turn the toggle off for the
 non-interactive first-passing-take workflow.
 
+The voice picker groups **Local Voicebox** and **ElevenLabs** without routing one through the
+other. ElevenLabs defaults to Eleven v3's Natural preset, displays the account's included-credit
+balance before confirmation, records actual character usage when reported, and never retries a
+failed or uncertain request automatically.
+
 Studio also pauses at **Image review** before composition. Every scene shows its narration,
 editable project-local scene prompt, selected image, retained image takes, and a collapsed
 generation audit containing the exact provider prompt, negative prompt, model, seed, and settings.
@@ -124,10 +133,17 @@ The Local services controls now separate lightweight reads from destructive reco
 - **Restart everything…** asks for confirmation, cancels the current pipeline, stops browser
   audio/video, clears ComfyUI's queue, and restarts ComfyUI and Voicebox.
 
-Refreshing or closing the browser does not cancel the pipeline or erase the page state. Studio
-replays the saved run, restores narration and image approvals, and rereads finished image files
-when the page reconnects. Only the explicit **Restart everything…** control clears the active
-Studio session and restarts local services. Voicebox is considered ready only after its old
+Mount a project before editing or generating it. Studio permits only one mounted project and
+blocks switching or unmounting while work is active or unresolved. A successful unmount stops
+playback and clears every project-specific form, preview, review panel, stage, and browser-saved
+value. **Project activity** keeps a durable record of every planned, submitted, completed, failed,
+cancelled, or uncertain generation and links to saved artifacts.
+
+Refreshing or closing the browser does not cancel the pipeline or erase its job state. Studio
+replays the saved run, restores narration and image approvals, rereads finished image files, and
+reopens any outstanding confirmation when the page reconnects. Only the explicit **Restart
+everything…** control clears the active Studio run and restarts local services. Voicebox is
+considered ready only after its old
 application process has fully exited and its health and profile APIs pass several consecutive
 checks; the environment check also waits through a normal Voicebox startup instead of failing
 during model loading.
