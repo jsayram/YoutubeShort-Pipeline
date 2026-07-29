@@ -13,7 +13,13 @@ import {
   mergePartialManifest,
   selectRequestedScenes,
 } from "./image-generation-audit.mjs";
-import { buildGeminiPrompt } from "./image-worker-common.mjs";
+import {
+  beginAuthorizedRemoteImage,
+  buildGeminiPrompt,
+  failRemoteImage,
+  finishRemoteImage,
+  skipAuthorizedRemoteImage,
+} from "./image-worker-common.mjs";
 
 await loadEnv();
 const { flags } = parseArgs();
@@ -94,7 +100,7 @@ function findImage(interaction) {
 }
 
 try {
-for (const item of prompts) {
+for (const [itemIndex, item] of prompts.entries()) {
   if (!item.id || !item.prompt) throw new Error("Every image prompt needs an id and prompt.");
   if (!flags.force) {
     for (const extension of generatedExtensions) {
@@ -117,6 +123,13 @@ for (const item of prompts) {
           },
         });
         await audit.completeScene(item.id, { status: "reused", output: manifest.at(-1) });
+        await skipAuthorizedRemoteImage(
+          slug,
+          "gemini",
+          item,
+          itemIndex,
+          `public/generated/${item.id}.${extension}`,
+        );
         break;
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
@@ -138,7 +151,9 @@ for (const item of prompts) {
     },
   });
   let interaction;
+  let generationJob;
   try {
+    generationJob = await beginAuthorizedRemoteImage(slug, "gemini", item, itemIndex);
     cloudRequestCount += 1;
     interaction = await ai.interactions.create({
       model: config.imageGen.model,
@@ -150,6 +165,7 @@ for (const item of prompts) {
       },
     });
   } catch (error) {
+    await failRemoteImage(slug, generationJob, error);
     await audit.failScene(item.id, error);
     await audit.fail(error);
     if (String(error).includes("429") || String(error).toLowerCase().includes("quota")) {
@@ -178,6 +194,9 @@ for (const item of prompts) {
     model: config.imageGen.model,
     prompt: fullPrompt,
     promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
+  });
+  await finishRemoteImage(slug, generationJob, {
+    artifact: `public/generated/${item.id}.${extension}`,
   });
   await audit.completeScene(item.id, {
     output: manifest.at(-1),

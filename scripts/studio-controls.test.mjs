@@ -55,6 +55,33 @@ test("refresh safely rejoins a run and full service restart remains explicit", a
   assert.match(studio, /const voicebox = await waitForVoiceboxStable\(45000\)/);
 });
 
+test("Studio mounts one project, clears it on unmount, and gates paid provider work", async () => {
+  const [html, studio, jobs, narration, cloudflare, fluxRouter] = await Promise.all([
+    read("scripts/studio/index.html"),
+    read("scripts/studio.mjs"),
+    read("scripts/generation-jobs.mjs"),
+    read("scripts/narration-review.mjs"),
+    read("scripts/generate-images-cloudflare.mjs"),
+    read("scripts/generate-images-flux2.mjs"),
+  ]);
+
+  assert.match(html, /id="mount-project"/);
+  assert.match(html, /id="unmount-project"/);
+  assert.match(html, /function clearWorkspace\(\)/);
+  assert.match(html, /localStorage\.removeItem\(formStateKey\)/);
+  assert.match(html, /id="project-activity"/);
+  assert.match(html, /id="generation-confirmation"/);
+  assert.match(studio, /route === "\/api\/mount"/);
+  assert.match(studio, /route === "\/api\/unmount"/);
+  assert.match(studio, /requireMounted\(response, slug\)/);
+  assert.match(studio, /Every paid provider request must be confirmed/);
+  assert.match(jobs, /"awaiting-confirmation"/);
+  assert.match(jobs, /markInterruptedJobsUnknown/);
+  assert.match(narration, /authorizedNarrationJob/);
+  assert.match(cloudflare, /beginAuthorizedRemoteImage/);
+  assert.match(fluxRouter, /Automatic Cloudflare fallback is disabled/);
+});
+
 test("local LLM enrichment stays an optional provider-independent overlay", async () => {
   const [html, studio, dispatcher, local, flux, cloudflare, gemini, template] =
     await Promise.all([

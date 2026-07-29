@@ -32,7 +32,9 @@ if (localLlm.reachable && localLlm.modelReady) {
 }
 
 const templateConfig = await readJson(path.join(repoRoot, "templates", "video.json"));
-const provider = templateConfig.imageGen?.provider ?? "comfyui";
+const provider = process.env.IMAGE_PROVIDER ?? templateConfig.imageGen?.provider ?? "comfyui";
+const narrationProvider =
+  process.env.NARRATION_PROVIDER ?? templateConfig.narration?.provider ?? "voicebox";
 const finalCutBridge = path.resolve(
   process.env.FINAL_CUT_BRIDGE_DIR ?? path.join(repoRoot, "..", "final-cut-youtube-bridge"),
 );
@@ -87,7 +89,7 @@ if (provider === "drawthings" || provider === "draw-things") {
       }
     }
   }
-} else if (provider === "comfyui" || provider === "local") {
+} else if (["comfyui", "local", "flux2-local", "flux2"].includes(provider)) {
   const comfyUrl = (process.env.COMFYUI_BASE_URL ?? "http://127.0.0.1:8188").replace(/\/$/, "");
   const stats = await fetch(`${comfyUrl}/system_stats`).catch(() => null);
   if (stats?.ok) {
@@ -99,7 +101,9 @@ if (provider === "drawthings" || provider === "draw-things") {
       .then((response) => response.json())
       .then((info) => info.CheckpointLoaderSimple.input.required.ckpt_name[0])
       .catch(() => []);
-    if (seen.includes(wanted)) console.log(`✓ Checkpoint "${wanted}"`);
+    if (provider !== "comfyui" && provider !== "local") {
+      console.log("✓ Local FLUX provider will validate its model components before generation");
+    } else if (seen.includes(wanted)) console.log(`✓ Checkpoint "${wanted}"`);
     else {
       failures.push(
         `ComfyUI cannot see checkpoint "${wanted}". Found: ${seen.join(", ") || "none"}. ` +
@@ -112,10 +116,23 @@ if (provider === "drawthings" || provider === "draw-things") {
         "cd ~/ComfyUI && venv/bin/python main.py --listen 127.0.0.1 --port 8188",
     );
   }
-} else if (process.env.GEMINI_API_KEY) {
-  console.log("✓ GEMINI_API_KEY is configured");
+} else if (provider === "cloudflare-flux2") {
+  if (process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN) {
+    console.log("✓ Cloudflare account and API token are configured");
+  } else {
+    failures.push("Cloudflare needs CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.");
+  }
+} else if (provider === "pixazo-sdxl" || provider === "pixazo") {
+  if (process.env.PIXAZO_API ?? process.env.PIXAZO_API_KEY) {
+    console.log("✓ Pixazo API key is configured");
+  } else {
+    failures.push("Pixazo needs PIXAZO_API or PIXAZO_API_KEY.");
+  }
+} else if (provider === "gemini" || provider === "google") {
+  if (process.env.GEMINI_API_KEY) console.log("✓ GEMINI_API_KEY is configured");
+  else failures.push("GEMINI_API_KEY is missing from .env.");
 } else {
-  failures.push("GEMINI_API_KEY is missing from .env.");
+  failures.push(`Unknown image provider "${provider}".`);
 }
 
 const baseUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
@@ -123,7 +140,8 @@ const voiceboxAppRunning = await commandOutput("pgrep", ["-x", "voicebox"]).then
   (output) => Boolean(output.trim()),
   () => false,
 );
-const voiceboxDeadline = Date.now() + (voiceboxAppRunning ? 45000 : 1);
+const voiceboxDeadline =
+  Date.now() + (narrationProvider === "voicebox" && voiceboxAppRunning ? 45000 : 1);
 let voicebox = null;
 let stableChecks = 0;
 do {
@@ -151,7 +169,33 @@ do {
   }
 } while (Date.now() < voiceboxDeadline);
 
-if (voicebox && stableChecks >= 2) {
+if (narrationProvider === "elevenlabs") {
+  const key = String(process.env.ELEVENLABS_API_KEY ?? "").trim();
+  if (!key) {
+    failures.push("ELEVENLABS_API_KEY is missing from .env.");
+  } else {
+    const headers = { "xi-api-key": key };
+    const [voicesResponse, subscriptionResponse] = await Promise.all([
+      fetch("https://api.elevenlabs.io/v2/voices?page_size=1", { headers }).catch(() => null),
+      fetch("https://api.elevenlabs.io/v1/user/subscription", { headers }).catch(() => null),
+    ]);
+    if (!voicesResponse?.ok) {
+      failures.push("ElevenLabs key is missing voices_read or cannot list account voices.");
+    }
+    if (!subscriptionResponse?.ok) {
+      failures.push("ElevenLabs key is missing user_read or cannot read included-credit balance.");
+    }
+    if (voicesResponse?.ok && subscriptionResponse?.ok) {
+      const subscription = await subscriptionResponse.json();
+      const remaining =
+        Number(subscription.character_limit) - Number(subscription.character_count);
+      console.log(
+        `✓ ElevenLabs (${Math.max(0, remaining)} included credits remaining; paid overages blocked)`,
+      );
+      console.log("✓ ElevenLabs text_to_speech permission will be enforced before synthesis");
+    }
+  }
+} else if (voicebox && stableChecks >= 2) {
   const { status, profiles } = voicebox;
   console.log(`✓ Voicebox at ${baseUrl} (model ${status.model_size ?? "unknown"})`);
 

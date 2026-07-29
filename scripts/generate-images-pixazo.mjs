@@ -2,10 +2,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { loadEnv, parseArgs, readJson, videoDir } from "./lib.mjs";
 import {
+  beginAuthorizedRemoteImage,
   buildFluxPrompt,
+  failRemoteImage,
   finishImageRun,
+  finishRemoteImage,
   installGenerationLock,
   seedFor,
+  skipAuthorizedRemoteImage,
   writeExactImage,
 } from "./image-worker-common.mjs";
 import {
@@ -205,13 +209,27 @@ try {
       };
       manifest.push(entry);
       await audit.completeScene(item.id, { status: "reused", output: entry });
+      await skipAuthorizedRemoteImage(
+        flags.project,
+        "pixazo-sdxl",
+        item,
+        index,
+        `public/generated/${item.id}.png`,
+      );
       console.log(`[${index + 1}/${scenes.length}] ${item.id} — already generated, skipping`);
       continue;
     }
 
     const itemStart = Date.now();
     let generated;
+    let generationJob;
     try {
+      generationJob = await beginAuthorizedRemoteImage(
+        flags.project,
+        "pixazo-sdxl",
+        item,
+        index,
+      );
       generated = await pixazoImage({ prompt, negativePrompt, seed });
       await writeExactImage({
         bytes: generated.bytes,
@@ -221,6 +239,7 @@ try {
         postProcess: gen.postProcess ?? null,
       });
     } catch (error) {
+      await failRemoteImage(flags.project, generationJob, error);
       await audit.failScene(item.id, error);
       await audit.fail(error);
       throw error;
@@ -239,6 +258,9 @@ try {
       promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
     };
     manifest.push(entry);
+    await finishRemoteImage(flags.project, generationJob, {
+      artifact: `public/generated/${item.id}.png`,
+    });
     await audit.completeScene(item.id, {
       output: entry,
       providerResponse: generated.response,

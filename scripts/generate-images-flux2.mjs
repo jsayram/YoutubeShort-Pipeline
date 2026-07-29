@@ -30,32 +30,18 @@ const localReady =
   models.includes(required.diffusionModel) &&
   encoders.includes(required.textEncoder) &&
   vaes.includes(required.vae);
-const cloudReady = Boolean(
-  process.env.CLOUDFLARE_ACCOUNT_ID && process.env.CLOUDFLARE_API_TOKEN,
-);
 const forwarded = process.argv.slice(2);
 
 if (localReady) {
   console.log("FLUX.2 route: local ComfyUI");
-  try {
-    await run(process.execPath, [
-      path.join(repoRoot, "scripts", "generate-images-flux2-local.mjs"),
-      ...forwarded,
-    ]);
-    process.exit(0);
-  } catch (error) {
-    if (!cloudReady || gen.fallbackProvider !== "cloudflare-flux2") throw error;
-    console.warn("Local FLUX.2 failed. Continuing unfinished scenes with Cloudflare fallback.");
-  }
-} else if (!cloudReady || gen.fallbackProvider !== "cloudflare-flux2") {
-  throw new Error(
-    "Local FLUX.2 models are unavailable and the Cloudflare fallback is not configured.",
-  );
-} else {
-  console.log("FLUX.2 route: Cloudflare fallback (local model unavailable)");
+  await run(process.execPath, [
+    path.join(repoRoot, "scripts", "generate-images-flux2-local.mjs"),
+    ...forwarded,
+  ]);
+  process.exit(0);
 }
 
-await run(process.execPath, [
-  path.join(repoRoot, "scripts", "generate-images-cloudflare.mjs"),
-  ...forwarded,
-]);
+throw new Error(
+  "Local FLUX.2 models are unavailable. Automatic Cloudflare fallback is disabled to protect " +
+    "credits. Select Cloudflare FLUX.2 explicitly in Studio and confirm every scene.",
+);

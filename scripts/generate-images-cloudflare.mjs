@@ -2,13 +2,17 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { loadEnv, parseArgs, readJson, run, videoDir } from "./lib.mjs";
 import {
+  beginAuthorizedRemoteImage,
   buildFluxPrompt,
+  failRemoteImage,
   finishImageRun,
+  finishRemoteImage,
   installGenerationLock,
   promptWithReferences,
   referencesForScene,
   resolveSeedSalt,
   seedFor,
+  skipAuthorizedRemoteImage,
   splitImageItems,
   writeExactImage,
 } from "./image-worker-common.mjs";
@@ -199,6 +203,13 @@ try {
         references: selectedReferences.map((reference) => reference.id),
       });
       await audit.completeScene(item.id, { status: "reused", output: manifest.at(-1) });
+      await skipAuthorizedRemoteImage(
+        flags.project,
+        "cloudflare-flux2",
+        item,
+        index,
+        `public/generated/${item.id}.png`,
+      );
       continue;
     }
     const itemStart = Date.now();
@@ -209,7 +220,14 @@ try {
       references: selectedReferences.map((reference) => reference.id),
     });
     let bytes;
+    let generationJob;
     try {
+      generationJob = await beginAuthorizedRemoteImage(
+        flags.project,
+        "cloudflare-flux2",
+        item,
+        index,
+      );
       bytes = await cloudflareImage({
         prompt,
         width: sceneWidth,
@@ -218,6 +236,7 @@ try {
         referenceFiles: selectedReferences,
       });
     } catch (error) {
+      await failRemoteImage(flags.project, generationJob, error);
       await audit.failScene(item.id, error);
       await audit.fail(error);
       throw error;
@@ -237,6 +256,9 @@ try {
       references: selectedReferences.map((reference) => reference.id),
       prompt,
       promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
+    });
+    await finishRemoteImage(flags.project, generationJob, {
+      artifact: `public/generated/${item.id}.png`,
     });
     await audit.completeScene(item.id, { output: manifest.at(-1) });
   }

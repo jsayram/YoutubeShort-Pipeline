@@ -12,9 +12,11 @@ import {
 } from "./lib.mjs";
 import {
   analyzeVoiceClip,
+  assembleVoiceClips,
   ensureVoiceClipQuietTail,
   expectedLastWord,
   normalizeVoiceClip,
+  probeAudioDuration,
   transcribeVoiceClip,
   transcriptEndsWith,
 } from "./narration-audio.mjs";
@@ -27,6 +29,18 @@ import {
 import { loadStyles } from "./image-styles.mjs";
 import { resolveTopic } from "./topics.mjs";
 import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
+import {
+  ELEVENLABS_DEFAULT_MODEL,
+  ELEVENLABS_NATURAL_STABILITY,
+  estimateElevenLabsUsage,
+  elevenLabsSubscription,
+  synthesizeElevenLabsLine,
+} from "./elevenlabs-provider.mjs";
+import {
+  listJobs,
+  providerOutcomeIsUncertain,
+  transitionJob,
+} from "./generation-jobs.mjs";
 
 const CLIENT_HEADERS = { "X-Voicebox-Client-Id": "youtube-pipeline" };
 const lineLocks = new Set();
@@ -117,9 +131,31 @@ export async function prepareNarrationReview(
     const selected = line.takes.find(
       (take) => take.id === line.selectedTakeId && take.text === line.text && take.qa?.passed,
     );
-    if (selected) continue;
+    if (selected) {
+      if (state.settings.provider === "elevenlabs") {
+        const unused = (await listJobs(slug)).find(
+          (entry) =>
+            entry.kind === "narration-line" &&
+            entry.provider === "elevenlabs" &&
+            Number(entry.item?.index) === Number(line.index) &&
+            entry.item?.text === line.text &&
+            entry.status === "authorized",
+        );
+        if (unused) {
+          await transitionJob(slug, unused.id, "cancelled", {
+            actual: { unit: "characters", amount: 0 },
+            artifact: selected.audio,
+            error: { message: "No provider request was sent because the approved take was reused." },
+          });
+        }
+      }
+      continue;
+    }
 
-    const attempts = autoApprove ? 2 : 1;
+    // Remote generations are never retried automatically because a rejected or uncertain
+    // response may already have consumed credits. Voicebox remains local and can keep its
+    // existing automatic QA retry when review is disabled.
+    const attempts = autoApprove && state.settings.provider !== "elevenlabs" ? 2 : 1;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const result = await generateNarrationTake(slug, line.index);
       state = result.state;
@@ -159,11 +195,17 @@ export async function generateNarrationTake(slug, lineIndex) {
       line.key,
     );
     await fs.mkdir(candidateDir, { recursive: true });
-    const sourceFile = path.join(candidateDir, `${takeId}-source.wav`);
+    const sourceFile = path.join(
+      candidateDir,
+      `${takeId}-source.${state.settings.provider === "elevenlabs" ? "mp3" : "wav"}`,
+    );
     const normalizedFile = path.join(candidateDir, `${takeId}.wav`);
     const take = {
       id: takeId,
+      provider: state.settings.provider,
       generationId: null,
+      providerRequestId: null,
+      usage: null,
       text: line.text,
       createdAt: new Date().toISOString(),
       sourceAudio: relativeProjectPath(projectDir, sourceFile),
@@ -177,9 +219,47 @@ export async function generateNarrationTake(slug, lineIndex) {
     await saveState(projectDir, state);
 
     try {
-      const generation = await speak(state.settings, line.text);
-      take.generationId = generation.id;
-      await exportGeneration(state.settings.baseUrl, generation.id, sourceFile);
+      if (state.settings.provider === "elevenlabs") {
+        const job = await authorizedNarrationJob(slug, lineIndex, line.text);
+        await transitionJob(slug, job.id, "submitted");
+        await transitionJob(slug, job.id, "running");
+        const before = await elevenLabsSubscription();
+        const estimate = estimateElevenLabsUsage(line.text);
+        if (before.remaining !== null && estimate.maximum > before.remaining) {
+          throw new Error(
+            `ElevenLabs included credits are insufficient: ${estimate.maximum} required, ` +
+              `${before.remaining} remaining. Studio does not use paid overages.`,
+          );
+        }
+        const generation = await synthesizeElevenLabsLine({
+          voiceId: state.settings.voiceId,
+          text: line.text,
+          outputFile: sourceFile,
+          modelId: state.settings.modelId,
+          stability: state.settings.stability,
+        });
+        take.providerRequestId = generation.requestId;
+        const balanceAfter = await elevenLabsSubscription().catch(() => null);
+        take.usage = {
+          estimate,
+          actual: {
+            unit: "characters",
+            amount: generation.characterCost ?? estimate.maximum,
+          },
+          balanceBefore: before,
+          balanceAfter,
+        };
+        await transitionJob(slug, job.id, "succeeded", {
+          providerRequestId: generation.requestId,
+          actual: take.usage.actual,
+          artifact: take.sourceAudio,
+        });
+      } else {
+        const generation = await speak(state.settings, line.text);
+        take.generationId = generation.id;
+        take.providerRequestId = generation.id;
+        await exportGeneration(state.settings.baseUrl, generation.id, sourceFile);
+      }
       await normalizeVoiceClip(sourceFile, normalizedFile);
       take.qa = await inspectCandidate(normalizedFile, line.text, state.settings);
       take.durationMs = take.qa.analysis.durationMs;
@@ -202,6 +282,24 @@ export async function generateNarrationTake(slug, lineIndex) {
       if (take.qa.passed && !line.selectedTakeId) line.selectedTakeId = take.id;
     } catch (error) {
       take.qa = { passed: false, status: "failed", reason: String(error.message ?? error) };
+      if (state.settings.provider === "elevenlabs") {
+        const job = (await listJobs(slug)).find(
+          (entry) =>
+            entry.kind === "narration-line" &&
+            Number(entry.item?.index) === Number(lineIndex) &&
+            ["submitted", "running"].includes(entry.status),
+        );
+        if (job) {
+          await transitionJob(
+            slug,
+            job.id,
+            providerOutcomeIsUncertain(error) ? "unknown" : "failed",
+            {
+            error: { message: String(error.message ?? error) },
+            },
+          ).catch(() => {});
+        }
+      }
     } finally {
       line.generating = false;
       line.approvalValid = selectedTakeIsValid(line);
@@ -213,6 +311,24 @@ export async function generateNarrationTake(slug, lineIndex) {
   } finally {
     lineLocks.delete(lockKey);
   }
+}
+
+async function authorizedNarrationJob(slug, lineIndex, text) {
+  const job = (await listJobs(slug)).find(
+    (entry) =>
+      entry.kind === "narration-line" &&
+      entry.provider === "elevenlabs" &&
+      Number(entry.item?.index) === Number(lineIndex) &&
+      entry.item?.text === text &&
+      entry.status === "authorized",
+  );
+  if (!job) {
+    throw new Error(
+      `ElevenLabs line ${Number(lineIndex) + 1} has no fresh credit authorization. ` +
+        "Return to Studio and confirm this request.",
+    );
+  }
+  return job;
 }
 
 export async function selectNarrationTake(slug, lineIndex, takeId) {
@@ -267,6 +383,10 @@ export async function approveNarrationReview(slug) {
   if (!validation.valid) throw new Error(validation.errors.join(" "));
   state.status = "assembling";
   await saveState(projectDir, state);
+
+  if (state.settings.provider === "elevenlabs") {
+    return approveProviderNeutralNarration(projectDir, state);
+  }
 
   const story = await voiceboxApi(state.settings.baseUrl, "/stories", {
     method: "POST",
@@ -336,6 +456,11 @@ export function voiceSettingsChanged(previous, current) {
   return [
     "profileId",
     "profile",
+    "provider",
+    "voiceId",
+    "modelId",
+    "preset",
+    "stability",
     "engine",
     "modelSize",
     "language",
@@ -389,6 +514,47 @@ async function resolveSettings(projectDir) {
   const configPath = path.join(projectDir, "video.json");
   const config = await readJson(configPath);
   const voice = config.voicebox ?? {};
+  const provider = config.narration?.provider === "elevenlabs" ? "elevenlabs" : "voicebox";
+  const hyperframesVersion = await resolveHyperframesVersion(config);
+  if (provider === "elevenlabs") {
+    const eleven = config.elevenlabs ?? {};
+    if (!eleven.voiceId) throw new Error("Choose an ElevenLabs voice before generating narration.");
+    const settings = {
+      provider,
+      voiceId: String(eleven.voiceId),
+      profileId: String(eleven.voiceId),
+      profile: String(eleven.voiceName ?? "ElevenLabs voice"),
+      engine: "elevenlabs",
+      modelId: String(eleven.modelId ?? ELEVENLABS_DEFAULT_MODEL),
+      modelSize: String(eleven.modelId ?? ELEVENLABS_DEFAULT_MODEL),
+      preset: String(eleven.preset ?? "natural"),
+      stability: Math.max(
+        0,
+        Math.min(1, Number(eleven.settings?.stability ?? ELEVENLABS_NATURAL_STABILITY)),
+      ),
+      language: String(voice.language ?? "en"),
+      gapMs: Math.max(0, Math.round(Number(voice.gapMs ?? 3000))),
+      finalHoldMs: Math.max(0, Math.round(Number(voice.finalHoldMs ?? voice.gapMs ?? 3000))),
+      minTailQuietMs: Math.max(0, Math.round(Number(voice.minTailQuietMs ?? 20))),
+      qaTranscribe: voice.qaTranscribe !== false,
+      qaModel: String(voice.qaModel ?? "tiny.en"),
+      hyperframesVersion,
+      storyName: config.title ?? path.basename(projectDir),
+      storyDescription: voice.storyDescription ?? null,
+    };
+    config.narration = { ...(config.narration ?? {}), provider };
+    config.elevenlabs = {
+      ...eleven,
+      voiceId: settings.voiceId,
+      voiceName: settings.profile,
+      modelId: settings.modelId,
+      preset: settings.preset,
+      settings: { ...(eleven.settings ?? {}), stability: settings.stability },
+    };
+    await writeJson(configPath, config);
+    return settings;
+  }
+
   const baseUrl = (process.env.VOICEBOX_BASE_URL ?? "http://127.0.0.1:17493").replace(/\/$/, "");
   const health = await fetch(`${baseUrl}/health`).catch(() => null);
   if (!health?.ok) throw new Error(`Voicebox is not reachable at ${baseUrl}.`);
@@ -400,8 +566,8 @@ async function resolveSettings(projectDir) {
   );
   if (!profile) throw new Error(`Voicebox profile "${requested}" was not found.`);
   const resolved = resolveVoiceboxEngine(profile, voice.engine ?? "qwen");
-  const hyperframesVersion = await resolveHyperframesVersion(config);
   const settings = {
+    provider,
     baseUrl,
     profileId: profile.id,
     profile: profile.name,
@@ -419,8 +585,154 @@ async function resolveSettings(projectDir) {
     storyDescription: voice.storyDescription ?? null,
   };
   config.voicebox = { ...voice, profile: profile.name, engine: resolved.engine };
+  config.narration = { ...(config.narration ?? {}), provider };
   await writeJson(configPath, config);
   return settings;
+}
+
+async function approveProviderNeutralNarration(projectDir, state) {
+  const selected = state.lines.map((line) => ({
+    line,
+    take: line.takes.find((take) => take.id === line.selectedTakeId),
+  }));
+  const placed = [];
+  for (const [index, entry] of selected.entries()) {
+    const analysis = entry.take.qa.analysis;
+    const previous = placed.at(-1);
+    const clipStartMs = previous
+      ? Math.max(
+          previous.clipEndMs,
+          Math.round(
+            previous.speechEndMs + state.settings.gapMs - analysis.leadingQuietMs,
+          ),
+        )
+      : 0;
+    placed.push({
+      index,
+      text: entry.line.text,
+      take: entry.take,
+      file: path.join(projectDir, entry.take.audio),
+      durationMs: entry.take.durationMs,
+      leadingQuietMs: analysis.leadingQuietMs,
+      trailingQuietMs: analysis.trailingQuietMs,
+      clipStartMs,
+      clipEndMs: clipStartMs + entry.take.durationMs,
+      speechStartMs: clipStartMs + analysis.leadingQuietMs,
+      speechEndMs: clipStartMs + entry.take.durationMs - analysis.trailingQuietMs,
+    });
+  }
+
+  const audioDir = path.join(projectDir, "public", "audio");
+  const finalPath = path.join(audioDir, "narration.wav");
+  const clips = placed.map((line, index) => ({
+    file: line.file,
+    durationMs: line.durationMs,
+    gapAfterMs:
+      index === placed.length - 1
+        ? 0
+        : Math.max(0, placed[index + 1].clipStartMs - line.clipEndMs),
+  }));
+  await assembleVoiceClips(clips, finalPath);
+  const narrationDuration = await probeAudioDuration(finalPath);
+  const round = (value) => Number(Number(value).toFixed(3));
+  const videoDuration = round(narrationDuration + state.settings.finalHoldMs / 1000);
+  const lines = placed.map((line, index) => {
+    const next = placed[index + 1];
+    const previous = placed[index - 1];
+    const speechStart = round(line.speechStartMs / 1000);
+    const speechEnd = round(line.speechEndMs / 1000);
+    const clipStart = round(line.clipStartMs / 1000);
+    const clipEnd = round(line.clipEndMs / 1000);
+    const imageStart =
+      index === 0
+        ? 0
+        : Math.max(previous.speechEndMs / 1000, speechStart - 0.5);
+    return {
+      index,
+      text: line.text,
+      provider: "elevenlabs",
+      providerRequestId: line.take.providerRequestId,
+      audio: line.take.audio.replace(/^public\//, ""),
+      sourceAudio: line.take.sourceAudio.replace(/^public\//, ""),
+      start: clipStart,
+      duration: round(line.durationMs / 1000),
+      end: clipEnd,
+      clipStart,
+      clipEnd,
+      speechStart,
+      speechEnd,
+      leadingQuietMs: line.leadingQuietMs,
+      trailingQuietMs: line.trailingQuietMs,
+      boundaryPeakDb: line.take.qa.analysis.boundaryPeakDb,
+      pauseStart: speechEnd,
+      pauseEnd: next ? round(next.speechStartMs / 1000) : videoDuration,
+      imageStart: round(imageStart),
+      imageEnd: next ? round(next.speechStartMs / 1000) : videoDuration,
+      transitionStart: round(imageStart),
+      transitionEnd: index === 0 ? 0 : speechStart,
+      qa: line.take.qa,
+    };
+  });
+  const timing = {
+    story: null,
+    provider: "elevenlabs",
+    audio: "audio/narration.wav",
+    lineAudioDirectory: "audio/lines/candidates",
+    profile: state.settings.profile,
+    voiceId: state.settings.voiceId,
+    engine: "elevenlabs",
+    modelSize: state.settings.modelId,
+    modelId: state.settings.modelId,
+    gapMs: state.settings.gapMs,
+    pauseMs: state.settings.gapMs,
+    finalHoldMs: state.settings.finalHoldMs,
+    transitionMs: 500,
+    minTailQuietMs: state.settings.minTailQuietMs,
+    qaTranscribe: state.settings.qaTranscribe,
+    qaModel: state.settings.qaTranscribe ? state.settings.qaModel : null,
+    tempo: 1,
+    speechDuration: round(
+      placed.reduce((sum, line) => sum + (line.speechEndMs - line.speechStartMs), 0) / 1000,
+    ),
+    narrationDuration: round(narrationDuration),
+    spokenDuration: round(narrationDuration),
+    videoDuration,
+    lines,
+  };
+  await writeJsonAtomic(path.join(audioDir, "narration.timing.json"), timing);
+  await writeJsonAtomic(path.join(projectDir, "content", "story.json"), {
+    provider: "elevenlabs",
+    voiceId: state.settings.voiceId,
+    voiceName: state.settings.profile,
+    modelId: state.settings.modelId,
+    gapMs: state.settings.gapMs,
+    finalHoldMs: state.settings.finalHoldMs,
+    lines: selected.map(({ line, take }) => ({
+      index: line.index,
+      text: line.text,
+      takeId: take.id,
+      providerRequestId: take.providerRequestId,
+      durationMs: take.durationMs,
+      usage: take.usage,
+      qa: take.qa,
+    })),
+  });
+  const configPath = path.join(projectDir, "video.json");
+  const config = await readJson(configPath);
+  config.duration = videoDuration;
+  await writeJson(configPath, config);
+  await run(process.execPath, [
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "validate-narration.mjs"),
+    "--project",
+    path.basename(projectDir),
+  ]);
+  state.status = "approved";
+  state.approvedAt = new Date().toISOString();
+  state.updatedAt = state.approvedAt;
+  for (const line of state.lines) line.approvalValid = selectedTakeIsValid(line);
+  await fs.rm(path.join(projectDir, "content", "pipeline-stale.json"), { force: true });
+  await saveState(projectDir, state);
+  return state;
 }
 
 async function speak(settings, text) {

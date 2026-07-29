@@ -682,6 +682,32 @@
         color: var(--accent);
         font-size: 13px;
       }
+      dialog {
+        width: min(620px, calc(100vw - 32px));
+        color: var(--text);
+        background: #111216;
+        border: 1px solid #3c3e47;
+        border-radius: 16px;
+        padding: 24px;
+      }
+      dialog::backdrop { background: rgba(0, 0, 0, 0.78); }
+      .job-list { display: grid; gap: 10px; margin-top: 14px; }
+      .job-card {
+        border: 1px solid #292b32;
+        border-radius: 12px;
+        padding: 12px;
+        background: #0d0e11;
+      }
+      .job-card[data-active="true"] { border-color: var(--accent); }
+      .mount-status { color: var(--muted); margin-top: 8px; }
+      .credit-warning {
+        padding: 12px;
+        border: 1px solid #9a6c13;
+        border-radius: 10px;
+        color: #ffd980;
+        background: rgba(154, 108, 19, 0.12);
+        margin: 14px 0;
+      }
     </style>
   </head>
   <body>
@@ -719,7 +745,41 @@
         </div>
       </section>
 
-      <div class="card">
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <label for="mount-slug">Mounted project</label>
+            <div class="sub">Generation and review controls are locked to one project at a time.</div>
+          </div>
+          <div class="actions">
+            <button id="mount-project" class="compact">Mount project</button>
+            <button id="create-project" class="ghost compact">Create and mount</button>
+            <button id="unmount-project" class="ghost compact" disabled>Unmount</button>
+          </div>
+        </div>
+        <input
+          id="mount-slug"
+          type="text"
+          placeholder="Choose an existing project"
+          autocomplete="off"
+          list="project-list"
+        />
+        <datalist id="project-list"></datalist>
+        <div class="mount-status" id="mount-status">No project mounted.</div>
+      </section>
+
+      <section class="card hidden" id="project-activity">
+        <div class="section-head">
+          <div>
+            <label>Project activity</label>
+            <div class="sub">Every generation remains here across refreshes and Studio restarts.</div>
+          </div>
+          <button id="refresh-jobs" class="ghost compact">Refresh</button>
+        </div>
+        <div class="job-list" id="job-list"></div>
+      </section>
+
+      <div class="card hidden" id="project-workspace">
         <div class="row">
           <div>
             <label for="slug">Project slug</label>
@@ -730,7 +790,6 @@
               autocomplete="off"
               list="project-list"
             />
-            <datalist id="project-list"></datalist>
           </div>
           <div>
             <label for="title">Title</label>
@@ -742,6 +801,25 @@
             <div class="hint" id="voicehint"></div>
           </div>
         </div>
+
+        <details class="hidden" id="elevenlabs-settings">
+          <summary>ElevenLabs natural narration settings</summary>
+          <div class="row" style="margin-top:12px">
+            <div>
+              <label for="elevenlabs-model">Model</label>
+              <select id="elevenlabs-model">
+                <option value="eleven_v3">Eleven v3 — expressive</option>
+                <option value="eleven_multilingual_v2">Multilingual v2 — stable long-form</option>
+                <option value="eleven_flash_v2_5">Flash v2.5 — lower credit use</option>
+              </select>
+            </div>
+            <div>
+              <label for="elevenlabs-stability">Stability</label>
+              <input id="elevenlabs-stability" type="range" min="0" max="1" step="0.05" value="0.5" />
+              <div class="hint">Natural preset: 0.50. Lower is more expressive; higher is more consistent.</div>
+            </div>
+          </div>
+        </details>
 
         <div class="row">
           <div>
@@ -938,6 +1016,16 @@ Start a recording and talk about your day."></textarea>
           <div class="sub" id="deliverypath" style="margin-top: 8px"></div>
         </div>
       </div>
+
+      <dialog id="generation-confirmation">
+        <label id="confirmation-title">Confirm generation</label>
+        <div class="credit-warning" id="confirmation-warning"></div>
+        <div id="confirmation-details"></div>
+        <div class="actions" style="margin-top:18px">
+          <button id="confirm-generation">Authorize this request</button>
+          <button id="decline-generation" class="ghost">Do not generate</button>
+        </div>
+      </dialog>
     </div>
 
     <script>
@@ -950,12 +1038,16 @@ Start a recording and talk about your day."></textarea>
       let pipelineBusy = false;
       let servicesRestarting = false;
       let imageReviewWorking = false;
+      let mountedProject = null;
+      let workspaceDirty = false;
       const formStateKey = "youtube-studio-form-v1";
       const savedFormIds = [
         "slug",
         "title",
         "script",
         "voice",
+        "elevenlabs-model",
+        "elevenlabs-stability",
         "style",
         "topic",
         "pause",
@@ -1007,9 +1099,285 @@ Start a recording and talk about your day."></textarea>
       restoreFormState({ includeSelects: false });
       document.addEventListener("input", (event) => {
         if (savedFormIds.includes(event.target?.id)) persistFormState();
+        if (mountedProject && savedFormIds.includes(event.target?.id)) workspaceDirty = true;
       });
       document.addEventListener("change", (event) => {
         if (savedFormIds.includes(event.target?.id)) persistFormState();
+        if (mountedProject && savedFormIds.includes(event.target?.id)) workspaceDirty = true;
+      });
+
+      function formatEstimate(job) {
+        const estimate = job.estimate ?? {};
+        const parts = [];
+        if (estimate.maximum != null) parts.push(`Maximum: ${estimate.maximum} ${estimate.unit ?? "units"}`);
+        if (estimate.balance?.remaining != null) {
+          parts.push(`Included balance: ${estimate.balance.remaining} remaining`);
+          if (estimate.maximum != null) {
+            parts.push(`Projected remaining: ${Math.max(0, estimate.balance.remaining - estimate.maximum)}`);
+          }
+        }
+        if (estimate.narrationLines != null) parts.push(`${estimate.narrationLines} narration lines`);
+        if (estimate.imageScenes != null) parts.push(`${estimate.imageScenes} image scenes`);
+        return parts.join(" · ") || "Usage estimate unavailable";
+      }
+
+      async function refreshJobs() {
+        const panel = $("project-activity");
+        if (!mountedProject) {
+          panel.classList.add("hidden");
+          $("job-list").replaceChildren();
+          return;
+        }
+        const response = await fetch(`/api/jobs?slug=${encodeURIComponent(mountedProject)}`, {
+          cache: "no-store",
+        }).catch(() => null);
+        if (!response?.ok) return [];
+        const { jobs } = await response.json();
+        panel.classList.remove("hidden");
+        $("job-list").innerHTML = jobs.length
+          ? jobs.map((job) => {
+              const active = !["succeeded", "failed", "cancelled"].includes(job.status);
+              const artifact = job.artifact
+                ? `<div class="sub">Saved to ${escapeHtml(job.artifact)}</div>`
+                : "";
+              const cancellable = ["planned", "awaiting-confirmation", "authorized"].includes(job.status);
+              const reconcilable = job.status === "unknown";
+              return `<article class="job-card" data-active="${active}">
+                <div><b>${escapeHtml(job.label)}</b> · ${escapeHtml(job.status)}</div>
+                <div class="sub">${escapeHtml(job.provider)}${job.model ? ` · ${escapeHtml(job.model)}` : ""}</div>
+                <div class="sub">${escapeHtml(formatEstimate(job))}</div>
+                ${job.actual ? `<div class="sub">Actual: ${escapeHtml(JSON.stringify(job.actual))}</div>` : ""}
+                ${artifact}
+                ${job.error?.message ? `<div class="err">${escapeHtml(job.error.message)}</div>` : ""}
+                ${cancellable ? `<button class="ghost compact" data-cancel-job="${escapeHtml(job.id)}">Cancel unsubmitted request</button>` : ""}
+                ${reconcilable ? `<button class="danger compact" data-resolve-job="${escapeHtml(job.id)}">Reconcile with provider…</button>` : ""}
+              </article>`;
+            }).join("")
+          : `<div class="sub">No generation activity for this project yet.</div>`;
+        return jobs;
+      }
+
+      function clearWorkspace() {
+        stopPlayback();
+        clearTimeout(assetRefreshTimer);
+        clearTimeout(imageReviewPoll);
+        activeRunSlug = null;
+        narrationReviewSlug = null;
+        imageReviewSlug = null;
+        workspaceDirty = false;
+        localStorage.removeItem(formStateKey);
+        savedFormState = {};
+        for (const id of ["slug", "title", "script"]) $(id).value = "";
+        $("pause").value = "3";
+        $("elevenlabs-model").value = "eleven_v3";
+        $("elevenlabs-stability").value = "0.5";
+        $("elevenlabs-settings").classList.add("hidden");
+        $("opt-regenerate-audio").checked = false;
+        $("opt-regenerate-audio").dataset.required = "false";
+        $("regenerate-audio-wrap").classList.add("hidden");
+        $("narration-review").classList.add("hidden");
+        $("project-assets").classList.add("hidden");
+        $("final").classList.add("hidden");
+        $("project-workspace").classList.add("hidden");
+        $("project-activity").classList.add("hidden");
+        $("narration-review-lines").replaceChildren();
+        $("saved-shots").replaceChildren();
+        $("saved-references").replaceChildren();
+        $("job-list").replaceChildren();
+        $("err").textContent = "";
+        stageNodes.clear();
+        stagesEl.replaceChildren();
+        promptData = null;
+        editedSceneIds = new Set();
+        $("scene-prompt-list").replaceChildren();
+        $("prompt-message").textContent = "";
+      }
+
+      async function mountProject(slug, create = false) {
+        const response = await fetch("/api/mount", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slug, create }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          $("mount-status").textContent = data.error ?? "Could not mount project.";
+          return false;
+        }
+        clearWorkspace();
+        mountedProject = data.mountedProject;
+        $("mount-slug").value = mountedProject;
+        $("slug").value = mountedProject;
+        $("slug").readOnly = true;
+        $("mount-status").textContent = `Mounted: ${mountedProject}`;
+        $("unmount-project").disabled = false;
+        $("project-workspace").classList.remove("hidden");
+        await loadProjects();
+        const jobs = await refreshJobs();
+        workspaceDirty = false;
+        const awaiting = jobs.find((job) => job.status === "awaiting-confirmation");
+        if (awaiting) {
+          $("mount-status").textContent =
+            `Mounted: ${mountedProject} · a generation is waiting for confirmation`;
+          void authorizePlannedJob(awaiting);
+        }
+        return true;
+      }
+
+      async function unmountProject() {
+        if (workspaceDirty) {
+          const choice = window.prompt(
+            "This project has unsaved Studio changes. Type SAVE to keep a draft, DISCARD to remove them, or STAY to remain mounted.",
+            "STAY",
+          )?.trim().toUpperCase();
+          if (!choice || choice === "STAY") return;
+          if (!["SAVE", "DISCARD"].includes(choice)) {
+            $("mount-status").textContent = "Unmount cancelled: choose SAVE, DISCARD, or STAY.";
+            return;
+          }
+          if (choice === "SAVE") {
+            const saved = await fetch("/api/project/draft", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                slug: mountedProject,
+                title: $("title").value,
+                script: $("script").value,
+                voiceRef: $("voice").value,
+                elevenlabsModel: $("elevenlabs-model").value,
+                elevenlabsStability: Number($("elevenlabs-stability").value),
+                style: $("style").value,
+                topic: $("topic").value,
+                pauseSeconds: Number($("pause").value || 3),
+              }),
+            });
+            if (!saved.ok) {
+              $("mount-status").textContent = (await saved.json()).error;
+              return;
+            }
+          }
+        }
+        const response = await fetch("/api/unmount", { method: "POST" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          $("mount-status").textContent = data.error ?? "Could not unmount project.";
+          await refreshJobs();
+          return;
+        }
+        mountedProject = null;
+        clearWorkspace();
+        $("mount-slug").value = "";
+        $("mount-status").textContent = "No project mounted.";
+        $("unmount-project").disabled = true;
+      }
+
+      function confirmGeneration(job) {
+        return new Promise((resolve) => {
+          const dialog = $("generation-confirmation");
+          $("confirmation-title").textContent = job.monetary
+            ? "Confirm credit-consuming request"
+            : "Confirm generation work";
+          $("confirmation-warning").textContent =
+            job.warning ?? "Review this generation before it starts.";
+          $("confirmation-details").innerHTML = `
+            <div><b>${escapeHtml(job.label)}</b></div>
+            <div class="sub">Provider: ${escapeHtml(job.provider)}${job.model ? ` · ${escapeHtml(job.model)}` : ""}</div>
+            <div class="sub">${escapeHtml(formatEstimate(job))}</div>
+            <div class="sub">Result: ${escapeHtml(job.destination ?? "Project Activity")}</div>`;
+          const finish = (approved) => {
+            $("confirm-generation").onclick = null;
+            $("decline-generation").onclick = null;
+            dialog.close();
+            resolve(approved);
+          };
+          $("confirm-generation").onclick = () => finish(true);
+          $("decline-generation").onclick = () => finish(false);
+          dialog.showModal();
+        });
+      }
+
+      async function authorizePlannedJob(job) {
+        const approved = await confirmGeneration(job);
+        if (!approved) {
+          await fetch("/api/jobs/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug: mountedProject, jobId: job.id }),
+          });
+          await refreshJobs();
+          return false;
+        }
+        const response = await fetch("/api/jobs/authorize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slug: mountedProject,
+            jobId: job.id,
+            acknowledgement: job.monetary
+              ? "I understand this request may consume credits"
+              : "I authorize this generation",
+          }),
+        });
+        if (!response.ok) {
+          $("err").textContent = (await response.json()).error;
+          return false;
+        }
+        await refreshJobs();
+        return true;
+      }
+
+      async function cancelUnsubmittedJobs(jobs) {
+        await Promise.all(
+          jobs.map((job) =>
+            fetch("/api/jobs/cancel", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ slug: mountedProject, jobId: job.id }),
+            }).catch(() => null),
+          ),
+        );
+        await refreshJobs();
+      }
+
+      $("mount-project").addEventListener("click", () =>
+        mountProject($("mount-slug").value.trim(), false),
+      );
+      $("create-project").addEventListener("click", () =>
+        mountProject($("mount-slug").value.trim(), true),
+      );
+      $("unmount-project").addEventListener("click", unmountProject);
+      $("refresh-jobs").addEventListener("click", refreshJobs);
+      $("job-list").addEventListener("click", async (event) => {
+        const jobId = event.target.dataset.cancelJob;
+        const resolveId = event.target.dataset.resolveJob;
+        if (jobId) {
+          await fetch("/api/jobs/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ slug: mountedProject, jobId }),
+          });
+        } else if (resolveId) {
+          const succeeded = window.confirm(
+            "Check the provider dashboard first.\n\nPress OK if the request succeeded and consumed credits. Press Cancel to record it as failed.",
+          );
+          const accepted = window.confirm(
+            "I checked the provider and accept that Studio will record this outcome without retrying.",
+          );
+          if (!accepted) return;
+          await fetch("/api/jobs/resolve", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              slug: mountedProject,
+              jobId: resolveId,
+              outcome: succeeded ? "succeeded" : "failed",
+              acknowledgement: "I checked the provider and accept the recorded outcome",
+            }),
+          });
+        } else {
+          return;
+        }
+        await refreshJobs();
       });
 
       const LABELS = {
@@ -1105,6 +1473,7 @@ Start a recording and talk about your day."></textarea>
           } else {
             setMeta(event.id, event.detail ?? event.status);
           }
+          void refreshJobs();
           return;
         }
 
@@ -1261,6 +1630,7 @@ Start a recording and talk about your day."></textarea>
 
         if (event.type === "done") {
           setRunning(false);
+          void refreshJobs();
           maybeOfferRender(event.slug);
           loadPromptEditor();
           return;
@@ -1269,6 +1639,7 @@ Start a recording and talk about your day."></textarea>
         if (event.type === "error") {
           $("err").textContent = event.message;
           setRunning(false);
+          void refreshJobs();
           return;
         }
 
@@ -1337,15 +1708,21 @@ Start a recording and talk about your day."></textarea>
 
       $("run").addEventListener("click", async () => {
         $("err").textContent = "";
+        if (!mountedProject) {
+          $("err").textContent = "Mount a project before running the pipeline.";
+          return;
+        }
         persistFormState();
         $("run").disabled = true;
-        $("run").textContent = "Checking Voicebox…";
+        $("run").textContent = "Planning generation…";
         const body = {
-          slug: $("slug").value.trim(),
+          slug: mountedProject,
           title: $("title").value.trim(),
           script: $("script").value,
           options: {
-            profile: $("voice").value || undefined,
+            voiceRef: $("voice").value || undefined,
+            elevenlabsModel: $("elevenlabs-model").value,
+            elevenlabsStability: Number($("elevenlabs-stability").value),
             style: $("style").value || undefined,
             topic: $("topic").value || undefined,
             gapMs: Math.round(Number($("pause").value || 0) * 1000),
@@ -1360,6 +1737,30 @@ Start a recording and talk about your day."></textarea>
             doctor: !$("opt-nodoctor").checked,
           },
         };
+        const planResponse = await fetch("/api/run/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const plan = await planResponse.json().catch(() => ({}));
+        if (!planResponse.ok) {
+          $("err").textContent = plan.error ?? "Could not plan generation.";
+          updateRunControls();
+          return;
+        }
+        const plannedJobs = [plan.pipeline, ...(plan.jobs ?? [])];
+        const authorizationJobIds = [];
+        for (const job of plannedJobs) {
+          if (job.status !== "authorized" && !(await authorizePlannedJob(job))) {
+            await cancelUnsubmittedJobs(plannedJobs);
+            $("err").textContent = "Generation was not authorized. No provider request was sent.";
+            updateRunControls();
+            return;
+          }
+          authorizationJobIds.push(job.id);
+        }
+        body.authorizationJobIds = authorizationJobIds.filter((id) => id !== plan.pipeline.id);
+        body.pipelineJobId = plan.pipeline.id;
         const response = await fetch("/api/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1372,6 +1773,8 @@ Start a recording and talk about your day."></textarea>
           activeRunSlug = body.slug;
           $("project-assets").classList.add("hidden");
           setRunning(true);
+          workspaceDirty = false;
+          await refreshJobs();
         }
       });
 
@@ -1454,6 +1857,23 @@ Start a recording and talk about your day."></textarea>
         const status = card.querySelector("[data-line-status]");
         if (event.target.matches("[data-regenerate-line]")) {
           event.target.disabled = true;
+          const text = card.querySelector("[data-review-text]").value;
+          const planResponse = await fetch("/api/jobs/plan-item", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              slug: narrationReviewSlug,
+              kind: "narration-line",
+              lineIndex,
+              text,
+            }),
+          });
+          const plan = await planResponse.json().catch(() => ({}));
+          if (!planResponse.ok || !(await authorizePlannedJob(plan.job))) {
+            status.textContent = plan.error ?? "Regeneration was not authorized.";
+            event.target.disabled = false;
+            return;
+          }
           // Always save the current textarea value before regenerating, even if it looks
           // unchanged — editNarrationLine() is a no-op when the text matches, so this can never
           // regress a plain re-roll, and it's the only way to guarantee this can't silently
@@ -1461,7 +1881,8 @@ Start a recording and talk about your day."></textarea>
           await reviewRequest("/api/narration-review/line", "PUT", {
             slug: narrationReviewSlug,
             lineIndex,
-            text: card.querySelector("[data-review-text]").value,
+            text,
+            jobId: plan.job.id,
           }, status);
         }
       });
@@ -1691,10 +2112,27 @@ Start a recording and talk about your day."></textarea>
           imageReviewWorking = true;
           updateRunControls();
           try {
+            const prompt = card.querySelector("[data-image-prompt]").value;
+            const planResponse = await fetch("/api/jobs/plan-item", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                slug: imageReviewSlug,
+                kind: "image-scene",
+                lineIndex,
+                prompt,
+              }),
+            });
+            const plan = await planResponse.json().catch(() => ({}));
+            if (!planResponse.ok || !(await authorizePlannedJob(plan.job))) {
+              status.textContent = plan.error ?? "Regeneration was not authorized.";
+              return;
+            }
             await imageReviewRequest("/api/image-review/regenerate", {
               slug: imageReviewSlug,
               lineIndex,
-              prompt: card.querySelector("[data-image-prompt]").value,
+              prompt,
+              jobId: plan.job.id,
             }, status);
           } finally {
             imageReviewWorking = false;
@@ -2266,26 +2704,41 @@ Start a recording and talk about your day."></textarea>
         $("opt-regenerate-audio").checked = false;
         $("opt-regenerate-audio").dataset.required = "false";
         if (project) {
-          if (!("title" in savedFormState)) $("title").value = project.title ?? "";
-          if (!("script" in savedFormState)) $("script").value = project.script ?? "";
-          if (!("pause" in savedFormState)) $("pause").value = project.pauseSeconds ?? 3;
+          $("title").value = project.draft?.title ?? project.title ?? "";
+          $("script").value = project.draft?.script ?? project.script ?? "";
+          $("pause").value = project.draft?.pauseSeconds ?? project.pauseSeconds ?? 3;
           if (
-            !("voice" in savedFormState) &&
-            project.voiceProfile &&
-            voices.some((voice) => voice.name === project.voiceProfile)
+            (project.draft?.voiceRef || project.voiceRef) &&
+            voices.some(
+              (voice) =>
+                voice.ref === (project.draft?.voiceRef || project.voiceRef) ||
+                (voice.provider === "voicebox" && voice.name === project.voiceProfile),
+            )
           ) {
-            $("voice").value = project.voiceProfile;
+            const voice = voices.find(
+              (entry) =>
+                entry.ref === (project.draft?.voiceRef || project.voiceRef) ||
+                (entry.provider === "voicebox" && entry.name === project.voiceProfile),
+            );
+            $("voice").value = voice.ref;
           }
+          $("elevenlabs-model").value =
+            project.draft?.elevenlabsModel ?? project.elevenlabsModel ?? "eleven_v3";
+          $("elevenlabs-stability").value = String(
+            project.draft?.elevenlabsStability ?? project.elevenlabsStability ?? 0.5,
+          );
         }
         $("opt-captions").checked = project?.captionsEnabled === true;
         $("opt-review-narration").checked = project ? project.reviewNarration !== false : true;
         $("opt-enrich").checked = project ? project.enrichWithLLM === true : true;
         if (!styles.length) return false;
-        if (project?.styleId && styles.some((style) => style.id === project.styleId)) {
-          $("style").value = project.styleId;
+        const projectStyle = project?.draft?.style ?? project?.styleId;
+        if (projectStyle && styles.some((style) => style.id === projectStyle)) {
+          $("style").value = projectStyle;
         }
-        if (project?.topicId && topics.some((topic) => topic.id === project.topicId)) {
-          $("topic").value = project.topicId;
+        const projectTopic = project?.draft?.topic ?? project?.topicId;
+        if (projectTopic && topics.some((topic) => topic.id === projectTopic)) {
+          $("topic").value = projectTopic;
         }
         describeTopic();
         describeStyle();
@@ -2307,8 +2760,7 @@ Start a recording and talk about your day."></textarea>
                   `<option value="${escapeHtml(project.slug)}">${escapeHtml(project.title)}</option>`,
               )
               .join("");
-            applyProjectSettings($("slug").value.trim());
-            restoreFormState();
+            if (mountedProject) applyProjectSettings(mountedProject);
             describeVoice();
             describeTopic();
             describeStyle();
@@ -2387,7 +2839,7 @@ Start a recording and talk about your day."></textarea>
         hint.textContent = parts.join(" ");
         $("importpath").value = "";
         await loadProjects();
-        await loadPromptEditor();
+        await mountProject(data.slug, false);
       }
 
       // The native chooser runs server-side and returns a real absolute path, which a file
@@ -2421,7 +2873,7 @@ Start a recording and talk about your day."></textarea>
         if (event.key === "Enter") importProject(false);
       });
 
-      // Voices come from Voicebox itself, so the list is whatever is actually installed.
+      // Voicebox and ElevenLabs remain separate providers while sharing one grouped picker.
       let voices = [];
 
       function updateAudioRegenerationOption() {
@@ -2441,10 +2893,23 @@ Start a recording and talk about your day."></textarea>
         }
 
         wrap.classList.remove("hidden");
-        const selectedVoice = $("voice").value;
+        const selected = voices.find((voice) => voice.ref === $("voice").value);
+        const selectedVoice = selected?.name ?? null;
+        const selectedModel =
+          selected?.provider === "elevenlabs" ? $("elevenlabs-model").value : null;
+        const selectedStability =
+          selected?.provider === "elevenlabs" ? Number($("elevenlabs-stability").value) : null;
         const changed =
           Boolean(builtVoice && selectedVoice) &&
-          builtVoice.toLowerCase() !== selectedVoice.toLowerCase();
+          (
+            builtVoice.toLowerCase() !== selectedVoice.toLowerCase() ||
+            (selected?.provider === "elevenlabs" &&
+              (
+                (project?.audioModel && project.audioModel !== selectedModel) ||
+                (project?.audioStability != null &&
+                  Number(project.audioStability) !== selectedStability)
+              ))
+          );
         const wasRequired = checkbox.dataset.required === "true";
         checkbox.dataset.required = String(changed);
         checkbox.disabled = changed;
@@ -2460,15 +2925,18 @@ Start a recording and talk about your day."></textarea>
       }
 
       function describeVoice() {
-        const voice = voices.find((entry) => entry.name === $("voice").value);
+        const voice = voices.find((entry) => entry.ref === $("voice").value);
         const hint = $("voicehint");
         hint.classList.remove("bad");
         if (!voice) {
+          $("elevenlabs-settings").classList.add("hidden");
           hint.textContent = "";
           updateAudioRegenerationOption();
           return;
         }
-        const bits = [voice.cloned ? "cloned" : "preset"];
+        $("elevenlabs-settings").classList.toggle("hidden", voice.provider !== "elevenlabs");
+        const bits = [voice.provider === "elevenlabs" ? "ElevenLabs" : "Local Voicebox"];
+        if (voice.cloned) bits.push("cloned");
         if (voice.engine) bits.push(voice.engine);
         if (voice.language) bits.push(voice.language);
         if (voice.generations) bits.push(`${voice.generations} generations`);
@@ -2482,28 +2950,37 @@ Start a recording and talk about your day."></textarea>
         .then((response) => response.json())
         .then((data) => {
           const select = $("voice");
-          if (data.error) {
-            select.innerHTML = `<option value="">Voicebox unavailable</option>`;
-            const hint = $("voicehint");
-            hint.textContent = data.error;
-            hint.classList.add("bad");
-            return;
-          }
           voices = data.voices;
-          select.innerHTML = voices
+          select.innerHTML = (data.groups ?? [])
             .map(
-              (voice) =>
-                `<option value="${escapeHtml(voice.name)}"${
-                  voice.name === data.default ? " selected" : ""
-                }>${escapeHtml(voice.name)}</option>`,
+              (group) =>
+                `<optgroup label="${escapeHtml(group.label)}">` +
+                group.voices
+                  .map(
+                    (voice) =>
+                      `<option value="${escapeHtml(voice.ref)}"${
+                        voice.ref === data.default ? " selected" : ""
+                      }>${escapeHtml(voice.name)}</option>`,
+                  )
+                  .join("") +
+                `</optgroup>`,
             )
             .join("");
-          applyProjectSettings($("slug").value.trim());
-          restoreFormState();
+          if (mountedProject) applyProjectSettings(mountedProject);
+          const providerErrors = Object.entries(data.errors ?? {})
+            .filter(([, message]) => message)
+            .map(([provider, message]) => `${provider}: ${message}`);
+          if (providerErrors.length) {
+            const hint = $("voicehint");
+            hint.textContent = providerErrors.join(" · ");
+            hint.classList.add("bad");
+          }
           describeVoice();
         });
 
       $("voice").addEventListener("change", describeVoice);
+      $("elevenlabs-model").addEventListener("change", updateAudioRegenerationOption);
+      $("elevenlabs-stability").addEventListener("change", updateAudioRegenerationOption);
 
       // Content providers: which model makes the stills, and what look it produces. Presets that
       // need a model you have not downloaded stay visible but disabled, with the download note
@@ -2609,7 +3086,14 @@ Start a recording and talk about your day."></textarea>
       // Rejoin a run that is already going when the page loads.
       fetch("/api/state")
         .then((response) => response.json())
-        .then((state) => {
+        .then(async (state) => {
+          if (state.mountedProject) {
+            await mountProject(state.mountedProject, false);
+            for (const event of state.run?.events ?? []) handle(event);
+          } else {
+            mountedProject = null;
+            clearWorkspace();
+          }
           setServicesRestarting(Boolean(state.resetting));
           imageReviewWorking = Boolean(state.imageReviewBusy);
           setRunning(Boolean(state.busy));

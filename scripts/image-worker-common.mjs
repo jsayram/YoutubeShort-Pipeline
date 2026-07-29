@@ -10,6 +10,11 @@ import {
   stripQuotedText,
   writeJson,
 } from "./lib.mjs";
+import {
+  listJobs,
+  providerOutcomeIsUncertain,
+  transitionJob,
+} from "./generation-jobs.mjs";
 
 // FLUX's ComfyUI workflow zeroes out its "negative" conditioning (ConditioningZeroOut) rather
 // than encoding real negative text, and both local and Cloudflare FLUX.2 run at guidance 1, where
@@ -27,6 +32,62 @@ const FLUX_NO_TEXT_REQUIREMENT =
 const FLUX_OBJECT_ONLY_REQUIREMENT =
   "Composition requirement: an object-only still life in an unoccupied setting. The narration-named " +
   "prop and its immediate environment are the only subjects.";
+
+export async function beginAuthorizedRemoteImage(slug, provider, item, index) {
+  const job = await matchingImageJob(slug, provider, item, index, "authorized");
+  if (!job) {
+    throw new Error(
+      `${provider} scene ${Number(index) + 1} has no fresh cost authorization. ` +
+        "Open Studio and confirm this provider request.",
+    );
+  }
+  await transitionJob(slug, job.id, "submitted");
+  await transitionJob(slug, job.id, "running");
+  return job;
+}
+
+export async function skipAuthorizedRemoteImage(slug, provider, item, index, artifact) {
+  const job = await matchingImageJob(slug, provider, item, index, "authorized");
+  if (!job) return null;
+  return transitionJob(slug, job.id, "cancelled", {
+    actual: { unit: "provider request", amount: 0 },
+    artifact,
+    error: { message: "No provider request was sent because the existing artifact was reused." },
+  });
+}
+
+async function matchingImageJob(slug, provider, item, index, status) {
+  return (await listJobs(slug)).find(
+    (entry) =>
+      entry.kind === "image-scene" &&
+      entry.provider === provider &&
+      (
+        (entry.item?.sceneId && entry.item.sceneId === item.id) ||
+        (!entry.item?.sceneId && Number(entry.item?.index) === Number(index))
+      ) &&
+      entry.status === status,
+  );
+}
+
+export async function finishRemoteImage(slug, job, result = {}) {
+  return transitionJob(slug, job.id, "succeeded", {
+    providerRequestId: result.providerRequestId ?? null,
+    actual: result.actual ?? { unit: "provider request", amount: 1 },
+    artifact: result.artifact ?? null,
+  });
+}
+
+export async function failRemoteImage(slug, job, error, { uncertain = false } = {}) {
+  if (!job) return;
+  return transitionJob(
+    slug,
+    job.id,
+    uncertain || providerOutcomeIsUncertain(error) ? "unknown" : "failed",
+    {
+    error: { message: String(error?.message ?? error) },
+    },
+  );
+}
 
 export function styleForScene(item, styleSuffix = "") {
   if (String(item.castMode ?? "") !== "object") return styleSuffix;

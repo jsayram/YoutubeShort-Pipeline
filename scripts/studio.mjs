@@ -30,6 +30,21 @@ import {
 import { resolveVoiceboxEngine } from "./voicebox-profile.mjs";
 import { localLlmStatus } from "./local-llm.mjs";
 import {
+  authorizeJob,
+  blockingJobs,
+  createJob,
+  findJob,
+  listJobs,
+  markInterruptedJobsUnknown,
+  transitionJob,
+} from "./generation-jobs.mjs";
+import {
+  ELEVENLABS_DEFAULT_MODEL,
+  elevenLabsSubscription,
+  estimateElevenLabsUsage,
+  listElevenLabsVoices,
+} from "./elevenlabs-provider.mjs";
+import {
   editNarrationLine,
   generateNarrationTake,
   loadNarrationReview,
@@ -87,28 +102,31 @@ const MIME = {
 
 /** @type {{id:string, slug:string, stages:any[], events:any[], child:any, done:boolean}|null} */
 let current = null;
+let mountedProject = null;
 const listeners = new Set();
 let persistStateChain = Promise.resolve();
 let imageReviewActions = 0;
 
 function savedRunState() {
-  if (!current) return null;
   return {
-    version: 1,
+    version: 2,
     updatedAt: new Date().toISOString(),
-    run: {
-      id: current.id,
-      slug: current.slug,
-      stages: current.stages,
-      events: current.events,
-      done: current.done,
-    },
+    mountedProject,
+    run: current
+      ? {
+          id: current.id,
+          slug: current.slug,
+          stages: current.stages,
+          events: current.events,
+          done: current.done,
+          jobId: current.jobId ?? null,
+        }
+      : null,
   };
 }
 
 function persistCurrent() {
   const snapshot = savedRunState();
-  if (!snapshot) return persistStateChain;
   persistStateChain = persistStateChain
     .catch(() => {})
     .then(async () => {
@@ -120,6 +138,8 @@ function persistCurrent() {
 
 async function restoreCurrent() {
   const saved = await readJson(studioStatePath).catch(() => null);
+  mountedProject = validSlug(saved?.mountedProject) ? String(saved.mountedProject) : null;
+  if (mountedProject) await markInterruptedJobsUnknown(mountedProject);
   if (!saved?.run?.id || !saved.run.slug || !Array.isArray(saved.run.events)) return;
   current = {
     id: String(saved.run.id),
@@ -128,6 +148,7 @@ async function restoreCurrent() {
     events: saved.run.events,
     child: null,
     done: saved.run.done !== false,
+    jobId: saved.run.jobId ?? null,
   };
   // A Studio process cannot resume a child process after a service restart. Preserve everything
   // that was visible, but mark an unfinished stage as interrupted instead of pretending it is
@@ -252,6 +273,7 @@ async function startRun({ slug, title, scriptText, options }) {
   const projectDir = videoDir(slug);
   const exists = await fs.access(projectDir).then(() => true, () => false);
   const gapMs = Math.max(0, Math.min(10000, Math.round(Number(options.gapMs ?? 3000))));
+  let runFailed = false;
 
   current = {
     id: String(Date.now()),
@@ -260,6 +282,7 @@ async function startRun({ slug, title, scriptText, options }) {
     events: [],
     child: null,
     done: false,
+    jobId: options.pipelineJobId ?? null,
   };
 
   const runId = current.id;
@@ -267,7 +290,20 @@ async function startRun({ slug, title, scriptText, options }) {
 
   try {
     if (options.doctor === false) setStage("doctor", "skipped");
-    else await runStage("doctor", node, [script("doctor.mjs")]);
+    else {
+      const requestedProvider = String(options.voiceRef ?? options.profile ?? "").startsWith(
+        "elevenlabs:",
+      )
+        ? "elevenlabs"
+        : "voicebox";
+      const requestedStyle = (await loadStyles()).find((entry) => entry.id === options.style);
+      await runStage("doctor", node, [script("doctor.mjs")], {
+        env: {
+          NARRATION_PROVIDER: requestedProvider,
+          IMAGE_PROVIDER: requestedStyle?.provider ?? "comfyui",
+        },
+      });
+    }
 
     if (exists) {
       setStage("scaffold", "done", `Reusing videos/${slug}`);
@@ -296,10 +332,16 @@ async function startRun({ slug, title, scriptText, options }) {
     prepareArgs.push("--captions", String(options.captions === true));
     // Persist the chosen voice into video.json so the project keeps it, and so a later CLI run
     // speaks in the same voice as the one started from here.
-    if (options.profile) {
-      prepareArgs.push("--profile", options.profile);
+    const requestedVoiceRef = String(options.voiceRef ?? options.profile ?? "");
+    if (requestedVoiceRef && !requestedVoiceRef.startsWith("elevenlabs:")) {
+      const requestedVoice = requestedVoiceRef.startsWith("voicebox:")
+        ? requestedVoiceRef.slice("voicebox:".length)
+        : requestedVoiceRef;
+      prepareArgs.push("--profile", requestedVoice);
       const voices = (await listVoices()) ?? [];
-      const chosen = voices.find((voice) => voice.name === options.profile);
+      const chosen = voices.find(
+        (voice) => voice.id === requestedVoice || voice.name === requestedVoice,
+      );
       if (chosen?.engine) prepareArgs.push("--engine", chosen.engine);
     }
     if (options.topic) prepareArgs.push("--topic", options.topic);
@@ -318,7 +360,33 @@ async function startRun({ slug, title, scriptText, options }) {
     preparedConfig.finalCut.enabled = true;
     preparedConfig.voicebox ??= {};
     preparedConfig.voicebox.reviewBeforeImages = options.reviewNarration !== false;
+    const selectedVoice = (await listAllVoices()).voices.find(
+      (voice) => voice.ref === options.voiceRef || voice.name === options.profile,
+    );
+    if (selectedVoice?.provider === "elevenlabs") {
+      preparedConfig.narration = {
+        ...(preparedConfig.narration ?? {}),
+        provider: "elevenlabs",
+      };
+      preparedConfig.elevenlabs = {
+        ...(preparedConfig.elevenlabs ?? {}),
+        voiceId: selectedVoice.id,
+        voiceName: selectedVoice.name,
+        modelId: options.elevenlabsModel ?? ELEVENLABS_DEFAULT_MODEL,
+        preset: "natural",
+        settings: {
+          ...(preparedConfig.elevenlabs?.settings ?? {}),
+          stability: Number(options.elevenlabsStability ?? 0.5),
+        },
+      };
+    } else {
+      preparedConfig.narration = {
+        ...(preparedConfig.narration ?? {}),
+        provider: "voicebox",
+      };
+    }
     await writeJson(preparedConfigPath, preparedConfig);
+    await fs.rm(path.join(projectDir, "content", "studio-draft.json"), { force: true });
     await emitPrompts(slug);
 
     if (options.skipVoice) setStage("voice", "skipped");
@@ -346,12 +414,31 @@ async function startRun({ slug, title, scriptText, options }) {
     const paused = await finishPipeline(slug, options);
     if (!paused) emit({ type: "done", slug });
   } catch (error) {
+    runFailed = true;
     if (!current?.resetting) {
       emit({ type: "error", message: String(error.message ?? error) });
     }
   } finally {
     if (current) {
       current.done = true;
+      if (current.jobId) {
+        const job = await findJob(slug, current.jobId).catch(() => null);
+        if (job && !["succeeded", "failed", "cancelled"].includes(job.status)) {
+          const cancelled = job.status === "cancel-requested";
+          await transitionJob(
+            slug,
+            current.jobId,
+            cancelled
+              ? "cancelled"
+              : runFailed || current.stages.some((stage) => stage.status === "failed")
+                ? "failed"
+                : "succeeded",
+            runFailed && !cancelled
+              ? { error: { message: "Pipeline stopped before completing its current phase." } }
+              : {},
+          ).catch(() => {});
+        }
+      }
       void persistCurrent();
     }
   }
@@ -690,6 +777,8 @@ async function listVoices() {
     const resolved = resolveVoiceboxEngine(profile, null);
     return {
       id: profile.id,
+      ref: `voicebox:${profile.id}`,
+      provider: "voicebox",
       name: profile.name,
       description: profile.description ?? "",
       language: profile.language ?? "",
@@ -700,6 +789,40 @@ async function listVoices() {
       generations: profile.generation_count ?? 0,
     };
   });
+}
+
+async function listAllVoices() {
+  const [voicebox, elevenlabs, subscription] = await Promise.allSettled([
+    listVoices(),
+    listElevenLabsVoices(),
+    elevenLabsSubscription(),
+  ]);
+  const voiceboxVoices =
+    voicebox.status === "fulfilled" && Array.isArray(voicebox.value) ? voicebox.value : [];
+  const elevenLabsVoices =
+    elevenlabs.status === "fulfilled" && Array.isArray(elevenlabs.value) ? elevenlabs.value : [];
+  return {
+    voices: [...voiceboxVoices, ...elevenLabsVoices],
+    groups: [
+      { provider: "voicebox", label: "Local Voicebox", voices: voiceboxVoices },
+      { provider: "elevenlabs", label: "ElevenLabs", voices: elevenLabsVoices },
+    ],
+    subscription: subscription.status === "fulfilled" ? subscription.value : null,
+    errors: {
+      voicebox:
+        voicebox.status === "rejected" || voicebox.value === null
+          ? "Voicebox is unavailable."
+          : null,
+      elevenlabs:
+        elevenlabs.status === "rejected"
+          ? String(elevenlabs.reason?.message ?? elevenlabs.reason)
+          : null,
+      subscription:
+        subscription.status === "rejected"
+          ? String(subscription.reason?.message ?? subscription.reason)
+          : null,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------- image styles
@@ -713,13 +836,14 @@ async function fetchJson(url, timeoutMs = 1800) {
 }
 
 async function serviceSnapshot() {
-  const [comfyStats, comfyQueue, voiceHealth, localLlm, template] =
+  const [comfyStats, comfyQueue, voiceHealth, localLlm, template, elevenSubscription] =
     await Promise.all([
     fetchJson(`${comfyUrl}/system_stats`),
     fetchJson(`${comfyUrl}/queue`),
     fetchJson(`${voiceboxUrl}/health`),
     localLlmStatus(),
     readJson(path.join(repoRoot, "templates", "video.json")).catch(() => null),
+    elevenLabsSubscription().catch(() => null),
     ]);
 
   const device = comfyStats?.devices?.[0] ?? null;
@@ -782,6 +906,26 @@ async function serviceSnapshot() {
         // `open -a` launches a closed app and foregrounds an already-running one, which covers
         // both the "it is not started" and "I closed the window" cases.
         action: voiceRunning ? "Open Voicebox" : "Launch Voicebox",
+      },
+      {
+        id: "elevenlabs",
+        name: "ElevenLabs",
+        status: elevenSubscription ? "ready" : "offline",
+        kind: "cloud",
+        detail: elevenSubscription
+          ? [
+              elevenSubscription.tier ? `${elevenSubscription.tier} tier` : null,
+              elevenSubscription.remaining != null
+                ? `${elevenSubscription.remaining} included credits remaining`
+                : "balance unavailable",
+              elevenSubscription.resetAt
+                ? `resets ${new Date(elevenSubscription.resetAt).toLocaleDateString()}`
+                : null,
+              "paid overages blocked by Studio",
+            ].filter(Boolean).join(" · ")
+          : "Key missing required voices_read, text_to_speech, or user_read permission",
+        url: null,
+        action: null,
       },
       {
         id: "local-llm",
@@ -1184,6 +1328,127 @@ async function sendFile(request, response, filePath) {
   createReadStream(filePath).pipe(response);
 }
 
+function mountedSlug(bodyOrUrl) {
+  if (bodyOrUrl instanceof URL) return String(bodyOrUrl.searchParams.get("slug") ?? "").trim();
+  return String(bodyOrUrl?.slug ?? "").trim();
+}
+
+function requireMounted(response, slug) {
+  if (!mountedProject) {
+    sendJson(response, 409, { error: "Mount a project before using project controls." });
+    return false;
+  }
+  if (slug !== mountedProject) {
+    sendJson(response, 409, {
+      error: `Project "${mountedProject}" is mounted. Unmount it before working on "${slug}".`,
+    });
+    return false;
+  }
+  return true;
+}
+
+async function planGenerationJobs(slug, body) {
+  const scriptText = String(body.script ?? "").trim();
+  const lines = scriptText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const options = body.options ?? {};
+  const jobs = [];
+  const voiceRef = String(options.voiceRef ?? options.profile ?? "");
+
+  if (voiceRef.startsWith("elevenlabs:") && options.skipVoice !== true) {
+    const subscription = await elevenLabsSubscription();
+    const totalEstimate = lines.reduce(
+      (sum, text) => sum + estimateElevenLabsUsage(text).maximum,
+      0,
+    );
+    if (subscription.remaining !== null && totalEstimate > subscription.remaining) {
+      throw new Error(
+        `ElevenLabs included credits are insufficient for this narration: ` +
+          `${totalEstimate} required, ${subscription.remaining} remaining. ` +
+          "Studio will not use paid overages.",
+      );
+    }
+    for (const [index, text] of lines.entries()) {
+      const estimate = estimateElevenLabsUsage(text);
+      jobs.push(
+        await createJob(slug, {
+          kind: "narration-line",
+          provider: "elevenlabs",
+          model: options.elevenlabsModel ?? ELEVENLABS_DEFAULT_MODEL,
+          item: { type: "narration-line", index, text },
+          label: `Narration line ${index + 1} of ${lines.length}`,
+          destination: `Narration review · line ${index + 1}`,
+          estimate: { ...estimate, balance: subscription },
+          warning: "This request consumes ElevenLabs included credits and cannot be undone.",
+          monetary: true,
+          remote: true,
+          requiresConfirmation: true,
+          dedupeKey: `run:${slug}:narration:${index}:${voiceRef}:${text}`,
+        }),
+      );
+    }
+  }
+
+  if (options.skipImages !== true) {
+    const styles = await loadStyles();
+    const style = styles.find((entry) => entry.id === options.style);
+    const provider = style?.provider ?? "comfyui";
+    const local = ["comfyui", "local", "flux2-local", "drawthings", "draw-things"].includes(
+      provider,
+    );
+    if (!local) {
+      for (const [index, text] of lines.entries()) {
+        jobs.push(
+          await createJob(slug, {
+            kind: "image-scene",
+            provider,
+            model: style?.model ?? null,
+            item: { type: "image-scene", index, narration: text },
+            label: `Image scene ${index + 1} of ${lines.length}`,
+            destination: `Image review · scene ${index + 1}`,
+            estimate: {
+              unit: "provider request",
+              maximum: 1,
+              costKnown: false,
+            },
+            warning:
+              "The provider does not expose a reliable account balance here. Cost is unknown.",
+            monetary: true,
+            remote: true,
+            requiresConfirmation: true,
+            dedupeKey: `run:${slug}:image:${index}:${provider}:${text}`,
+          }),
+        );
+      }
+    }
+  }
+
+  const pipeline = await createJob(slug, {
+    kind: "pipeline",
+    provider: "pipeline",
+    item: { type: "project", slug },
+    label: `Pipeline for ${slug}`,
+    destination: `videos/${slug}`,
+    estimate: {
+      narrationLines: lines.length,
+      imageScenes: options.skipImages === true ? 0 : lines.length,
+    },
+    monetary: false,
+    remote: false,
+    requiresConfirmation: true,
+    dedupeKey: `pipeline:${slug}`,
+  });
+  return { jobs, pipeline };
+}
+
+async function validateAuthorizedJobs(slug, ids = []) {
+  for (const id of ids) {
+    const job = await findJob(slug, id);
+    if (!job || job.status !== "authorized") {
+      throw new Error(`Generation job "${id}" is not authorized.`);
+    }
+  }
+}
+
 const server = http.createServer(async (request, response) => {
   const url = new URL(request.url, `http://localhost:${port}`);
   const route = url.pathname;
@@ -1191,6 +1456,221 @@ const server = http.createServer(async (request, response) => {
   try {
     if (route === "/" || route === "/index.html") {
       await sendFile(request, response, path.join(studioDir, "index.html"));
+      return;
+    }
+
+    if (route === "/api/mount" && request.method === "GET") {
+      sendJson(response, 200, {
+        mountedProject,
+        jobs: mountedProject ? await listJobs(mountedProject) : [],
+      });
+      return;
+    }
+
+    if (route === "/api/mount" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug)) {
+        sendJson(response, 400, { error: "Bad project slug." });
+        return;
+      }
+      let exists = await fs.access(path.join(videoDir(slug), "video.json")).then(
+        () => true,
+        () => false,
+      );
+      if (!exists && body.create === true) {
+        await run(node, [script("new-video.mjs"), slug]);
+        exists = true;
+      }
+      if (!exists) {
+        sendJson(response, 404, { error: `Project "${slug}" does not exist.` });
+        return;
+      }
+      if (mountedProject && mountedProject !== slug) {
+        const active = await blockingJobs(mountedProject);
+        if (active.length || (current && !current.done)) {
+          sendJson(response, 409, {
+            error: `Cannot switch while ${mountedProject} has active or unresolved work.`,
+            jobs: active,
+          });
+          return;
+        }
+      }
+      mountedProject = slug;
+      await persistCurrent();
+      sendJson(response, 200, { mountedProject, jobs: await listJobs(slug) });
+      return;
+    }
+
+    if (route === "/api/unmount" && request.method === "POST") {
+      if (!mountedProject) {
+        sendJson(response, 200, { unmounted: true, mountedProject: null });
+        return;
+      }
+      const active = await blockingJobs(mountedProject);
+      if (active.length || (current && !current.done)) {
+        sendJson(response, 409, {
+          error: "Cancel or resolve every active generation before unmounting.",
+          jobs: active,
+        });
+        return;
+      }
+      mountedProject = null;
+      current = null;
+      await persistCurrent();
+      sendJson(response, 200, { unmounted: true, mountedProject: null });
+      return;
+    }
+
+    if (route === "/api/jobs" && request.method === "GET") {
+      const slug = mountedSlug(url);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      sendJson(response, 200, { jobs: await listJobs(slug) });
+      return;
+    }
+
+    if (route === "/api/jobs/authorize" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      const job = await authorizeJob(slug, String(body.jobId ?? ""), body.acknowledgement);
+      sendJson(response, 200, { job });
+      return;
+    }
+
+    if (route === "/api/jobs/cancel" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      const job = await findJob(slug, String(body.jobId ?? ""));
+      if (!job) {
+        sendJson(response, 404, { error: "Generation job was not found." });
+        return;
+      }
+      if (!["planned", "awaiting-confirmation", "authorized"].includes(job.status)) {
+        sendJson(response, 409, {
+          error:
+            "This request was already submitted. Cancel the active pipeline; provider charges may already apply.",
+        });
+        return;
+      }
+      sendJson(response, 200, {
+        job: await transitionJob(slug, job.id, "cancelled"),
+      });
+      return;
+    }
+
+    if (route === "/api/jobs/resolve" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      const job = await findJob(slug, String(body.jobId ?? ""));
+      if (!job || job.status !== "unknown") {
+        sendJson(response, 409, { error: "Only an unknown provider request can be reconciled." });
+        return;
+      }
+      if (body.acknowledgement !== "I checked the provider and accept the recorded outcome") {
+        sendJson(response, 400, { error: "Provider reconciliation acknowledgement is required." });
+        return;
+      }
+      const outcome = body.outcome === "succeeded" ? "succeeded" : "failed";
+      sendJson(response, 200, {
+        job: await transitionJob(slug, job.id, outcome, {
+          error:
+            outcome === "failed"
+              ? { message: "User reconciled this uncertain request as failed." }
+              : null,
+        }),
+      });
+      return;
+    }
+
+    if (route === "/api/jobs/plan-item" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      const config = await readJson(path.join(videoDir(slug), "video.json"));
+      const lineIndex = Number(body.lineIndex);
+      if (!Number.isInteger(lineIndex) || lineIndex < 0) {
+        sendJson(response, 400, { error: "Bad line index." });
+        return;
+      }
+      let job;
+      if (body.kind === "narration-line") {
+        const provider = config.narration?.provider ?? "voicebox";
+        const text = String(body.text ?? "").trim();
+        const remote = provider === "elevenlabs";
+        const balance = remote ? await elevenLabsSubscription() : null;
+        job = await createJob(slug, {
+          kind: "narration-line",
+          provider,
+          model: remote ? config.elevenlabs?.modelId ?? ELEVENLABS_DEFAULT_MODEL : config.voicebox?.engine,
+          item: { type: "narration-line", index: lineIndex, text },
+          label: `Regenerate narration line ${lineIndex + 1}`,
+          destination: `Narration review · line ${lineIndex + 1}`,
+          estimate: remote
+            ? { ...estimateElevenLabsUsage(text), balance }
+            : { unit: "local generation", maximum: 1 },
+          warning: remote
+            ? "This request consumes ElevenLabs included credits and cannot be undone."
+            : "This local generation uses Voicebox compute time.",
+          monetary: remote,
+          remote,
+          requiresConfirmation: true,
+          dedupeKey: `reroll:${slug}:narration:${lineIndex}:${provider}:${text}:${Date.now()}`,
+        });
+      } else if (body.kind === "image-scene") {
+        const provider = config.imageGen?.provider ?? "comfyui";
+        const review = await loadImageReview(slug);
+        const scene = review?.lines?.find((entry) => Number(entry.index) === lineIndex);
+        const remote = !["comfyui", "local", "flux2-local", "drawthings", "draw-things"].includes(
+          provider,
+        );
+        job = await createJob(slug, {
+          kind: "image-scene",
+          provider,
+          model: config.imageGen?.model ?? config.imageGen?.checkpoint ?? null,
+          item: {
+            type: "image-scene",
+            index: lineIndex,
+            sceneId: scene?.id ?? null,
+            prompt: String(body.prompt ?? ""),
+          },
+          label: `Regenerate image scene ${lineIndex + 1}`,
+          destination: `Image review · scene ${lineIndex + 1}`,
+          estimate: {
+            unit: remote ? "provider request" : "local generation",
+            maximum: 1,
+            costKnown: !remote,
+          },
+          warning: remote
+            ? "Provider balance and exact cost may be unknown. This request cannot be undone."
+            : "This local generation uses GPU compute time.",
+          monetary: remote,
+          remote,
+          requiresConfirmation: true,
+          dedupeKey: `reroll:${slug}:image:${lineIndex}:${provider}:${Date.now()}`,
+        });
+      } else {
+        sendJson(response, 400, { error: "Unknown generation kind." });
+        return;
+      }
+      sendJson(response, 200, { job });
+      return;
+    }
+
+    if (route === "/api/run/plan" && request.method === "POST") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      if ((current && !current.done) || (await blockingJobs(slug)).some(
+        (job) => !["awaiting-confirmation", "authorized"].includes(job.status),
+      )) {
+        sendJson(response, 409, { error: "A generation is already active or unresolved." });
+        return;
+      }
+      const plan = await planGenerationJobs(slug, body);
+      sendJson(response, 200, plan);
       return;
     }
 
@@ -1216,10 +1696,20 @@ const server = http.createServer(async (request, response) => {
             .access(path.join(projectDir, "public", "audio", "narration.wav"))
             .then(() => true, () => false),
         ]);
+        const draft = await readJson(path.join(projectDir, "content", "studio-draft.json")).catch(
+          () => null,
+        );
         const builtVoiceProfile =
           timing?.profile ?? narrationReview?.settings?.profile ?? null;
         const builtVoiceEngine =
           timing?.engine ?? narrationReview?.settings?.engine ?? null;
+        const narrationProvider = config.narration?.provider ?? "voicebox";
+        const voiceRef =
+          narrationProvider === "elevenlabs"
+            ? `elevenlabs:${config.elevenlabs?.voiceId ?? ""}`
+            : config.voicebox?.profile
+              ? `voicebox:${config.voicebox.profile}`
+              : null;
         projects.push({
           slug: entry.name,
           title: config.title,
@@ -1228,17 +1718,51 @@ const server = http.createServer(async (request, response) => {
           captionsEnabled: config.captions?.enabled === true,
           reviewNarration: config.voicebox?.reviewBeforeImages !== false,
           voiceProfile: config.voicebox?.profile ?? null,
+          voiceRef,
+          narrationProvider,
+          elevenlabsModel: config.elevenlabs?.modelId ?? ELEVENLABS_DEFAULT_MODEL,
+          elevenlabsStability: Number(config.elevenlabs?.settings?.stability ?? 0.5),
           audioVoiceProfile: builtVoiceProfile,
           audioVoiceEngine: builtVoiceEngine,
+          audioProvider: timing?.provider ?? narrationReview?.settings?.provider ?? "voicebox",
+          audioVoiceId: timing?.voiceId ?? narrationReview?.settings?.voiceId ?? null,
+          audioModel:
+            timing?.modelId ??
+            narrationReview?.settings?.modelId ??
+            narrationReview?.settings?.modelSize ??
+            null,
+          audioStability: narrationReview?.settings?.stability ?? null,
           hasNarrationAudio,
           pauseSeconds: Number(config.voicebox?.gapMs ?? 3000) / 1000,
           enrichWithLLM: config.imageGen?.enrichWithLLM === true,
           styleId: config.imageGen?.style ?? null,
           topicId: config.topic ?? null,
           script: await readNarration(path.join(videosRoot, entry.name)),
+          draft,
         });
       }
-      sendJson(response, 200, { projects });
+      sendJson(response, 200, { projects, mountedProject });
+      return;
+    }
+
+    if (route === "/api/project/draft" && request.method === "PUT") {
+      const body = await readBody(request);
+      const slug = mountedSlug(body);
+      if (!validSlug(slug) || !requireMounted(response, slug)) return;
+      const draft = {
+        version: 1,
+        title: String(body.title ?? ""),
+        script: String(body.script ?? ""),
+        voiceRef: body.voiceRef ? String(body.voiceRef) : null,
+        elevenlabsModel: body.elevenlabsModel ? String(body.elevenlabsModel) : null,
+        elevenlabsStability: Number(body.elevenlabsStability ?? 0.5),
+        style: body.style ? String(body.style) : null,
+        topic: body.topic ? String(body.topic) : null,
+        pauseSeconds: Number(body.pauseSeconds ?? 3),
+        updatedAt: new Date().toISOString(),
+      };
+      await writeJson(path.join(videoDir(slug), "content", "studio-draft.json"), draft);
+      sendJson(response, 200, { saved: true, draft });
       return;
     }
 
@@ -1355,18 +1879,19 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (route === "/api/voices") {
-      const voices = await listVoices();
-      if (!voices) {
-        sendJson(response, 200, {
-          voices: [],
-          error: `Voicebox is not reachable at ${voiceboxUrl}. Start the app and reload.`,
-        });
-        return;
-      }
+      const catalogue = await listAllVoices();
       const template = await readJson(path.join(repoRoot, "templates", "video.json")).catch(
         () => null,
       );
-      sendJson(response, 200, { voices, default: template?.voicebox?.profile ?? null });
+      const templateVoice = catalogue.voices.find(
+        (voice) =>
+          voice.provider === "voicebox" &&
+          (voice.id === template?.voicebox?.profile || voice.name === template?.voicebox?.profile),
+      );
+      sendJson(response, 200, {
+        ...catalogue,
+        default: templateVoice?.ref ?? catalogue.groups[0]?.voices[0]?.ref ?? null,
+      });
       return;
     }
 
@@ -1421,6 +1946,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (slug && !requireMounted(response, slug)) return;
       const profileId = await promptProfileIdFor(styleId);
       sendJson(response, 200, await promptEditorState({ slug: slug || null, profileId }));
       return;
@@ -1430,6 +1956,7 @@ const server = http.createServer(async (request, response) => {
       if (rejectPromptWriteWhileRunning(response)) return;
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
+      if (validSlug(slug) && !requireMounted(response, slug)) return;
       if (!validSlug(slug)) {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
@@ -1462,6 +1989,7 @@ const server = http.createServer(async (request, response) => {
       if (rejectPromptWriteWhileRunning(response)) return;
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
+      if (validSlug(slug) && !requireMounted(response, slug)) return;
       if (!validSlug(slug)) {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
@@ -1483,6 +2011,7 @@ const server = http.createServer(async (request, response) => {
       if (rejectPromptWriteWhileRunning(response)) return;
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
+      if (validSlug(slug) && !requireMounted(response, slug)) return;
       if (!validSlug(slug)) {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
@@ -1511,6 +2040,7 @@ const server = http.createServer(async (request, response) => {
       if (rejectPromptWriteWhileRunning(response)) return;
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
+      if (validSlug(slug) && !requireMounted(response, slug)) return;
       if (!validSlug(slug)) {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
@@ -1621,6 +2151,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
 
       const prompts = await readJson(
         path.join(videoDir(slug), "content", "image-prompts.json"),
@@ -1667,6 +2198,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await loadNarrationReview(slug);
       if (!state) {
         sendJson(response, 404, { error: "This project has no narration review yet." });
@@ -1682,6 +2214,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await loadImageReview(slug);
       if (!state) {
         sendJson(response, 404, { error: "This project has no image review yet." });
@@ -1698,19 +2231,41 @@ const server = http.createServer(async (request, response) => {
       }
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
-      if (!validSlug(slug)) {
+      if (!validSlug(slug) || !requireMounted(response, slug)) {
+        if (validSlug(slug) && mountedProject !== slug) return;
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
       imageReviewActions += 1;
+      const actionJob = body.jobId ? await findJob(slug, String(body.jobId)) : null;
       try {
+        if (!actionJob || actionJob.status !== "authorized") {
+          throw new Error("This regeneration does not have a fresh authorization.");
+        }
+        if (!actionJob.remote) {
+          await transitionJob(slug, actionJob.id, "submitted");
+          await transitionJob(slug, actionJob.id, "running");
+        }
         const state = await regenerateImageTake(
           slug,
           Number(body.lineIndex),
           body.prompt,
         );
+        if (!actionJob.remote) {
+          const line = state.lines.find((entry) => Number(entry.index) === Number(body.lineIndex));
+          const take = line?.takes?.at(-1);
+          await transitionJob(slug, actionJob.id, "succeeded", {
+            actual: { unit: "local generation", amount: 1 },
+            artifact: take?.image ?? null,
+          });
+        }
         sendJson(response, 200, { review: publicImageReviewState(slug, state) });
       } catch (error) {
+        if (actionJob && !actionJob.remote) {
+          await transitionJob(slug, actionJob.id, "failed", {
+            error: { message: String(error.message ?? error) },
+          }).catch(() => {});
+        }
         const state = await loadImageReview(slug);
         sendJson(response, 500, {
           error: String(error.message ?? error),
@@ -1729,6 +2284,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await selectImageTake(
         slug,
         Number(body.lineIndex),
@@ -1745,6 +2301,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await approveImage(slug, Number(body.lineIndex));
       sendJson(response, 200, { review: publicImageReviewState(slug, state) });
       return;
@@ -1757,6 +2314,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await approveAllImages(slug);
       sendJson(response, 200, { review: publicImageReviewState(slug, state) });
       return;
@@ -1773,6 +2331,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await loadImageReview(slug);
       const validation = validateImageReview(state);
       if (!validation.valid) {
@@ -1788,13 +2347,38 @@ const server = http.createServer(async (request, response) => {
     if (route === "/api/narration-review/line" && request.method === "PUT") {
       const body = await readBody(request);
       const slug = String(body.slug ?? "").trim();
-      if (!validSlug(slug)) {
+      if (!validSlug(slug) || !requireMounted(response, slug)) {
+        if (validSlug(slug) && mountedProject !== slug) return;
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
-      await editNarrationLine(slug, Number(body.lineIndex), body.text);
-      const result = await generateNarrationTake(slug, Number(body.lineIndex));
-      sendJson(response, 200, { review: publicReviewState(slug, result.state) });
+      const actionJob = body.jobId ? await findJob(slug, String(body.jobId)) : null;
+      if (!actionJob || actionJob.status !== "authorized") {
+        sendJson(response, 409, { error: "This regeneration does not have a fresh authorization." });
+        return;
+      }
+      try {
+        if (!actionJob.remote) {
+          await transitionJob(slug, actionJob.id, "submitted");
+          await transitionJob(slug, actionJob.id, "running");
+        }
+        await editNarrationLine(slug, Number(body.lineIndex), body.text);
+        const result = await generateNarrationTake(slug, Number(body.lineIndex));
+        if (!actionJob.remote) {
+          await transitionJob(slug, actionJob.id, "succeeded", {
+            actual: { unit: "local generation", amount: 1 },
+            artifact: result.take.audio,
+          });
+        }
+        sendJson(response, 200, { review: publicReviewState(slug, result.state) });
+      } catch (error) {
+        if (!actionJob.remote) {
+          await transitionJob(slug, actionJob.id, "failed", {
+            error: { message: String(error.message ?? error) },
+          }).catch(() => {});
+        }
+        throw error;
+      }
       return;
     }
 
@@ -1805,6 +2389,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await selectNarrationTake(
         slug,
         Number(body.lineIndex),
@@ -1825,6 +2410,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad project slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const state = await loadNarrationReview(slug);
       const validation = validateReview(state);
       if (!validation.valid) {
@@ -1838,11 +2424,18 @@ const server = http.createServer(async (request, response) => {
 
     if (route === "/api/state") {
       sendJson(response, 200, {
+        mountedProject,
         busy: Boolean(current && !current.done),
         imageReviewBusy: imageReviewActions > 0,
         resetting: Boolean(serviceResetPromise),
         run: current
-          ? { id: current.id, slug: current.slug, stages: current.stages, done: current.done }
+          ? {
+              id: current.id,
+              slug: current.slug,
+              stages: current.stages,
+              done: current.done,
+              events: current.events,
+            }
           : null,
       });
       return;
@@ -1870,23 +2463,56 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Paste a script first." });
         return;
       }
-      // Opening the app window does not prove its model server is ready. Wait briefly for a
-      // manually launched Voicebox, and never begin the environment check in the half-started
-      // state that previously produced a false "Voicebox is not reachable" failure.
-      const voicebox = await waitForVoiceboxStable(45000);
-      if (!voicebox) {
-        sendJson(response, 503, {
-          error:
-            "Voicebox is open but not ready. Use Restart everything and wait until its status says running.",
+      if (!requireMounted(response, slug)) return;
+      const authorizationJobIds = Array.isArray(body.authorizationJobIds)
+        ? body.authorizationJobIds.map(String)
+        : [];
+      await validateAuthorizedJobs(slug, authorizationJobIds);
+      const planned = (await listJobs(slug)).filter(
+        (job) =>
+          ["narration-line", "image-scene"].includes(job.kind) &&
+          ["awaiting-confirmation", "authorized"].includes(job.status),
+      );
+      if (planned.some((job) => job.status !== "authorized")) {
+        sendJson(response, 409, {
+          error: "Every paid provider request must be confirmed before the pipeline can start.",
+          jobs: planned,
         });
         return;
       }
+      // Opening the app window does not prove its model server is ready. Wait briefly for a
+      // manually launched Voicebox, and never begin the environment check in the half-started
+      // state that previously produced a false "Voicebox is not reachable" failure.
+      const selectedVoice = String(body.options?.voiceRef ?? body.options?.profile ?? "");
+      if (!selectedVoice.startsWith("elevenlabs:")) {
+        const voicebox = await waitForVoiceboxStable(45000);
+        if (!voicebox) {
+          sendJson(response, 503, {
+            error:
+              "Voicebox is open but not ready. Use Restart everything and wait until its status says running.",
+          });
+          return;
+        }
+      }
+      const pipelineJob = body.pipelineJobId
+        ? await findJob(slug, String(body.pipelineJobId))
+        : null;
+      if (!pipelineJob || pipelineJob.status !== "authorized") {
+        sendJson(response, 409, { error: "The pipeline job is missing or no longer authorized." });
+        return;
+      }
+      await transitionJob(slug, pipelineJob.id, "submitted");
+      await transitionJob(slug, pipelineJob.id, "running");
       sendJson(response, 200, { started: true });
       void startRun({
         slug,
         title: body.title ? String(body.title) : "",
         scriptText,
-        options: body.options ?? {},
+        options: {
+          ...(body.options ?? {}),
+          pipelineJobId: pipelineJob.id,
+          authorizationJobIds,
+        },
       });
       return;
     }
@@ -1902,6 +2528,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       sendJson(response, 200, { started: true });
       void startRender(slug);
       return;
@@ -1914,6 +2541,7 @@ const server = http.createServer(async (request, response) => {
         sendJson(response, 400, { error: "Bad slug." });
         return;
       }
+      if (!requireMounted(response, slug)) return;
       const file = path.join(videoDir(slug), "final-cut", `${slug}.fcpxml`);
       await fs.access(file);
       await run("/usr/bin/open", ["-a", "Final Cut Pro", file]);
@@ -1922,6 +2550,23 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (route === "/api/cancel" && request.method === "POST") {
+      const slug = mountedProject;
+      if (slug) {
+        for (const job of await blockingJobs(slug)) {
+          if (["planned", "awaiting-confirmation", "authorized"].includes(job.status)) {
+            await transitionJob(slug, job.id, "cancelled").catch(() => {});
+          } else if (job.id === current?.jobId && ["submitted", "running"].includes(job.status)) {
+            await transitionJob(slug, job.id, "cancel-requested").catch(() => {});
+          } else if (["submitted", "running", "cancel-requested"].includes(job.status)) {
+            await transitionJob(slug, job.id, "unknown", {
+              error: {
+                message:
+                  "Cancellation occurred after provider submission. Credits may have been consumed; this job will not retry automatically.",
+              },
+            }).catch(() => {});
+          }
+        }
+      }
       sendJson(response, 200, { cancelled: stopStageChild() });
       return;
     }

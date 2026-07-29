@@ -11,6 +11,9 @@
     "channel": "default",
     "libraryPath": null
   },
+  "narration": {
+    "provider": "voicebox"
+  },
   "voicebox": {
     "profile": "MyOwn",
     "engine": "qwen",
@@ -24,6 +27,15 @@
     "qaModel": "tiny.en",
     "reviewBeforeImages": true,
     "storyDescription": null
+  },
+  "elevenlabs": {
+    "voiceId": null,
+    "voiceName": null,
+    "modelId": "eleven_v3",
+    "preset": "natural",
+    "settings": {
+      "stability": 0.5
+    }
   },
   "captions": {
     "enabled": false,
