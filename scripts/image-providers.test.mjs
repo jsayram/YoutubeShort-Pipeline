@@ -128,9 +128,9 @@ for (const variable of ["castPlan", "castBrief", "castTags", "visualAction", "sh
 }
 assert.match(photographic.sceneTemplate, /no people in it/i);
 assert.match(photographic.sceneTemplate, /no visible face, no visible hands/i);
+assert.match(photographic.sceneTemplate, /different primary object and a different setting/i);
 assert.match(photographic.stylePrompt, /old grainy 35mm camera/i);
-assert.match(photographic.stylePrompt, /sunrise and sunset over the ocean/i);
-assert.match(photographic.stylePrompt, /balloons, roses, wrapped gifts, coffee cups, candles/i);
+assert.match(photographic.stylePrompt, /varied locations and times of day/i);
 assert.match(photographic.negativeExtra, /portrait, face/i);
 assert.match(photographic.negativeExtra, /hands, fingers/i);
 assert.match(flatVector.stylePrompt, /rough brush-shaped geometry/i);
