@@ -3,8 +3,10 @@ import fsSync from "node:fs";
 import path from "node:path";
 import {
   commandOutput,
+  deconflictNegativePrompt,
   dedupeTerms,
   loadEnv,
+  makeWordlessVisualPrompt,
   parseArgs,
   readJson,
   run,
@@ -16,6 +18,11 @@ import {
   videoDir,
   writeJson,
 } from "./lib.mjs";
+import {
+  createImageGenerationAudit,
+  mergePartialManifest,
+  selectRequestedScenes,
+} from "./image-generation-audit.mjs";
 
 // Local image generation through a running ComfyUI. Same shape as the Voicebox step: the app is
 // a local HTTP service, this script only speaks its documented API and never edits its tree.
@@ -124,23 +131,15 @@ const outHeight = Number(gen.outHeight ?? config.height ?? 1920);
 // The style suffix historically carried its own "no readable text, no logo, no watermark" tail.
 // Those phrases were being fed to the positive encoder, where they read as a request for text.
 // Split once here; every prompt reuses the cleaned half and inherits the negated half.
-const { positive: styleSuffix, negatives: styleNegatives } = splitNegations(gen.styleSuffix ?? "");
-// Screens and covers are where SDXL invents logos and garbled lettering, which the style
-// guide rejects outright — so the glowing-display vocabulary is banned here, not just "text".
+const selectedStyleSuffix = gen.compactStyleSuffix ?? gen.styleSuffix ?? "";
+const { positive: styleSuffix, negatives: styleNegatives } = splitNegations(selectedStyleSuffix);
+// Prohibit rendered lettering, not the physical objects that may carry it. A phone, book, sign,
+// or record sleeve can be essential to the story and should remain as a blank or pictorial prop.
 const negativePrompt =
   gen.negativePrompt ??
-  "text, letters, words, typography, numbers, watermark, signature, logo, emblem, icon, badge, " +
-    "sticker, label, ui, interface, app screen, glowing display, screen content, chart, graph, " +
+  "readable text, letters, words, typography, numbers, watermark, signature, logo, wordmark, " +
     "caption, subtitle, blurry, low quality, jpeg artifacts, deformed, extra limbs, cluttered, " +
-    "busy background, stock photo, collage, frame, border, oversaturated, neon plastic, " +
-    // The style guide wants a charcoal world lit by one accent. Left unconstrained, SDXL
-    // drifts to bright studio backdrops and paints the accent onto the subject as a material.
-    "white background, bright background, high-key lighting, daylight, overcast sky, blown " +
-    "highlights, washed out, pale grey backdrop, painted green object, coloured plastic object, " +
-    // "acid-lime" reads as the fruit often enough to matter, and covered objects like books
-    // attract embossed titles no amount of "no text" prevents.
-    "lime fruit, citrus, fruit, pencil, stationery, embossed lettering, engraved title, " +
-    "orange glow, amber light, warm sunset, moon";
+    "busy background, stock photo, collage, frame, border, oversaturated, neon plastic";
 
 const outputDir = path.join(projectDir, "public", "generated");
 const referenceDir = path.join(projectDir, "assets", "references");
@@ -161,7 +160,9 @@ for (const item of [
   referenceIds.add(item.id);
   referencePrompts.push({ ...item, kind: "reference", role: item.role ?? "style" });
 }
-const scenePrompts = prompts.filter((item) => item.kind !== "reference");
+const allScenePrompts = prompts.filter((item) => item.kind !== "reference");
+const selection = selectRequestedScenes(allScenePrompts, flags);
+const scenePrompts = selection.scenes;
 const sharedReferences = referencePrompts.map(
   (item) => `assets/references/${item.id}.png`,
 );
@@ -177,6 +178,7 @@ if (!stats?.ok) {
       `  cd ~/ComfyUI && venv/bin/python main.py --listen 127.0.0.1 --port 8188`,
   );
 }
+const systemStats = await stats.json().catch(() => null);
 
 const objectInfo = await fetch(`${baseUrl}/object_info/CheckpointLoaderSimple`).then((r) => r.json());
 const available = objectInfo.CheckpointLoaderSimple.input.required.ckpt_name[0];
@@ -185,6 +187,42 @@ if (!available.includes(checkpoint)) {
     `ComfyUI does not see checkpoint "${checkpoint}". Available: ${available.join(", ") || "none"}.`,
   );
 }
+
+const audit = await createImageGenerationAudit({
+  projectDir,
+  project: flags.project,
+  provider: "comfyui",
+  service: {
+    type: "ComfyUI",
+    baseUrl,
+    reachable: true,
+    systemStats,
+    checkpointsSeen: available,
+  },
+  configuration: {
+    checkpoint,
+    vae: vaeName,
+    steps,
+    cfg,
+    sampler,
+    scheduler,
+    genWidth,
+    genHeight,
+    outWidth,
+    outHeight,
+    loras: gen.loras ?? [],
+    postProcess: gen.postProcess ?? null,
+    selectedScenes: selection.prefixes,
+    promptPolicy: {
+      sceneAuthority: "enriched concrete scene",
+      textBearingProps: "preserved with a wordless glow, light pulse, or abstract pictorial mark",
+      readableText: "negative conditioning",
+      negativeConflicts: "scene-required props, lighting, and silhouettes override defaults",
+    },
+  },
+  promptFile: promptsFile,
+  prompts: scenePrompts,
+});
 
 // A stable seed per prompt id keeps re-runs reproducible, which the render pipeline relies on.
 // --force salts it (see resolveSeedSalt below) so a forced regeneration with an unchanged
@@ -214,7 +252,7 @@ if (referenceSeedSalt) console.log(`Forced regeneration: reference seed salt ${r
 // is routed to the negative encoder, together with the standing no-lettering vocabulary — the
 // frames are meant to be wordless so captions can be added over them afterwards.
 export function conditioningFor(item) {
-  const source = splitNegations(stripQuotedText(item.prompt));
+  const source = splitNegations(stripQuotedText(makeWordlessVisualPrompt(item.prompt)));
   // Two passes. splitNegations moves explicit prohibitions to the negative side; scrubTextNouns
   // then removes any surviving clause that merely mentions lettering, which the encoder would
   // read as a request for it.
@@ -237,19 +275,21 @@ export function conditioningFor(item) {
     "(text:1.6), (letters:1.5), (words:1.5), (typography:1.4), (numbers:1.4), " +
     "(watermark:1.4), (logo:1.3), (caption:1.3), (subtitle:1.3), (user interface:1.3)";
 
+  const negative = [
+    emphasis,
+    usesAnimagine
+      ? "lowres, bad anatomy, bad hands, missing fingers, extra digits, fewer digits, cropped, " +
+        "worst quality, low quality, low score, bad score, average score, blurry"
+      : "",
+    // A style preset can push against the wrong medium, e.g. "photograph" when the look is
+    // meant to be flat vector.
+    ...(gen.negativeExtra ? [gen.negativeExtra] : []),
+    ...dedupeTerms([negativePrompt, ...TEXT_NEGATIVES, ...styleNegatives, ...source.negatives]),
+  ].join(", ");
+
   return {
     positive,
-    negative: [
-      emphasis,
-      usesAnimagine
-        ? "lowres, bad anatomy, bad hands, missing fingers, extra digits, fewer digits, cropped, " +
-          "worst quality, low quality, low score, bad score, average score, blurry"
-        : "",
-      // A style preset can push against the wrong medium, e.g. "photograph" when the look is
-      // meant to be flat vector.
-      ...(gen.negativeExtra ? [gen.negativeExtra] : []),
-      ...dedupeTerms([negativePrompt, ...TEXT_NEGATIVES, ...styleNegatives, ...source.negatives]),
-    ].join(", "),
+    negative: deconflictNegativePrompt(positive, negative),
   };
 }
 
@@ -436,6 +476,7 @@ async function generate(item, referenceHandles) {
 const manifest = [];
 const startedAt = Date.now();
 
+try {
 // Reference art is generated before the scenes that depend on it, and without references of its
 // own — the character sheet is what defines the character, so it cannot be steered by itself.
 const ordered = [...referencePrompts, ...scenePrompts];
@@ -470,7 +511,25 @@ for (const [index, item] of ordered.entries()) {
     );
     if (existing) {
       console.log(`${progressLabel(item, isReference)} ${item.id} — already generated, skipping`);
-      if (!isReference) manifest.push({ id: item.id, file: relativeFile, skipped: true });
+      if (!isReference) {
+        const conditioning = conditioningFor(item);
+        const entry = {
+          id: item.id,
+          file: relativeFile,
+          skipped: true,
+          prompt: conditioning.positive,
+          negativePrompt: conditioning.negative,
+          promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
+        };
+        manifest.push(entry);
+        await audit.startScene(item.id, {
+          finalPrompt: conditioning.positive,
+          negativePrompt: conditioning.negative,
+          seed: Number(item.seed ?? seedFor(item.id, sceneSeedSalt)),
+          settings: { steps, cfg, sampler, scheduler, width: genWidth, height: genHeight },
+        });
+        await audit.completeScene(item.id, { status: "reused", output: entry });
+      }
       continue;
     }
   }
@@ -482,7 +541,27 @@ for (const [index, item] of ordered.entries()) {
   for (const reference of wanted) {
     references.push(await uploadReference(reference));
   }
-  const image = await generate(item, references);
+  const conditioning = conditioningFor(item);
+  const seed = Number(
+    item.seed ?? seedFor(item.id, item.kind === "reference" ? referenceSeedSalt : sceneSeedSalt),
+  );
+  if (!isReference) {
+    await audit.startScene(item.id, {
+      finalPrompt: conditioning.positive,
+      negativePrompt: conditioning.negative,
+      seed,
+      settings: { steps, cfg, sampler, scheduler, width: genWidth, height: genHeight },
+      references: wanted,
+    });
+  }
+  let image;
+  try {
+    image = await generate(item, references);
+  } catch (error) {
+    if (!isReference) await audit.failScene(item.id, error);
+    await audit.fail(error);
+    throw error;
+  }
   const query = new URLSearchParams({
     filename: image.filename,
     subfolder: image.subfolder ?? "",
@@ -553,22 +632,32 @@ for (const [index, item] of ordered.entries()) {
     file: relativeFile,
     provider: "comfyui",
     checkpoint,
-    seed: Number(item.seed ?? seedFor(item.id, sceneSeedSalt)),
+    seed,
     steps,
     cfg,
     sampler,
     scheduler,
+    prompt: conditioning.positive,
+    negativePrompt: conditioning.negative,
+    promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
+  });
+  await audit.completeScene(item.id, {
+    output: manifest.at(-1),
+    providerResponse: image,
   });
 }
 
-await writeJson(path.join(outputDir, "manifest.json"), manifest);
+const finalManifest = selection.partial
+  ? await mergePartialManifest(projectDir, manifest)
+  : manifest;
+await writeJson(path.join(outputDir, "manifest.json"), finalManifest);
 
 // A shorter imported script can replace a longer project. Keep the generated directory aligned
 // with the current prompt list so obsolete shots are not mistaken for current output when someone
 // inspects the folder or another tool scans it directly.
-const currentSceneFiles = new Set(scenePrompts.map((item) => `${item.id}.png`));
+const currentSceneFiles = new Set(allScenePrompts.map((item) => `${item.id}.png`));
 let staleRemoved = 0;
-for (const entry of await fs.readdir(outputDir, { withFileTypes: true })) {
+for (const entry of selection.partial ? [] : await fs.readdir(outputDir, { withFileTypes: true })) {
   if (
     entry.isFile() &&
     /\.(?:png|jpe?g|webp)$/i.test(entry.name) &&
@@ -586,7 +675,7 @@ console.log(
     `(${manifest.length - made} reused). No network, no API key.`,
 );
 
-for (const entry of manifest) {
+for (const entry of finalManifest) {
   const file = path.join(projectDir, entry.file);
   const size = await commandOutput("ffprobe", [
     "-v",
@@ -604,3 +693,12 @@ for (const entry of manifest) {
   }
 }
 console.log(`All images verified at ${outWidth}x${outHeight}.`);
+await audit.finish("completed", {
+  manifest: "public/generated/manifest.json",
+  generated: manifest.filter((entry) => !entry.skipped).length,
+  reused: manifest.filter((entry) => entry.skipped).length,
+});
+} catch (error) {
+  if (audit.document.status !== "failed") await audit.fail(error);
+  throw error;
+}

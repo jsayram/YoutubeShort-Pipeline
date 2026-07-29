@@ -47,9 +47,9 @@ const CATEGORY_INSTRUCTIONS = {
     "The scene must contain NO people, faces, hands, or human figures of any kind. " +
     "Represent human emotion through objects, settings, and empty spaces only.",
   people:
-    "You may include people if the narration implies them. Describe their posture, " +
-    "body language, and position in the scene, but keep faces vague — no specific " +
-    "features. Focus on the action and the emotional setting.",
+    "Choose whether this beat is best shown through objects only, one person, or multiple people. " +
+    "Do not add people merely because the wider story has recurring characters. If people help, " +
+    "keep them subordinate to the narration's concrete object or event and describe their position.",
   symbolic:
     "Create a symbolic, non-literal composition. Describe abstract shapes, textures, " +
     "material qualities, and color relationships that evoke the line's feeling. " +
@@ -79,11 +79,18 @@ export function buildSystemPrompt(profile) {
     `- ${CATEGORY_INSTRUCTIONS[category]}`,
     "- Name EXACT objects (material, color, condition), a SPECIFIC setting (not generic), " +
       "and the quality of light.",
+    "- Keep the scene physically coherent from one camera viewpoint. Do not request opposite " +
+      "sides of the same object at once, and use one unambiguous supporting surface or location.",
     "- Find a creative visual metaphor that makes the viewer feel the line without reading it.",
+    "- Preserve every concrete object explicitly named by the narration. Those objects are more " +
+      "important than a generic cast or composition from the wider story.",
     "- Each scene MUST differ from its neighbors: different primary object, different location, " +
       "different time of day.",
     `- ${FORMAT_INSTRUCTIONS[format]}`,
-    "- Do not mention text, captions, titles, or any kind of lettering.",
+    "- The image must be wordless. Never request readable text, captions, titles, labels, or " +
+      "lettering. When the meaning involves a message, playlist, book, sign, or interface, keep " +
+      "the physical object and replace its written content with a soft notification glow, a " +
+      "small pulse of light, or a simple abstract pictorial mark. A heart is optional, never required.",
     "",
     "Style context (for your awareness, do not repeat this in your output):",
     profile.stylePrompt ?? "",
@@ -96,7 +103,7 @@ export function buildSystemPrompt(profile) {
 
 export function sceneConstraints(item) {
   const prompt = String(item.prompt ?? "");
-  const requiredEvent =
+  let requiredEvent =
     prompt.match(/required visual event\s+([\s\S]*?),\s*shot design\s+/i)?.[1]?.trim() ?? "";
   const shotPlan =
     prompt.match(/shot design\s+([\s\S]*?),\s*visual anchors\s+/i)?.[1]?.trim() ?? "";
@@ -112,6 +119,15 @@ export function sceneConstraints(item) {
     "solo-b":
       "Exactly one recurring older adult man. The absent partner may be implied only through an object, empty place, or shadow.",
   };
+  if (
+    item.castMode === "object" &&
+    /\b(?:person|people|figure|adult|woman|man|hands?|face|handles?|walks?|stands?)\b/i.test(
+      requiredEvent,
+    )
+  ) {
+    requiredEvent =
+      "Arrange the narration's objects and setting as a quiet still life with no human presence";
+  }
   return {
     castMode: String(item.castMode ?? ""),
     castRule:
@@ -129,14 +145,14 @@ function buildUserPrompt(item, index, total, narrationLines, enrichedNeighbors, 
   const parts = [
     `Narration line ${index + 1} of ${total}: "${line}"`,
     "",
-    "NON-NEGOTIABLE SCENE PLAN:",
-    `- Cast: ${constraints.castRule}`,
+    "OPTIONAL CONTINUITY CONTEXT FROM THE DRAFT SCENE:",
+    `- Draft cast suggestion: ${constraints.castRule}`,
     constraints.requiredEvent
-      ? `- Required visible action: ${constraints.requiredEvent}`
-      : "- Required visible action: preserve the existing scene plan exactly.",
+      ? `- Draft visible action: ${constraints.requiredEvent}`
+      : "- Draft visible action: none.",
     constraints.shotPlan
-      ? `- Camera and composition: ${constraints.shotPlan}`
-      : "- Camera and composition: preserve the existing scene plan exactly.",
+      ? `- Draft camera and composition: ${constraints.shotPlan}`
+      : "- Draft camera and composition: none.",
   ];
 
   // Extract story beat and sentiment from the existing template-built prompt.
@@ -158,11 +174,16 @@ function buildUserPrompt(item, index, total, narrationLines, enrichedNeighbors, 
 
   parts.push(
     "",
-    "Refine that exact plan into ONE specific, concrete scene. " +
+    "Create ONE specific, concrete scene for the narration. " +
       "Name exact objects (material, color, condition), the specific room or place, " +
-      "and the quality of light. The cast, visible action, and camera above are authoritative. " +
-      "Do not replace them with a different action, location concept, cast, or composition. " +
-      "If any earlier wording conflicts with the Cast rule, the Cast rule wins.",
+      "and the quality of light. The narration and your concrete visual interpretation are " +
+      "authoritative. Preserve every physical object named in the narration. Use the draft " +
+      "context only when it strengthens that interpretation; you may replace its cast, action, " +
+      "location, or camera. Prefer a dominant still life over generic people when an object can " +
+      "carry the meaning. Keep the camera geometry physically coherent: show only properties " +
+      "visible from that viewpoint and choose one supporting surface. Keep all visible surfaces " +
+      "wordless; use a soft notification glow, small light pulse, or abstract pictorial mark " +
+      "instead of a readable message or interface.",
     "",
   );
 
@@ -196,15 +217,11 @@ export function buildAuthoritativePrompt({
   if (format === "tags") {
     return [
       "safe",
-      constraints.castRule,
       constraints.emotionalTone
         ? `emotional tone ${constraints.emotionalTone}`
         : null,
-      constraints.requiredEvent
-        ? `required visual event ${constraints.requiredEvent}`
-        : null,
-      constraints.shotPlan ? `shot design ${constraints.shotPlan}` : null,
-      `concrete scene details ${cleanScene}`,
+      `authoritative concrete scene ${cleanScene}`,
+      "wordless surfaces",
     ]
       .filter(Boolean)
       .join(", ");
@@ -212,17 +229,11 @@ export function buildAuthoritativePrompt({
 
   return [
     `Create one wordless scene for this narration beat: ${narration}`,
-    `Cast constraint: ${constraints.castRule}`,
-    constraints.requiredEvent
-      ? `Required visible action: ${constraints.requiredEvent}`
-      : null,
-    constraints.shotPlan
-      ? `Camera and composition: ${constraints.shotPlan}`
-      : null,
     constraints.emotionalTone
       ? `Emotional tone: ${constraints.emotionalTone}`
       : null,
-    `Concrete scene execution: ${cleanScene}`,
+    `Authoritative concrete scene execution: ${cleanScene}`,
+    "Keep every visible surface free of readable lettering; use a simple pictorial symbol when needed",
   ]
     .filter(Boolean)
     .join(". ");
@@ -450,6 +461,7 @@ export async function main(argv = process.argv.slice(2)) {
           format,
         }),
         enrichment: {
+          status: "completed",
           provider: llm.provider,
           service: llm.name,
           model,
@@ -476,6 +488,22 @@ export async function main(argv = process.argv.slice(2)) {
       console.error(`  ${sceneId}: LLM error — ${error.message}`);
       console.error("    Keeping original prompt.");
       enrichedDescriptions[i] = "(error, kept original)";
+      enrichedPrompts[i] = {
+        ...item,
+        enrichment: {
+          status: "failed",
+          provider: llm.provider,
+          service: llm.name,
+          model,
+          format,
+          attemptedAt: new Date().toISOString(),
+          sourcePrompt: item.prompt,
+          error: {
+            name: error.name ?? "Error",
+            message: String(error.message ?? error),
+          },
+        },
+      };
     }
   }
 

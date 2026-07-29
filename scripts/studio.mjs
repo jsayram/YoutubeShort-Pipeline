@@ -49,6 +49,7 @@ const { flags } = parseArgs();
 const port = Number(flags.port ?? process.env.STUDIO_PORT ?? 4300);
 const studioDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "studio");
 const videosRoot = path.join(repoRoot, "videos");
+const studioStatePath = path.join(videosRoot, ".studio-state.json");
 // One place to change when a style is retired. These ids were previously inlined at four call
 // sites, so deleting the style they named silently broke Studio.
 const DEFAULTS = { style: "flux2-storybook", promptStyle: "photographic", topic: DEFAULT_TOPIC_ID };
@@ -71,6 +72,62 @@ const MIME = {
 /** @type {{id:string, slug:string, stages:any[], events:any[], child:any, done:boolean}|null} */
 let current = null;
 const listeners = new Set();
+let persistStateChain = Promise.resolve();
+
+function savedRunState() {
+  if (!current) return null;
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    run: {
+      id: current.id,
+      slug: current.slug,
+      stages: current.stages,
+      events: current.events,
+      done: current.done,
+    },
+  };
+}
+
+function persistCurrent() {
+  const snapshot = savedRunState();
+  if (!snapshot) return persistStateChain;
+  persistStateChain = persistStateChain
+    .catch(() => {})
+    .then(async () => {
+      await fs.mkdir(videosRoot, { recursive: true });
+      await writeJson(studioStatePath, snapshot);
+    });
+  return persistStateChain;
+}
+
+async function restoreCurrent() {
+  const saved = await readJson(studioStatePath).catch(() => null);
+  if (!saved?.run?.id || !saved.run.slug || !Array.isArray(saved.run.events)) return;
+  current = {
+    id: String(saved.run.id),
+    slug: String(saved.run.slug),
+    stages: Array.isArray(saved.run.stages) ? saved.run.stages : [],
+    events: saved.run.events,
+    child: null,
+    done: saved.run.done !== false,
+  };
+  // A Studio process cannot resume a child process after a service restart. Preserve everything
+  // that was visible, but mark an unfinished stage as interrupted instead of pretending it is
+  // still running. Saved images remain discoverable through /api/project-assets.
+  if (!current.done) {
+    for (const stage of current.stages) {
+      if (stage.status === "running") stage.status = "interrupted";
+    }
+    current.done = true;
+    current.events.push({
+      type: "error",
+      message: "Studio restarted while this run was active. Saved progress was restored.",
+      at: Date.now(),
+    });
+    await persistCurrent();
+  }
+}
 
 function stopStageChild(signal = "SIGTERM") {
   const child = current?.child;
@@ -92,6 +149,7 @@ function emit(event) {
   if (!current) return;
   const payload = { ...event, at: Date.now() };
   current.events.push(payload);
+  void persistCurrent();
   const frame = `data: ${JSON.stringify(payload)}\n\n`;
   for (const response of listeners) response.write(frame);
 }
@@ -259,7 +317,10 @@ async function startRun({ slug, title, scriptText, options }) {
       emit({ type: "error", message: String(error.message ?? error) });
     }
   } finally {
-    if (current) current.done = true;
+    if (current) {
+      current.done = true;
+      void persistCurrent();
+    }
   }
 }
 
@@ -339,6 +400,10 @@ async function resumeAfterNarrationReview(slug, options) {
   };
   emit({ type: "run", runId: current.id, slug, stages: current.stages });
   try {
+    // Approving narration starts a fresh continuation run and rebuilds the stage DOM in Studio.
+    // Re-emit the prompts so that continuation has an image grid to receive live thumbnails.
+    // Without this, image events were delivered correctly but had no cells to update.
+    await emitPrompts(slug);
     await runStage("review", node, [
       script("narration-review-cli.mjs"),
       "approve",
@@ -351,7 +416,10 @@ async function resumeAfterNarrationReview(slug, options) {
   } catch (error) {
     emit({ type: "error", message: String(error.message ?? error) });
   } finally {
-    if (current) current.done = true;
+    if (current) {
+      current.done = true;
+      void persistCurrent();
+    }
   }
 }
 
@@ -395,7 +463,10 @@ async function startRender(slug) {
   } catch (error) {
     emit({ type: "error", message: String(error.message ?? error) });
   } finally {
-    if (current) current.done = true;
+    if (current) {
+      current.done = true;
+      void persistCurrent();
+    }
   }
 }
 
@@ -813,6 +884,11 @@ async function cancelRunForReset() {
 
 async function resetAllServices() {
   const cancelledRun = await cancelRunForReset();
+  // This is the one explicit destructive UI action. Ordinary browser reloads preserve and replay
+  // history; Restart everything deliberately starts the control room from a clean slate.
+  await persistStateChain.catch(() => {});
+  current = null;
+  await fs.rm(studioStatePath, { force: true });
   const results = await Promise.allSettled([restartComfyUi(), restartVoicebox()]);
   const failures = results
     .map((result, index) =>
@@ -1015,9 +1091,12 @@ const server = http.createServer(async (request, response) => {
           rendered,
           captionsEnabled: config.captions?.enabled === true,
           reviewNarration: config.voicebox?.reviewBeforeImages !== false,
+          voiceProfile: config.voicebox?.profile ?? null,
+          pauseSeconds: Number(config.voicebox?.gapMs ?? 3000) / 1000,
           enrichWithLLM: config.imageGen?.enrichWithLLM === true,
           styleId: config.imageGen?.style ?? null,
           topicId: config.topic ?? null,
+          script: await readNarration(path.join(videosRoot, entry.name)),
         });
       }
       sendJson(response, 200, { projects });
@@ -1660,6 +1739,8 @@ function shutDownStudio() {
 
 process.once("SIGINT", shutDownStudio);
 process.once("SIGTERM", shutDownStudio);
+
+await restoreCurrent();
 
 server.listen(port, "127.0.0.1", () => {
   console.log(`\n  YouTube Short studio\n  http://localhost:${port}\n`);

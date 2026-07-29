@@ -5,10 +5,15 @@ import {
   loadEnv,
   parseArgs,
   readJson,
-  stripQuotedText,
   videoDir,
   writeJson,
 } from "./lib.mjs";
+import {
+  createImageGenerationAudit,
+  mergePartialManifest,
+  selectRequestedScenes,
+} from "./image-generation-audit.mjs";
+import { buildGeminiPrompt } from "./image-worker-common.mjs";
 
 await loadEnv();
 const { flags } = parseArgs();
@@ -18,7 +23,9 @@ const config = await readJson(path.join(projectDir, "video.json"));
 const promptsFile = process.env.IMAGE_PROMPTS_FILE
   ? path.resolve(process.env.IMAGE_PROMPTS_FILE)
   : path.join(projectDir, "content", "image-prompts.json");
-const prompts = await readJson(promptsFile);
+const allPrompts = await readJson(promptsFile);
+const selection = selectRequestedScenes(allPrompts, flags);
+const prompts = selection.scenes;
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) throw new Error("GEMINI_API_KEY is missing. Copy .env.example to .env and add the key.");
@@ -31,6 +38,37 @@ const outputDir = path.join(projectDir, "public", "generated");
 await fs.mkdir(outputDir, { recursive: true });
 const manifest = [];
 const generatedExtensions = ["png", "jpg", "jpeg", "webp"];
+
+function finalPromptFor(item) {
+  return buildGeminiPrompt(
+    item,
+    config.imageGen.compactStyleSuffix ?? config.imageGen.styleSuffix,
+  );
+}
+
+const audit = await createImageGenerationAudit({
+  projectDir,
+  project: slug,
+  provider: "gemini",
+  service: {
+    type: "Google GenAI",
+    endpoint: "Google GenAI interactions API",
+    credentialsPresent: Boolean(apiKey),
+  },
+  configuration: {
+    model: config.imageGen.model,
+    aspectRatio: config.imageGen.aspectRatio,
+    imageSize: config.imageGen.imageSize,
+    selectedScenes: selection.prefixes,
+    promptPolicy: {
+      sceneAuthority: "enriched concrete scene",
+      textBearingProps: "preserved with a wordless glow, light pulse, or abstract pictorial mark",
+      readableText: "wordless hard requirement in the submitted prompt",
+    },
+  },
+  promptFile: promptsFile,
+  prompts,
+});
 
 function findImage(interaction) {
   const blocks = [];
@@ -54,6 +92,7 @@ function findImage(interaction) {
   return null;
 }
 
+try {
 for (const item of prompts) {
   if (!item.id || !item.prompt) throw new Error("Every image prompt needs an id and prompt.");
   if (!flags.force) {
@@ -65,7 +104,18 @@ for (const item of prompts) {
           id: item.id,
           file: `public/generated/${item.id}.${extension}`,
           skipped: true,
+          prompt: finalPromptFor(item),
+          promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
         });
+        await audit.startScene(item.id, {
+          finalPrompt: finalPromptFor(item),
+          settings: {
+            model: config.imageGen.model,
+            aspectRatio: config.imageGen.aspectRatio,
+            imageSize: config.imageGen.imageSize,
+          },
+        });
+        await audit.completeScene(item.id, { status: "reused", output: manifest.at(-1) });
         break;
       } catch (error) {
         if (error.code !== "ENOENT") throw error;
@@ -77,16 +127,15 @@ for (const item of prompts) {
   // Gemini follows instructions rather than CLIP-style conditioning, so negation stays as
   // prose here — but it is stated once, last, and unambiguously. The frames must come back
   // wordless; captions are added over them in the composition.
-  const fullPrompt = [
-    stripQuotedText(item.prompt),
-    config.imageGen.styleSuffix,
-    "Hard requirement: the image must contain no text of any kind. No letters, words, numbers, " +
-      "captions, titles, labels, signage, book titles, logos, wordmarks, watermarks, user " +
-      "interface, or screen content. Any surface that would normally carry writing must be " +
-      "blank. Leave clear negative space where captions will be placed later.",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const fullPrompt = finalPromptFor(item);
+  await audit.startScene(item.id, {
+    finalPrompt: fullPrompt,
+    settings: {
+      model: config.imageGen.model,
+      aspectRatio: config.imageGen.aspectRatio,
+      imageSize: config.imageGen.imageSize,
+    },
+  });
   let interaction;
   try {
     interaction = await ai.interactions.create({
@@ -99,6 +148,8 @@ for (const item of prompts) {
       },
     });
   } catch (error) {
+    await audit.failScene(item.id, error);
+    await audit.fail(error);
     if (String(error).includes("429") || String(error).toLowerCase().includes("quota")) {
       throw new Error(
         "Google image quota is unavailable for this project. Enable billing/quota or create the image in Gemini and save it under public/generated with the expected filename.",
@@ -124,8 +175,28 @@ for (const item of prompts) {
     file: `public/generated/${item.id}.${extension}`,
     model: config.imageGen.model,
     prompt: fullPrompt,
+    promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
+  });
+  await audit.completeScene(item.id, {
+    output: manifest.at(-1),
+    providerResponse: {
+      mimeType: image.mimeType,
+      interactionId: interaction.id ?? null,
+    },
   });
   console.log(`Saved ${outputPath}`);
 }
 
-await writeJson(path.join(outputDir, "manifest.json"), manifest);
+const finalManifest = selection.partial
+  ? await mergePartialManifest(projectDir, manifest)
+  : manifest;
+await writeJson(path.join(outputDir, "manifest.json"), finalManifest);
+await audit.finish("completed", {
+  manifest: "public/generated/manifest.json",
+  generated: manifest.filter((entry) => !entry.skipped).length,
+  reused: manifest.filter((entry) => entry.skipped).length,
+});
+} catch (error) {
+  if (audit.document.status !== "failed") await audit.fail(error);
+  throw error;
+}

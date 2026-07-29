@@ -2,7 +2,7 @@
 
 A reusable local pipeline for making 60-second, 9:16 YouTube Shorts with:
 
-- ComfyUI, FLUX.2 Klein, Animagine, Google GenAI, or Cloudflare for visual assets
+- ComfyUI, FLUX.2 Klein, Animagine, Google GenAI, Cloudflare, or Pixazo SDXL for visual assets
 - Voicebox for a local male voice-over
 - HyperFrames for composition, animation, preview, and rendering
 - ChatGPT Codex or Claude Code as the directing agent
@@ -34,6 +34,7 @@ You need macOS, Node.js 22 or newer, FFmpeg, and the Voicebox app.
 4. Put the Google AI Studio key after `GEMINI_API_KEY=` in `.env`.
    Gemini remains optional. For the recurring-free FLUX fallback, also set
    `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; local FLUX does not need either value.
+   Pixazo's free-preview SDXL Base provider is optional too; set `PIXAZO_API` to enable it.
 5. Check the setup:
 
    ```sh
@@ -135,16 +136,54 @@ image dispatcher asks headless LM Studio (`LMSTUDIO_MODEL`, default `qwen/qwen3.
 script line into a more concrete, neighbor-aware scene before handing it to whichever provider is
 selected. It never edits `templates/prompt.json` or the video's saved
 `content/image-prompts.json`; the enriched result is written to
-`content/image-prompts.enriched.json` and supplied only to that image run. Turn the toggle off and
-the pipeline immediately uses the original provider prompts. If LM Studio is stopped, missing its
-model, or cannot run inference, generation continues with the original prompts instead of failing.
-Studio shows LM Studio and the configured model in **Local services**. The standalone
+`content/image-prompts.enriched.json`. That approved overlay is reused on later image rerolls while
+the source prompts are unchanged; pass `--refresh-enriched` to deliberately ask the LLM for new
+scene descriptions. The narration and Qwen's concrete scene own the objects, subject count,
+location, light, and camera; the topic's draft cast/action plan is advisory, and the look profile
+still owns only medium, palette, and texture. Text-bearing story props remain visible but their
+content is converted to a simple pictorial symbol (a heart for relationship beats), never readable
+lettering. Turn the toggle off and the pipeline immediately uses the original provider prompts. If
+LM Studio is stopped, missing its model, or cannot run inference, generation continues with the
+original prompts instead of failing. Studio shows LM Studio and the configured model in **Local
+services**. The standalone
 `npm run enrich -- --project <slug>` command remains available when a permanent, reviewable prompt
 rewrite is wanted.
 
-Every content provider uses the same story-aware scene interpretation and solo/shared cast
-rhythm. Across the pipeline, a two-person relationship scene is constrained to exactly one adult
-man and one adult woman; solo scenes still alternate between a woman and a man. Each provider
+Every image run writes a reproducibility record under `public/generated/audit/`. `latest.json`
+points to the newest run, while timestamped records remain as history. Each record includes the
+enrichment service and model, service capabilities observed at runtime, source and overlay
+prompts, exact final positive and negative prompts, checkpoint/model, dimensions, steps,
+guidance/CFG, sampler, scheduler, seed, references, elapsed time, output path, SHA-256 hash, and
+complete error details. Credentials are redacted. The exact final prompt is also stored with each
+generated entry in `public/generated/manifest.json`.
+
+For a controlled comparison, regenerate only selected numbered scenes without touching the rest:
+
+```sh
+npm run images -- --project my-video-name --force --only 01,05,06
+```
+
+Partial runs merge their new entries into the existing manifest and skip stale-image cleanup, so
+unselected scenes remain intact.
+
+Ordinary rerolls now reuse the approved enriched overlay automatically. To make that choice
+explicit while reproducing an older run, pass the saved seed salt:
+
+```sh
+npm run images -- --project my-video-name --force --only 01,05,06 \
+  --reuse-enriched --seed-salt 1552041690
+```
+
+To deliberately replace the approved Qwen scene descriptions:
+
+```sh
+npm run images -- --project my-video-name --refresh-enriched
+```
+
+Every content provider uses the same story-aware scene interpretation. Without enrichment, topic
+packs continue to provide their solo/shared cast rhythm. With enrichment enabled, the concrete
+scene decides whether objects, one person, or multiple people best communicate the narration;
+topic cast information supplies continuity only when people belong in that scene. Each provider
 keeps its own medium:
 nostalgic 35mm editorial photography, rough screen-printed vector shapes, dry-brush ink with
 restrained color washes, or rough oil-and-gouache illustration. They share a house direction:

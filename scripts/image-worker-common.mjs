@@ -1,7 +1,15 @@
 import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
-import { commandOutput, run, scrubTextNouns, splitNegations, stripQuotedText, writeJson } from "./lib.mjs";
+import {
+  commandOutput,
+  makeWordlessVisualPrompt,
+  run,
+  scrubTextNouns,
+  splitNegations,
+  stripQuotedText,
+  writeJson,
+} from "./lib.mjs";
 
 // FLUX's ComfyUI workflow zeroes out its "negative" conditioning (ConditioningZeroOut) rather
 // than encoding real negative text, and both local and Cloudflare FLUX.2 run at guidance 1, where
@@ -17,10 +25,14 @@ const FLUX_NO_TEXT_REQUIREMENT =
   "multi-panel layout. Every surface that could carry writing is left blank.";
 
 export function buildFluxPrompt(item, styleSuffix) {
-  const source = splitNegations(stripQuotedText(item.prompt));
+  const source = splitNegations(stripQuotedText(makeWordlessVisualPrompt(item.prompt)));
   const style = splitNegations(styleSuffix ?? "");
   const cleaned = scrubTextNouns([source.positive, style.positive].filter(Boolean).join(". "));
   return [cleaned, FLUX_NO_TEXT_REQUIREMENT].filter(Boolean).join("\n\n");
+}
+
+export function buildGeminiPrompt(item, styleSuffix) {
+  return buildFluxPrompt(item, styleSuffix);
 }
 
 // The salt defaults to 0 so a plain re-run still reproduces the same image. Forced
@@ -222,16 +234,32 @@ export async function writeExactImage({
 export async function finishImageRun({
   projectDir,
   scenes,
+  allScenes = scenes,
   manifest,
   outWidth,
   outHeight,
+  partial = false,
 }) {
   const outputDir = path.join(projectDir, "public", "generated");
-  await writeJson(path.join(outputDir, "manifest.json"), manifest);
+  let finalManifest = manifest;
+  if (partial) {
+    const previous = await fs
+      .readFile(path.join(outputDir, "manifest.json"), "utf8")
+      .then(JSON.parse)
+      .catch(() => []);
+    const updates = new Map(manifest.map((entry) => [entry.id, entry]));
+    finalManifest = previous.map((entry) => updates.get(entry.id) ?? entry);
+    for (const entry of manifest) {
+      if (!previous.some((previousEntry) => previousEntry.id === entry.id)) {
+        finalManifest.push(entry);
+      }
+    }
+  }
+  await writeJson(path.join(outputDir, "manifest.json"), finalManifest);
 
-  const currentSceneFiles = new Set(scenes.map((item) => `${item.id}.png`));
+  const currentSceneFiles = new Set(allScenes.map((item) => `${item.id}.png`));
   let staleRemoved = 0;
-  for (const entry of await fs.readdir(outputDir, { withFileTypes: true })) {
+  for (const entry of partial ? [] : await fs.readdir(outputDir, { withFileTypes: true })) {
     if (
       entry.isFile() &&
       /\.(?:png|jpe?g|webp)$/i.test(entry.name) &&
@@ -243,7 +271,7 @@ export async function finishImageRun({
   }
   if (staleRemoved) console.log(`Removed ${staleRemoved} stale generated image(s).`);
 
-  for (const entry of manifest) {
+  for (const entry of finalManifest) {
     const file = path.join(projectDir, entry.file);
     const size = await commandOutput("ffprobe", [
       "-v",
@@ -261,4 +289,5 @@ export async function finishImageRun({
     }
   }
   console.log(`All scene images verified at ${outWidth}x${outHeight}.`);
+  return finalManifest;
 }

@@ -12,6 +12,10 @@ import {
   splitImageItems,
   writeExactImage,
 } from "./image-worker-common.mjs";
+import {
+  createImageGenerationAudit,
+  selectRequestedScenes,
+} from "./image-generation-audit.mjs";
 
 await loadEnv();
 const { flags } = parseArgs();
@@ -24,7 +28,9 @@ const promptsFile = process.env.IMAGE_PROMPTS_FILE
   : path.join(projectDir, "content", "image-prompts.json");
 const prompts = await readJson(promptsFile);
 const gen = config.imageGen ?? {};
-const { references, scenes } = splitImageItems(prompts, gen);
+const { references, scenes: allScenes } = splitImageItems(prompts, gen);
+const selection = selectRequestedScenes(allScenes, flags);
+const scenes = selection.scenes;
 const releaseLock = await installGenerationLock(projectDir, flags.project);
 
 const sceneSeedSalt = resolveSeedSalt(flags, flags.force);
@@ -52,7 +58,7 @@ await fs.mkdir(outputDir, { recursive: true });
 await fs.mkdir(referenceDir, { recursive: true });
 
 function cleanPrompt(item) {
-  return buildFluxPrompt(item, gen.styleSuffix);
+  return buildFluxPrompt(item, gen.compactStyleSuffix ?? gen.styleSuffix);
 }
 
 async function modelChoices(nodeClass, field) {
@@ -77,6 +83,41 @@ for (const [label, wanted, available] of [
     throw new Error(`ComfyUI is missing FLUX ${label} "${wanted}".`);
   }
 }
+
+const audit = await createImageGenerationAudit({
+  projectDir,
+  project: flags.project,
+  provider: "flux2-local",
+  service: {
+    type: "ComfyUI FLUX.2",
+    baseUrl,
+    reachable: true,
+    diffusionModelsSeen: availableModels,
+    textEncodersSeen: availableEncoders,
+    vaesSeen: availableVaes,
+  },
+  configuration: {
+    diffusionModel,
+    textEncoder,
+    vae: vaeName,
+    steps,
+    guidance,
+    sampler,
+    sceneWidth,
+    sceneHeight,
+    outWidth,
+    outHeight,
+    selectedScenes: selection.prefixes,
+    promptPolicy: {
+      sceneAuthority: "enriched concrete scene",
+      textBearingProps: "preserved with a wordless glow, light pulse, or abstract pictorial mark",
+      readableText: "wordless hard requirement in positive conditioning",
+      negativeConditioning: "zeroed by the FLUX.2 workflow",
+    },
+  },
+  promptFile: promptsFile,
+  prompts: scenes,
+});
 
 const uploaded = new Map();
 async function uploadReference(reference) {
@@ -255,28 +296,50 @@ try {
   for (const [index, item] of scenes.entries()) {
     if (!item.id || !item.prompt) throw new Error("Every scene prompt needs an id and prompt.");
     const finalPath = path.join(outputDir, `${item.id}.png`);
+    const selectedReferences = referencesForScene(item, sharedReferences);
     const existing = await fs.access(finalPath).then(() => true, () => false);
     if (existing && !flags.force) {
       console.log(`[${index + 1}/${scenes.length}] ${item.id} — already generated, skipping`);
+      const prompt = promptWithReferences(cleanPrompt(item), selectedReferences);
       manifest.push({
         id: item.id,
         file: `public/generated/${item.id}.png`,
         skipped: true,
+        prompt,
+        promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
       });
+      await audit.startScene(item.id, {
+        finalPrompt: prompt,
+        seed: Number(item.seed ?? seedFor(item.id, sceneSeedSalt)),
+        settings: { steps, guidance, sampler, width: sceneWidth, height: sceneHeight },
+      });
+      await audit.completeScene(item.id, { status: "reused", output: manifest.at(-1) });
       continue;
     }
     const itemStart = Date.now();
-    const selectedReferences = referencesForScene(item, sharedReferences);
     const prompt = promptWithReferences(cleanPrompt(item), selectedReferences);
     const seed = Number(item.seed ?? seedFor(item.id, sceneSeedSalt));
-    const bytes = await generate({
-      id: item.id,
-      prompt,
+    await audit.startScene(item.id, {
+      finalPrompt: prompt,
       seed,
-      width: sceneWidth,
-      height: sceneHeight,
-      referenceHandles: selectedReferences,
+      settings: { steps, guidance, sampler, width: sceneWidth, height: sceneHeight },
+      references: selectedReferences.map((reference) => reference.id),
     });
+    let bytes;
+    try {
+      bytes = await generate({
+        id: item.id,
+        prompt,
+        seed,
+        width: sceneWidth,
+        height: sceneHeight,
+        referenceHandles: selectedReferences,
+      });
+    } catch (error) {
+      await audit.failScene(item.id, error);
+      await audit.fail(error);
+      throw error;
+    }
     await writeExactImage({
       bytes,
       finalPath,
@@ -297,19 +360,32 @@ try {
       steps,
       guidance,
       references: selectedReferences.map((reference) => reference.id),
+      prompt,
+      promptSource: process.env.IMAGE_PROMPTS_FILE ? "enriched-overlay" : "base",
     });
+    await audit.completeScene(item.id, { output: manifest.at(-1) });
   }
 
   await finishImageRun({
     projectDir,
     scenes,
+    allScenes,
     manifest,
     outWidth,
     outHeight,
+    partial: selection.partial,
+  });
+  await audit.finish("completed", {
+    manifest: "public/generated/manifest.json",
+    generated: manifest.filter((entry) => !entry.skipped).length,
+    reused: manifest.filter((entry) => entry.skipped).length,
   });
   console.log(
     `FLUX.2 local finished in ${((Date.now() - startedAt) / 1000).toFixed(0)}s with ${references.length} reusable reference image(s).`,
   );
+} catch (error) {
+  if (audit.document.status !== "failed") await audit.fail(error);
+  throw error;
 } finally {
   releaseLock();
 }

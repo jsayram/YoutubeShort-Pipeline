@@ -615,8 +615,9 @@
           </div>
         </div>
         <div class="reload-warning hidden" id="reload-warning">
-          A pipeline is running. Refreshing or closing this page will warn you first. If you
-          continue, the pipeline will be cancelled and ComfyUI and Voicebox will restart cleanly.
+          A pipeline is running in the background. You can safely refresh or close this page;
+          reopening Studio will reconnect to the run and restore its stages, logs, and completed
+          image previews.
         </div>
         <div class="service-grid" id="services">
           <div class="service"><div class="service-detail">Checking local services…</div></div>
@@ -849,7 +850,67 @@ Start a recording and talk about your day."></textarea>
       let activeRunSlug = null;
       let pipelineBusy = false;
       let servicesRestarting = false;
-      let reloadWasConfirmed = false;
+      const formStateKey = "youtube-short-studio-form-v1";
+      const savedFormIds = [
+        "slug",
+        "title",
+        "script",
+        "voice",
+        "style",
+        "topic",
+        "pause",
+        "opt-fast",
+        "opt-enrich",
+        "opt-render",
+        "opt-captions",
+        "opt-review-narration",
+        "opt-force",
+        "opt-keep",
+        "opt-nodoctor",
+      ];
+      let savedFormState = (() => {
+        try {
+          return JSON.parse(localStorage.getItem(formStateKey) ?? "{}");
+        } catch {
+          return {};
+        }
+      })();
+
+      function persistFormState() {
+        const next = {};
+        for (const id of savedFormIds) {
+          const field = $(id);
+          if (!field) continue;
+          next[id] =
+            field.type === "checkbox" ? field.checked : field.value;
+        }
+        savedFormState = next;
+        localStorage.setItem(formStateKey, JSON.stringify(next));
+      }
+
+      function restoreFormState({ includeSelects = true } = {}) {
+        for (const id of savedFormIds) {
+          if (!(id in savedFormState)) continue;
+          const field = $(id);
+          if (!field || (!includeSelects && field.tagName === "SELECT")) continue;
+          if (field.type === "checkbox") {
+            field.checked = savedFormState[id] === true;
+          } else if (
+            field.tagName !== "SELECT" ||
+            Array.from(field.options).some((option) => option.value === savedFormState[id])
+          ) {
+            field.value = savedFormState[id];
+          }
+        }
+      }
+
+      restoreFormState({ includeSelects: false });
+      document.addEventListener("input", (event) => {
+        if (savedFormIds.includes(event.target?.id)) persistFormState();
+      });
+      document.addEventListener("change", (event) => {
+        if (savedFormIds.includes(event.target?.id)) persistFormState();
+      });
 
       const LABELS = {
         doctor: "Environment check",
@@ -915,10 +976,14 @@ Start a recording and talk about your day."></textarea>
       function handle(event) {
         if (event.type === "run") {
           activeRunSlug = event.slug;
+          if (event.slug) $("slug").value = event.slug;
           buildStages(event.stages);
           $("project-assets").classList.add("hidden");
           $("final").classList.add("hidden");
           setRunning(true);
+          // Rebuild the live gallery from files as well as events. This covers narration-review
+          // continuations, browser refreshes, and a thumbnail event arriving before its grid.
+          void hydrateLiveImages(event.slug);
           return;
         }
 
@@ -1098,21 +1163,6 @@ Start a recording and talk about your day."></textarea>
         $("final").classList.add("hidden");
       }
 
-      // The browser owns the final confirmation UI for reloads. beforeunload warns, while
-      // pagehide runs only after the user actually chose to leave; that is the safe point to ask
-      // the local Studio server to cancel generation and restart its model services.
-      window.addEventListener("beforeunload", (event) => {
-        if (!pipelineBusy) return;
-        reloadWasConfirmed = true;
-        event.preventDefault();
-        event.returnValue = "";
-      });
-      window.addEventListener("pagehide", () => {
-        if (!pipelineBusy || !reloadWasConfirmed) return;
-        stopPlayback();
-        navigator.sendBeacon("/api/services/reset");
-      });
-
       // When the run stopped before rendering, offer it as a one-click follow-up rather than
       // rendering unasked.
       function maybeOfferRender(slug) {
@@ -1136,6 +1186,7 @@ Start a recording and talk about your day."></textarea>
 
       $("run").addEventListener("click", async () => {
         $("err").textContent = "";
+        persistFormState();
         $("run").disabled = true;
         $("run").textContent = "Checking Voicebox…";
         const body = {
@@ -1700,6 +1751,7 @@ Start a recording and talk about your day."></textarea>
         }
 
         pipelineBusy = false;
+        localStorage.removeItem(formStateKey);
         window.location.reload();
       });
       refreshServices();
@@ -1707,6 +1759,42 @@ Start a recording and talk about your day."></textarea>
 
       // This view reads the files on disk rather than relying on the live run event stream.
       // It therefore recovers images that finished before a Studio restart or browser reload.
+      async function hydrateLiveImages(slug) {
+        if (!/^[a-z0-9][a-z0-9-]*$/.test(slug) || !stageNodes.has("images")) return;
+        const response = await fetch(
+          `/api/project-assets?slug=${encodeURIComponent(slug)}&v=${Date.now()}`,
+          { cache: "no-store" },
+        ).catch(() => null);
+        if (!response?.ok) return;
+        const data = await response.json();
+        if (!data.total) return;
+
+        let grid = document.getElementById("shots");
+        if (!grid) {
+          grid = document.createElement("div");
+          grid.className = "grid";
+          grid.id = "shots";
+          extra("images")?.prepend(grid);
+        }
+        for (const image of data.images) {
+          let cell = grid.querySelector(`.shot[data-id="${CSS.escape(image.id)}"]`);
+          if (!cell) {
+            cell = document.createElement("div");
+            cell.className = "shot waiting";
+            cell.dataset.id = image.id;
+            cell.innerHTML = `<span>${escapeHtml(image.id)}</span>`;
+            grid.append(cell);
+          }
+          if (image.ready && !cell.querySelector("img")) {
+            cell.classList.remove("waiting");
+            cell.innerHTML =
+              `<img src="${escapeHtml(image.url)}" alt="" />` +
+              `<span>${escapeHtml(image.id)}</span>`;
+          }
+        }
+        setMeta("images", `${data.generated}/${data.total}`);
+      }
+
       async function refreshProjectAssets(manual = false) {
         const slug = $("slug").value.trim();
         const panel = $("project-assets");
@@ -1719,6 +1807,7 @@ Start a recording and talk about your day."></textarea>
         // still useful before a run or after selecting another project, but showing both for
         // the active slug made every shot look duplicated.
         if (slug === activeRunSlug && stageNodes.has("images")) {
+          await hydrateLiveImages(slug);
           panel.classList.add("hidden");
           if (manual) {
             button.disabled = false;
@@ -1802,6 +1891,18 @@ Start a recording and talk about your day."></textarea>
 
       function applyProjectSettings(slug) {
         const project = projectSettings.get(slug);
+        if (project) {
+          if (!("title" in savedFormState)) $("title").value = project.title ?? "";
+          if (!("script" in savedFormState)) $("script").value = project.script ?? "";
+          if (!("pause" in savedFormState)) $("pause").value = project.pauseSeconds ?? 3;
+          if (
+            !("voice" in savedFormState) &&
+            project.voiceProfile &&
+            voices.some((voice) => voice.name === project.voiceProfile)
+          ) {
+            $("voice").value = project.voiceProfile;
+          }
+        }
         $("opt-captions").checked = project?.captionsEnabled === true;
         $("opt-review-narration").checked = project ? project.reviewNarration !== false : true;
         $("opt-enrich").checked = project ? project.enrichWithLLM === true : true;
@@ -1831,6 +1932,10 @@ Start a recording and talk about your day."></textarea>
               )
               .join("");
             applyProjectSettings($("slug").value.trim());
+            restoreFormState();
+            describeVoice();
+            describeTopic();
+            describeStyle();
             refreshProjectAssets();
           });
       }
@@ -1980,6 +2085,8 @@ Start a recording and talk about your day."></textarea>
                 }>${escapeHtml(voice.name)}</option>`,
             )
             .join("");
+          applyProjectSettings($("slug").value.trim());
+          restoreFormState();
           describeVoice();
         });
 
@@ -2047,6 +2154,7 @@ Start a recording and talk about your day."></textarea>
                 }>${escapeHtml(topic.label)}</option>`,
             )
             .join("");
+          restoreFormState();
           describeTopic();
         })
         .catch(() => {});
@@ -2070,6 +2178,10 @@ Start a recording and talk about your day."></textarea>
             describeStyle();
             loadPromptEditor();
           }
+          restoreFormState();
+          describeStyle();
+          describeTopic();
+          loadPromptEditor();
           if (speed) {
             $("fastwrap").classList.remove("hidden");
             $("fastwrap").lastChild.textContent = ` Fast mode (${speed}, ${data.speedSampling.steps} steps)`;

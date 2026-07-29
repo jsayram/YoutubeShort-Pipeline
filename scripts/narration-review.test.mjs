@@ -136,6 +136,13 @@ test("Studio orders narration before images and keeps refresh and automatic path
   assert.match(studio, /options\.reviewNarration === false\) voiceArgs\.push\("--auto-approve"\)/);
   assert.match(studio, /route === "\/api\/narration-review" && request\.method === "GET"/);
   assert.match(studio, /setStage\("review", "waiting"/);
+  assert.match(
+    studio.slice(
+      studio.indexOf("async function resumeAfterNarrationReview"),
+      studio.indexOf("function publicReviewState"),
+    ),
+    /await emitPrompts\(slug\)/,
+  );
   assert.match(html, /id="opt-review-narration" checked/);
   assert.match(html, /Approve narration and generate images/);
   assert.match(html, /loadNarrationReview\(slug\)/);

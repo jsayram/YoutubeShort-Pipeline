@@ -150,6 +150,7 @@ if (flags.style) {
   // A video's override is deliberately applied after the provider preset. This makes it local
   // to this project; it cannot leak into future videos unless the user explicitly promotes it.
   config.imageGen.styleSuffix = effectivePromptProfile.stylePrompt;
+  config.imageGen.compactStyleSuffix = effectivePromptProfile.compactStylePrompt ?? null;
   // The look supplies negatives about medium and rendering; the topic supplies negatives about
   // cast. Joining them here is what lets one look serve any topic.
   config.imageGen.negativeExtra = [

@@ -190,26 +190,35 @@ export const TEXT_NEGATIVES = [
   "logo",
   "wordmark",
   "emblem",
-  "badge",
-  "ui",
-  "interface",
-  "app screen",
-  "screen content",
-  "menu",
-  "button label",
-  "keyboard",
-  "chart",
-  "graph",
-  "diagram",
-  "infographic",
 ];
 
-// Nouns that summon lettering no matter how the sentence frames them. "Space for captions",
-// "surfaces that could carry writing", and "room for typography" all put the noun into the
-// positive conditioning, and the encoder acts on the noun, not on the sentence's intent. Any
-// clause containing one of these is dropped from the positive prompt entirely.
+// Remove nouns that directly request lettering. Do not include containers such as a screen,
+// phone, book, record sleeve, sign, menu, chart, or interface here: those may be the story prop.
 const TEXT_NOUNS =
-  /\b(?:text|texts|lettering|letters|word|words|writing|written|typograph\w*|font|fonts|caption|captions|subtitle|subtitles|title|titles|label|labels|labell?ed|sign|signs|signage|logo|logos|wordmark|watermark|numeral|numerals|digit|digits|html|ui|interface|screen|infographic|chart|charts|graph|graphs|headline|headlines)\b/i;
+  /\b(?:text|texts|lettering|letters|word|words|writing|written|typograph\w*|font|fonts|caption|captions|subtitle|subtitles|title|titles|label|labels|labell?ed|logo|logos|wordmark|watermark|numeral|numerals|digit|digits|html|headline|headlines)\b/i;
+
+// Keep a text-bearing object while translating its written content into a simple image.
+export function makeWordlessVisualPrompt(text) {
+  return String(text ?? "")
+    .replace(
+      /\b(?:single\s+)?(?:unread\s+)?(?:text\s+)?(?:message|notification)(?!\s+(?:glow|light|pulse)\b)(?:\s+bubble|\s+badge|\s+icon|\s+prompt)?\b/gi,
+      "soft notification glow on the phone",
+    )
+    .replace(
+      /\breadable\s+(?:phone\s+)?(?:message|notification|interface|screen content)\b/gi,
+      "soft notification glow on the phone",
+    )
+    .replace(
+      /\b(?:message|notification)\s+text\b/gi,
+      "soft notification glow on the phone",
+    )
+    .replace(
+      /\b(?:playlist|message|notification)\s+(?:icon|symbol|interface)\b/gi,
+      "soft abstract light pulse on the phone",
+    )
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export function scrubTextNouns(text) {
   return String(text ?? "")
@@ -221,6 +230,33 @@ export function scrubTextNouns(text) {
     .join(" ")
     .replace(/\s{2,}/g, " ")
     .trim();
+}
+
+// Provider-wide negatives are defaults, never authority. Remove a negative term when it directly
+// contradicts a concrete prop, lighting condition, or composition required by this scene.
+export function deconflictNegativePrompt(positive, negative) {
+  const wanted = String(positive ?? "").toLowerCase();
+  const conflicts = [
+    [/\b(?:phone|smartphone|screen|display)\b/, /\b(?:ui|user interface|interface|app screen|glowing display|screen content|keyboard)\b/i],
+    [/\b(?:heart symbol|heart icon|pictorial symbol)\b/, /\b(?:icon|badge|emblem|symbol)\b/i],
+    [/\bamber\b/, /\b(?:amber light|orange glow)\b/i],
+    [/\b(?:sunset|golden hour)\b/, /\b(?:warm sunset|sunset)\b/i],
+    [/\b(?:morning|daylight)\b/, /\bdaylight\b/i],
+    [/\b(?:overcast|gray morning|grey morning|gray sky|grey sky)\b/, /\b(?:overcast sky|pale grey backdrop)\b/i],
+    [/\bsilhouette\b/, /\b(?:silhouette-only character|faceless|featureless face|black void face|face hidden by default|hidden eyes)\b/i],
+    [/\bmoon\b/, /\bmoon\b/i],
+  ];
+  return String(negative ?? "")
+    .split(",")
+    .map((term) => term.trim())
+    .filter(Boolean)
+    .filter(
+      (term) =>
+        !conflicts.some(
+          ([required, forbidden]) => required.test(wanted) && forbidden.test(term),
+        ),
+    )
+    .join(", ");
 }
 
 // Quoted strings read as "render these exact glyphs". Drop them outright.
@@ -248,6 +284,7 @@ export function splitNegations(text) {
       return "";
     })
     // Tidy the punctuation the removal leaves behind.
+    .replace(/\b(?:with|and|or)\s*(?=[,.;]|$)/gi, "")
     .replace(/\s*,\s*(?=[.,;])/g, "")
     .replace(/\s+([.,;])/g, "$1")
     .replace(/([.,;])\s*\1+/g, "$1")

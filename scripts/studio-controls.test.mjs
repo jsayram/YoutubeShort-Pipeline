@@ -27,7 +27,7 @@ test("imported projects keep the force-image control connected end to end", asyn
   assert.match(gemini, /oldExtension === extension/);
 });
 
-test("refresh has a visible status action and a separate confirmed full restart", async () => {
+test("refresh safely rejoins a run and full service restart remains explicit", async () => {
   const [html, studio] = await Promise.all([
     read("scripts/studio/index.html"),
     read("scripts/studio.mjs"),
@@ -35,10 +35,18 @@ test("refresh has a visible status action and a separate confirmed full restart"
 
   assert.match(html, /id="refresh-services"[^>]*>Check status</i);
   assert.match(html, /id="restart-services"[^>]*>Restart everything/i);
-  assert.match(html, /window\.addEventListener\("beforeunload"/);
-  assert.match(html, /window\.addEventListener\("pagehide"/);
-  assert.match(html, /navigator\.sendBeacon\("\/api\/services\/reset"\)/);
+  assert.match(html, /safely refresh or close this page/i);
+  assert.doesNotMatch(html, /navigator\.sendBeacon\("\/api\/services\/reset"\)/);
+  assert.match(html, /async function hydrateLiveImages\(slug\)/);
+  assert.match(html, /void hydrateLiveImages\(event\.slug\)/);
+  assert.match(html, /youtube-short-studio-form-v1/);
+  assert.match(html, /localStorage\.setItem\(formStateKey/);
+  assert.match(html, /localStorage\.removeItem\(formStateKey\)/);
   assert.match(html, /setServicesRestarting\(data\.resetting === true\)/);
+  assert.match(studio, /Replay what already happened so a reload rejoins mid-run/);
+  assert.match(studio, /const studioStatePath = path\.join\(videosRoot, "\.studio-state\.json"\)/);
+  assert.match(studio, /await restoreCurrent\(\)/);
+  assert.match(studio, /await fs\.rm\(studioStatePath, \{ force: true \}\)/);
   assert.match(studio, /route === "\/api\/services\/reset"/);
   assert.match(studio, /restartComfyUi\(\), restartVoicebox\(\)/);
   assert.match(studio, /waitForNoProcesses\("voicebox", 15000\)/);

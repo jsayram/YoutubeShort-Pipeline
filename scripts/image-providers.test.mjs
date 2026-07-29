@@ -20,6 +20,7 @@ for (const required of [
   "flux2-storybook",
   "cloudflare-flux2-storybook",
   "animagine-dark-storybook",
+  "pixazo-sdxl-watercolor",
   "gemini",
 ]) {
   assert.ok(ids.includes(required), `Missing content provider ${required}.`);
@@ -31,18 +32,28 @@ assert.equal(flux.fallbackProvider, "cloudflare-flux2");
 assert.equal(flux.requiredModels.diffusionModel, "flux-2-klein-4b.safetensors");
 assert.equal(flux.referencePrompts.length, 3);
 assert.match(flux.sceneTemplate, /interpret the full sentence as a story event/i);
-assert.match(flux.stylePrompt, /rough editorial oil or gouache plate/i);
-assert.match(flux.stylePrompt, /broad visible bristle strokes/i);
-assert.match(flux.stylePrompt, /sunrise, sunset/i);
+assert.match(flux.stylePrompt, /paper-watercolor editorial illustration/i);
+assert.match(flux.stylePrompt, /cold-press paper tooth/i);
+assert.match(flux.stylePrompt, /controlled warm-dark palette/i);
 assert.doesNotMatch(flux.stylePrompt, /Japanese animated|Ghibli/i);
 assert.doesNotMatch(flux.sceneTemplate, /hooded|faceless/i);
 assert.deepEqual(
   flux.referencePrompts.map((item) => item.role),
   ["character", "character", "style"],
 );
-assert.match(flux.referencePrompts[2].prompt, /No people/i);
-assert.match(flux.referencePrompts[0].prompt, /broad visible bristle strokes/i);
-assert.match(flux.referencePrompts[2].prompt, /brick red/i);
+assert.match(flux.referencePrompts[2].prompt, /No person/i);
+assert.match(flux.referencePrompts[0].prompt, /translucent layered watercolor washes/i);
+assert.match(flux.referencePrompts[2].prompt, /burnt umber/i);
+
+const pixazo = styles.find((style) => style.id === "pixazo-sdxl-watercolor");
+assert.equal(pixazo.provider, "pixazo-sdxl");
+assert.equal(pixazo.promptProfile, "flux2-storybook");
+assert.equal(pixazo.sampling.numSteps, 20);
+assert.equal(pixazo.sampling.guidanceScale, 5);
+assert.equal(pixazo.framing.genWidth, 576);
+assert.equal(pixazo.framing.genHeight, 1024);
+assert.match(pixazo.stylePrompt, /paper-watercolor editorial illustration/i);
+assert.match(pixazo.negativeExtra, /text, letters, words, numbers/i);
 
 const storybook = styles.find((style) => style.id === "storybook");
 const livingStorybook = styles.find((style) => style.id === "living-storybook");
@@ -83,11 +94,11 @@ assert.match(referencedPrompt, /do not copy its pose or background/i);
 assert.doesNotMatch(referencedPrompt, /hidden face/i);
 assert.deepEqual(
   referencesForScene({ castMode: "solo-a" }, references).map((item) => item.id),
-  ["protagonist-a-painted-reference-v4", "sunset-brush-material-reference-v4"],
+  ["protagonist-a-watercolor-reference-v5", "warm-dark-watercolor-material-reference-v5"],
 );
 assert.deepEqual(
   referencesForScene({ castMode: "solo-b" }, references).map((item) => item.id),
-  ["protagonist-b-painted-reference-v4", "sunset-brush-material-reference-v4"],
+  ["protagonist-b-watercolor-reference-v5", "warm-dark-watercolor-material-reference-v5"],
 );
 assert.equal(referencesForScene({ castMode: "pair" }, references).length, 3);
 
@@ -175,6 +186,8 @@ assert.match(flatLinePoetry.sceneTemplate, /\{\{castPlan\}\}/i);
 assert.doesNotMatch(flatLinePoetry.sceneTemplate, /\{\{storyBeat\}\}/i);
 assert.match(flatLinePoetry.stylePrompt, /flat-color screenprint/i);
 assert.match(flatLinePoetry.stylePrompt, /textured paper/i);
+assert.match(flatLinePoetry.compactStylePrompt, /matte risograph ink/i);
+assert.doesNotMatch(flatLinePoetry.compactStylePrompt, /gradient sky|gradient background/i);
 assert.match(flatLinePoetry.negativeExtra, /anime face|character sheet/i);
 assert.doesNotMatch(flatLinePoetry.stylePrompt, /brick red|rust/i);
 assert.doesNotMatch(flatLinePoetry.negativeExtra, /detailed visible face/i);

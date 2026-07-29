@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  buildAuthoritativePrompt,
   buildSystemPrompt,
   detectFormat,
   detectProviderCategory,
   reconstructPrompt,
+  sceneConstraints,
 } from "./enrich-prompts.mjs";
 
 test("natural-language enrichment preserves framing and replaces old anchors", () => {
@@ -85,6 +87,40 @@ test("provider category and format are derived without changing provider templat
   assert.equal(detectFormat(noPeople), "prose");
   assert.equal(detectFormat(people), "tags");
   assert.match(buildSystemPrompt(noPeople), /NO people, faces, hands/);
-  assert.match(buildSystemPrompt(people), /posture/);
+  assert.match(buildSystemPrompt(people), /objects only, one person, or multiple people/);
+  assert.match(buildSystemPrompt(people), /soft notification glow/);
+  assert.match(buildSystemPrompt(people), /heart is optional, never required/i);
   assert.match(buildSystemPrompt(symbolic), /abstract shapes/);
+});
+
+test("authoritative enrichment lets the concrete Qwen scene replace a competing draft plan", () => {
+  const item = {
+    id: "01-playlist",
+    castMode: "pair",
+    prompt:
+      "safe, emotional interpretation grief, exactly two older adults, " +
+      "required visual event Two figures stand together at a window, " +
+      "shot design Medium-wide view, visual anchors old, playlist, phone, " +
+      "unrelated generic relationship staging",
+  };
+  const constraints = sceneConstraints(item);
+  assert.match(constraints.castRule, /Exactly two recurring older adults/i);
+
+  const result = buildAuthoritativePrompt({
+    item,
+    narration: "I still have your old playlist saved on my phone.",
+    scene:
+      "cracked smartphone screen, dusty wooden table, old vinyl record sleeve, " +
+      "rain-streaked window, dim amber glow, cold gray morning",
+    format: "tags",
+  });
+  assert.match(result, /authoritative concrete scene/i);
+  assert.match(result, /cracked smartphone screen/i);
+  assert.match(result, /old vinyl record sleeve/i);
+  assert.match(result, /dim amber glow/i);
+  assert.doesNotMatch(result, /Exactly two recurring older adults/i);
+  assert.doesNotMatch(result, /Two figures stand together/i);
+  assert.doesNotMatch(result, /Medium-wide view/i);
+  assert.doesNotMatch(result, /unrelated generic relationship staging/i);
+  assert.ok(result.length < item.prompt.length + 200);
 });

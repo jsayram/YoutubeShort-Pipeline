@@ -34,6 +34,7 @@ export async function loadStyles() {
       promptProfile: profileId,
       sceneTemplate: profile.sceneTemplate,
       stylePrompt: profile.stylePrompt,
+      compactStylePrompt: profile.compactStylePrompt ?? null,
       negativeExtra: profile.negativePrompt ?? "",
     };
   });
@@ -110,6 +111,17 @@ export async function resolveStyles(baseUrl) {
         reason: configured
           ? null
           : "Cloudflare credentials are not configured in .env.",
+        checkpoint: null,
+        loras: [],
+      };
+    }
+
+    if (style.provider === "pixazo-sdxl") {
+      const configured = Boolean(process.env.PIXAZO_API ?? process.env.PIXAZO_API_KEY);
+      return {
+        ...style,
+        available: configured,
+        reason: configured ? null : "PIXAZO_API is not configured in .env.",
         checkpoint: null,
         loras: [],
       };
@@ -237,6 +249,7 @@ export function applyStyle(imageGen, style, { fast = false, speedLora = null } =
   // centres over a blurred enlargement of itself, so it must not be cropped to the frame.
   Object.assign(next, style.framing ?? {});
   next.styleSuffix = style.stylePrompt;
+  next.compactStyleSuffix = style.compactStylePrompt ?? null;
   next.negativeExtra = style.negativeExtra ?? "";
   // Deterministic finishing belongs to the preset too. Clear it when switching away from a
   // treated style so a later photographic run does not inherit ink edge extraction.
