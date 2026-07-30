@@ -26,6 +26,7 @@ for (const required of [
   "drawthings-oil-gouache",
   "animagine-dark-storybook",
   "pixazo-sdxl-watercolor",
+  "krea2-photographic",
   "gemini",
   "gemini-pastel-watercolor-ink",
 ]) {
@@ -61,6 +62,16 @@ assert.equal(pixazo.framing.genHeight, 576);
 assert.match(pixazo.stylePrompt, /editorial watercolor-and-ink storybook illustration/i);
 assert.match(pixazo.stylePrompt, /untouched white paper/i);
 assert.match(pixazo.negativeExtra, /text, letters, words, numbers/i);
+
+const krea2 = styles.find((style) => style.id === "krea2-photographic");
+assert.equal(krea2.provider, "krea2-local");
+assert.equal(krea2.fallbackProvider, undefined);
+assert.equal(krea2.requiredModels.diffusionModel, "krea2_turbo_bf16.safetensors");
+assert.equal(krea2.requiredModels.textEncoder, "qwen3vl_4b_fp8_scaled.safetensors");
+assert.equal(krea2.requiredModels.vae, "qwen_image_vae.safetensors");
+assert.equal(krea2.sampling.steps, 8);
+assert.equal(krea2.sampling.guidance, 1);
+assert.equal(krea2.referencePrompts, undefined);
 
 const watercolor = styles.find((style) => style.id === "pastel-watercolor-ink");
 const fluxWatercolor = styles.find((style) => style.id === "flux2-pastel-watercolor-ink");

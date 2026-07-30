@@ -1418,7 +1418,7 @@ async function planGenerationJobs(slug, body) {
     const styles = await loadStyles();
     const style = styles.find((entry) => entry.id === options.style);
     const provider = style?.provider ?? "comfyui";
-    const local = ["comfyui", "local", "flux2-local", "drawthings", "draw-things"].includes(
+    const local = ["comfyui", "local", "flux2-local", "krea2-local", "drawthings", "draw-things"].includes(
       provider,
     );
     if (!local) {
@@ -1730,7 +1730,7 @@ const server = http.createServer(async (request, response) => {
         const provider = config.imageGen?.provider ?? "comfyui";
         const review = await loadImageReview(slug);
         const scene = review?.lines?.find((entry) => Number(entry.index) === lineIndex);
-        const remote = !["comfyui", "local", "flux2-local", "drawthings", "draw-things"].includes(
+        const remote = !["comfyui", "local", "flux2-local", "krea2-local", "drawthings", "draw-things"].includes(
           provider,
         );
         job = await createJob(slug, {

@@ -11,7 +11,15 @@ import { localLlmStatus } from "./local-llm.mjs";
 //   "drawthings" — Draw Things' local HTTP API. Native Apple Silicon inference.
 //   "flux2-local" — FLUX.2 Klein through ComfyUI, with optional Cloudflare fallback.
 //   "cloudflare-flux2" — FLUX.2 Klein through Cloudflare Workers AI.
+//   "krea2-local" — Krea 2 Turbo through ComfyUI. Local only, no cloud fallback, no
+//                    reference-image support (its official workflow has no reference node).
 //   "pixazo-sdxl" — Pixazo's free-preview Stable Diffusion XL Base 1.0 endpoint.
+//   "nostalgic-vhs-2000" — Krea 2 Turbo through ComfyUI plus a LoRA chain (2000s Analog Core
+//                           VHS/camcorder style). Same local-only constraints as krea2-local.
+//   "graingaze-portrait" — Krea 2 Turbo through ComfyUI plus the Krea2_GrainGaze-portrait LoRA
+//                           (cinematic analog portrait look). Same constraints as krea2-local.
+//   "disposable-camera" — Krea 2 Turbo through ComfyUI plus the Disposable Camera LoRA (cheap
+//                          35mm point-and-shoot film-scan look). Same constraints as krea2-local.
 
 await loadEnv();
 const { flags } = parseArgs();
@@ -31,6 +39,11 @@ const backends = {
   "flux2-local": "generate-images-flux2.mjs",
   flux2: "generate-images-flux2.mjs",
   "cloudflare-flux2": "generate-images-cloudflare.mjs",
+  "krea2-local": "generate-images-krea.mjs",
+  krea2: "generate-images-krea.mjs",
+  "nostalgic-vhs-2000": "generate-images-nostalgic-vhs.mjs",
+  "graingaze-portrait": "generate-images-graingaze-portrait.mjs",
+  "disposable-camera": "generate-images-disposable-camera.mjs",
   "pixazo-sdxl": "generate-images-pixazo.mjs",
   pixazo: "generate-images-pixazo.mjs",
 };

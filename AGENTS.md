@@ -4,7 +4,8 @@ This repository turns a script or topic into a long-form, 16:9 YouTube video. It
 several external tools:
 
 - The selected provider creates still visual assets: local ComfyUI, local-first FLUX.2 Klein with
-  optional Cloudflare fallback, Google GenAI, Pixazo SDXL, or another registered provider.
+  optional Cloudflare fallback, Krea 2 Turbo through local ComfyUI (no cloud fallback, no
+  reference-image support), Google GenAI, Pixazo SDXL, or another registered provider.
 - Voicebox creates narration through its local REST API, one clip per script line, assembled into a
   Voicebox story. ElevenLabs is an optional alternative narration provider (`scripts/
   elevenlabs-provider.mjs`) — hosted, paid, and gated behind explicit per-line confirmation in

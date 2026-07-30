@@ -215,6 +215,139 @@ export async function resolveStyles(baseUrl) {
       };
     }
 
+    if (style.provider === "krea2-local") {
+      const required = style.requiredModels ?? {};
+      if (!models) {
+        return {
+          ...style,
+          available: false,
+          reason: "ComfyUI is not reachable.",
+          checkpoint: null,
+          loras: [],
+        };
+      }
+      const diffusionModel = firstMatch(models.diffusionModels, [required.diffusionModel]);
+      const textEncoder = firstMatch(models.textEncoders, [required.textEncoder]);
+      const vae = firstMatch(models.vaes, [required.vae]);
+      const missing = [
+        !diffusionModel && required.diffusionModel,
+        !textEncoder && required.textEncoder,
+        !vae && required.vae,
+      ].filter(Boolean);
+      return {
+        ...style,
+        available: missing.length === 0,
+        reason: missing.length > 0 ? `Missing local Krea 2 model file(s): ${missing.join(", ")}.` : null,
+        diffusionModel,
+        textEncoder,
+        vae,
+        checkpoint: null,
+        loras: [],
+      };
+    }
+
+    if (style.provider === "nostalgic-vhs-2000") {
+      const required = style.requiredModels ?? {};
+      if (!models) {
+        return {
+          ...style,
+          available: false,
+          reason: "ComfyUI is not reachable.",
+          checkpoint: null,
+          loras: [],
+        };
+      }
+      const diffusionModel = firstMatch(models.diffusionModels, [required.diffusionModel]);
+      const textEncoder = firstMatch(models.textEncoders, [required.textEncoder]);
+      const vae = firstMatch(models.vaes, [required.vae]);
+      const wantedLora = style.loras?.[0]?.name ?? null;
+      const styleLora = wantedLora ? firstMatch(models.loras, [wantedLora]) : null;
+      const missing = [
+        !diffusionModel && required.diffusionModel,
+        !textEncoder && required.textEncoder,
+        !vae && required.vae,
+        wantedLora && !styleLora && wantedLora,
+      ].filter(Boolean);
+      return {
+        ...style,
+        available: missing.length === 0,
+        reason: missing.length > 0 ? `Missing local Krea 2 model file(s): ${missing.join(", ")}.` : null,
+        diffusionModel,
+        textEncoder,
+        vae,
+        checkpoint: null,
+        loras: styleLora ? [{ ...style.loras[0], name: styleLora }] : [],
+      };
+    }
+
+    if (style.provider === "graingaze-portrait") {
+      const required = style.requiredModels ?? {};
+      if (!models) {
+        return {
+          ...style,
+          available: false,
+          reason: "ComfyUI is not reachable.",
+          checkpoint: null,
+          loras: [],
+        };
+      }
+      const diffusionModel = firstMatch(models.diffusionModels, [required.diffusionModel]);
+      const textEncoder = firstMatch(models.textEncoders, [required.textEncoder]);
+      const vae = firstMatch(models.vaes, [required.vae]);
+      const wantedLora = style.loras?.[0]?.name ?? null;
+      const styleLora = wantedLora ? firstMatch(models.loras, [wantedLora]) : null;
+      const missing = [
+        !diffusionModel && required.diffusionModel,
+        !textEncoder && required.textEncoder,
+        !vae && required.vae,
+        wantedLora && !styleLora && wantedLora,
+      ].filter(Boolean);
+      return {
+        ...style,
+        available: missing.length === 0,
+        reason: missing.length > 0 ? `Missing local Krea 2 model file(s): ${missing.join(", ")}.` : null,
+        diffusionModel,
+        textEncoder,
+        vae,
+        checkpoint: null,
+        loras: styleLora ? [{ ...style.loras[0], name: styleLora }] : [],
+      };
+    }
+
+    if (style.provider === "disposable-camera") {
+      const required = style.requiredModels ?? {};
+      if (!models) {
+        return {
+          ...style,
+          available: false,
+          reason: "ComfyUI is not reachable.",
+          checkpoint: null,
+          loras: [],
+        };
+      }
+      const diffusionModel = firstMatch(models.diffusionModels, [required.diffusionModel]);
+      const textEncoder = firstMatch(models.textEncoders, [required.textEncoder]);
+      const vae = firstMatch(models.vaes, [required.vae]);
+      const wantedLora = style.loras?.[0]?.name ?? null;
+      const styleLora = wantedLora ? firstMatch(models.loras, [wantedLora]) : null;
+      const missing = [
+        !diffusionModel && required.diffusionModel,
+        !textEncoder && required.textEncoder,
+        !vae && required.vae,
+        wantedLora && !styleLora && wantedLora,
+      ].filter(Boolean);
+      return {
+        ...style,
+        available: missing.length === 0,
+        reason: missing.length > 0 ? `Missing local Krea 2 model file(s): ${missing.join(", ")}.` : null,
+        diffusionModel,
+        textEncoder,
+        vae,
+        checkpoint: null,
+        loras: styleLora ? [{ ...style.loras[0], name: styleLora }] : [],
+      };
+    }
+
     if (style.provider !== "comfyui") {
       // Cloud providers do not depend on local models, so availability is about credentials,
       // which the generator checks when it runs.

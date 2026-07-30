@@ -89,7 +89,7 @@ if (provider === "drawthings" || provider === "draw-things") {
       }
     }
   }
-} else if (["comfyui", "local", "flux2-local", "flux2"].includes(provider)) {
+} else if (["comfyui", "local", "flux2-local", "flux2", "krea2-local", "krea2"].includes(provider)) {
   const comfyUrl = (process.env.COMFYUI_BASE_URL ?? "http://127.0.0.1:8188").replace(/\/$/, "");
   const stats = await fetch(`${comfyUrl}/system_stats`).catch(() => null);
   if (stats?.ok) {
@@ -102,7 +102,7 @@ if (provider === "drawthings" || provider === "draw-things") {
       .then((info) => info.CheckpointLoaderSimple.input.required.ckpt_name[0])
       .catch(() => []);
     if (provider !== "comfyui" && provider !== "local") {
-      console.log("✓ Local FLUX provider will validate its model components before generation");
+      console.log("✓ Local engine will validate its model components before generation");
     } else if (seen.includes(wanted)) console.log(`✓ Checkpoint "${wanted}"`);
     else {
       failures.push(

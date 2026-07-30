@@ -484,6 +484,116 @@
     }
   },
   {
+    "id": "krea2-photographic",
+    "label": "Krea 2 Turbo photographic (local)",
+    "provider": "krea2-local",
+    "promptProfile": "photographic",
+    "summary": "Krea 2 Turbo's distilled 8-step local checkpoint rendering the same grainy retro photographic look. Photorealism and speed are Krea 2's strengths among local models; no reference-image support yet, since its official ComfyUI workflow has no reference node.",
+    "requiredModels": {
+      "diffusionModel": "krea2_turbo_bf16.safetensors",
+      "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+      "vae": "qwen_image_vae.safetensors"
+    },
+    "download": "Install Krea 2 Turbo BF16 diffusion model, Qwen3-VL-4B FP8 text encoder, and the shared Qwen Image VAE from huggingface.co/Comfy-Org/Krea-2. BF16 is required for the diffusion model on Apple Silicon because MPS cannot execute FP8 weights there; the FP8 text encoder tested fine on an M1 Max.",
+    "sampling": {
+      "steps": 8,
+      "guidance": 1,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    }
+  },
+  {
+    "id": "nostalgic-vhs-2000",
+    "label": "Krea 2 Turbo + 2000s Analog Core VHS LoRA (local)",
+    "provider": "nostalgic-vhs-2000",
+    "promptProfile": "photographic",
+    "summary": "Krea 2 Turbo's distilled 8-step local checkpoint with the '2000s Analog Core' LoRA layered on top for a VHS/camcorder 2000s look: soft low-res focus, warm CRT color cast, tape grain. Separate provider/script from krea2-photographic so the plain Krea 2 path is untouched.",
+    "requiredModels": {
+      "diffusionModel": "krea2_turbo_bf16.safetensors",
+      "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+      "vae": "qwen_image_vae.safetensors"
+    },
+    "loras": [
+      {
+        "name": "vhs_krea2.safetensors",
+        "strength": 0.8
+      }
+    ],
+    "download": "Same Krea 2 Turbo BF16/text-encoder/VAE as krea2-photographic, plus the \"2000s Analog Core\" Krea 2 LoRA (vhs_krea2.safetensors, civitai.com/models/1134895) in the loras folder ComfyUI is configured to scan. Add the trigger word \"v8s\" to the scene's styleSuffix for the LoRA to actually engage. The creator's reference settings (40 steps, cfg 2.5-3, dpmpp2m) are for the non-distilled Krea 2 checkpoint; this turbo config (8 steps, cfg 1) is a starting point and may need tuning against a real test image.",
+    "sampling": {
+      "steps": 8,
+      "guidance": 1,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    }
+  },
+  {
+    "id": "graingaze-portrait",
+    "label": "Krea 2 Turbo + GrainGaze portrait LoRA (local)",
+    "provider": "graingaze-portrait",
+    "promptProfile": "photographic",
+    "summary": "Krea 2 Turbo's distilled 8-step local checkpoint with the Krea2_GrainGaze-portrait LoRA layered on top: cinematic analog portraits with tactile skin micro-grain and soft diffused light. No trigger word required. Creator recommends 3:4 or 1:1 framing for best results; this style keeps the pipeline's standard generation size for consistency. Separate provider/script so krea2-local and nostalgic-vhs-2000 stay untouched.",
+    "requiredModels": {
+      "diffusionModel": "krea2_turbo_bf16.safetensors",
+      "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+      "vae": "qwen_image_vae.safetensors"
+    },
+    "loras": [
+      {
+        "name": "Krea2_GrainGaze-portrait.safetensors",
+        "strength": 0.9
+      }
+    ],
+    "download": "Same Krea 2 Turbo BF16/text-encoder/VAE as krea2-photographic, plus the Krea2_GrainGaze-portrait LoRA (civitai.com model id 2773547) in the loras folder ComfyUI is configured to scan. No trigger word needed. Creator-recommended LoRA weight is 0.8-1.0 at the pipeline's native 8 steps / cfg 1, so this one has no turbo-vs-non-turbo conflict.",
+    "sampling": {
+      "steps": 8,
+      "guidance": 1,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    }
+  },
+  {
+    "id": "disposable-camera",
+    "label": "Krea 2 Turbo + Disposable Camera LoRA (local)",
+    "provider": "disposable-camera",
+    "promptProfile": "photographic",
+    "summary": "Krea 2 Turbo's distilled 8-step local checkpoint with the Disposable Camera LoRA layered on top: the rough, low-quality look of a cheap 35mm point-and-shoot film scan — grain, soft focus, faded colors, harsh flash, blur, crushed shadows, blown highlights. Trained for candid photos, party snapshots, travel photos, and street photography. Separate provider/script so krea2-local, nostalgic-vhs-2000, and graingaze-portrait stay untouched.",
+    "requiredModels": {
+      "diffusionModel": "krea2_turbo_bf16.safetensors",
+      "textEncoder": "qwen3vl_4b_fp8_scaled.safetensors",
+      "vae": "qwen_image_vae.safetensors"
+    },
+    "loras": [
+      {
+        "name": "DisposableCamera.safetensors",
+        "strength": 0.9
+      }
+    ],
+    "download": "Same Krea 2 Turbo BF16/text-encoder/VAE as krea2-photographic, plus the Disposable Camera LoRA (civitai.com model id 2764401) in the loras folder ComfyUI is configured to scan. Optional trigger words to push the look further: \"DisposableCamera\", \"film grain\", \"heavy film grain\", \"out of focus\", \"faded color\", \"frontal flash\". No documented cfg requirement, so this defaults to the pipeline's native turbo settings (8 steps, cfg 1).",
+    "sampling": {
+      "steps": 8,
+      "guidance": 1,
+      "sampler": "euler",
+      "scheduler": "beta",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    }
+  },
+  {
     "id": "pixazo-sdxl-watercolor",
     "label": "Pixazo SDXL watercolor (free, experimental)",
     "provider": "pixazo-sdxl",
