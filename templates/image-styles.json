@@ -201,6 +201,36 @@
     ]
   },
   {
+    "id": "flux2-tech-diagram",
+    "label": "FLUX.2 clean tech-diagram (local first)",
+    "provider": "flux2-local",
+    "fallbackProvider": "cloudflare-flux2",
+    "promptProfile": "tech-diagram",
+    "summary": "Clean, cool-toned geometric/isometric metaphor visuals for technical and AI concept explainers built for @code_details, after research found every other style in this pipeline (flat-vector included) carries a warm nostalgic/melancholy DNA built for @lovewilt/@ramirezvilla/@ForkingBites-style mood content, not a 'clear, confident, informative' tech-explainer tone. Same FLUX.2 Klein local engine as flux2-storybook, different prompt profile and a style-only reference (no character references needed since the paired topic pack is cast-free).",
+    "requiredModels": {
+      "diffusionModel": "flux-2-klein-4b.safetensors",
+      "textEncoder": "qwen_3_4b.safetensors",
+      "vae": "flux2-vae.safetensors"
+    },
+    "download": "Same FLUX.2 Klein 4B BF16 diffusion model, Qwen 3 4B text encoder, and FLUX.2 VAE as flux2-storybook. No additional downloads needed if flux2-storybook is already installed.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 1,
+      "sampler": "euler",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "referencePrompts": [
+      {
+        "id": "tech-diagram-material-reference-v1",
+        "role": "style",
+        "prompt": "A wordless clean flat-geometric technical material reference: crisp vector-like shapes, simple isometric forms, glowing node-and-line structures, minimal flat color blocks with soft gradient glow, sharp clean edges, no hand-drawn texture, no paper grain. Deep charcoal and near-black navy and slate surfaces, one glowing electric-cyan accent. Abstract material sample only. No person, face, character, room, recognizable object, lettering, logo, panel, or border."
+      }
+    ]
+  },
+  {
     "id": "cloudflare-flux2-storybook",
     "label": "FLUX.2 warm paper-comic (Cloudflare)",
     "provider": "cloudflare-flux2",
@@ -232,6 +262,78 @@
         "prompt": "A wordless layered paper-comic material reference: visible warm-beige paper fibre, torn deckled edges, overlapping cut-paper planes, matte screenprint ink, opaque gouache blocks, dry graphite hatching, broken charcoal and sepia contours, restrained risograph halftone, slight off-register print, and subtle aged wear. Warm-dark swatches of deep burnt umber, soft charcoal, oxblood rust, muted ochre, warm beige, amber light, and only tiny dusty teal or navy accents. Abstract material sample only. No person, face, character, room, recognizable object, lettering, logo, panel, or border."
       }
     ]
+  },
+  {
+    "id": "flux2-pixar-pets",
+    "label": "FLUX.2 Pixar-style pet storybook (local first)",
+    "provider": "flux2-local",
+    "fallbackProvider": "cloudflare-flux2",
+    "promptProfile": "pixar-pet-cartoon",
+    "summary": "Glossy premium 3D feature-animation pet scenes (Pixar/DreamWorks-caliber staging: big expressive eyes, subsurface-scattering fur, warm cinematic lighting) built for a pets niche. Reuses the already-installed local FLUX.2 Klein model, local-first with Cloudflare fallback like the other FLUX.2 story providers. FLUX.2 is prompt-faithful and free, but reads closer to painterly-stylized CGI than a fully glossy toy-render look; try gemini-pixar-pets if the glossy CGI finish needs to be stronger.",
+    "requiredModels": {
+      "diffusionModel": "flux-2-klein-4b.safetensors",
+      "textEncoder": "qwen_3_4b.safetensors",
+      "vae": "flux2-vae.safetensors"
+    },
+    "download": "Uses the already installed FLUX.2 Klein 4B BF16 model, Qwen 3 4B text encoder, and FLUX.2 VAE. No additional downloads needed if flux2-storybook is already installed.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 1.5,
+      "sampler": "euler",
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "referencePrompts": [
+      {
+        "id": "pixar-pet-companion-reference-v1",
+        "role": "character",
+        "prompt": "A wordless character reference for one recurring friendly golden retriever dog in premium 3D feature-animation style, standing neutrally against a plain soft-lit warm studio background. Soft rounded proportions, large expressive brown eyes, glossy stylized fur with visible subsurface scattering, warm three-point lighting, clean confident character-model finish. No second animal, person, room, landscape, prop, lettering, logo, or border."
+      },
+      {
+        "id": "pixar-glossy-cgi-material-reference-v1",
+        "role": "style",
+        "prompt": "A wordless material and lighting reference for premium 3D feature animation: glossy stylized CGI surfaces, soft ambient occlusion, warm golden-hour three-point lighting, gentle rim light, painterly stylized background blur, saturated storybook color palette of warm amber, honey, soft coral, and a light teal accent. Abstract material and lighting study only. No person, animal, character, room, recognizable object, lettering, logo, panel, or border."
+      }
+    ]
+  },
+  {
+    "id": "cloudflare-flux2-pixar-pets",
+    "label": "FLUX.2 Pixar-style pet storybook (Cloudflare)",
+    "provider": "cloudflare-flux2",
+    "promptProfile": "pixar-pet-cartoon",
+    "summary": "The same glossy premium 3D feature-animation pet treatment through Cloudflare Workers AI, for machines without the local FLUX.2 Klein install.",
+    "download": "No model download. Set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in .env.",
+    "sampling": {
+      "steps": 4,
+      "guidance": 1.5,
+      "genWidth": 1344,
+      "genHeight": 768,
+      "outWidth": 1920,
+      "outHeight": 1080
+    },
+    "referencePrompts": [
+      {
+        "id": "pixar-pet-companion-reference-v1",
+        "role": "character",
+        "prompt": "A wordless character reference for one recurring friendly golden retriever dog in premium 3D feature-animation style, standing neutrally against a plain soft-lit warm studio background. Soft rounded proportions, large expressive brown eyes, glossy stylized fur with visible subsurface scattering, warm three-point lighting, clean confident character-model finish. No second animal, person, room, landscape, prop, lettering, logo, or border."
+      },
+      {
+        "id": "pixar-glossy-cgi-material-reference-v1",
+        "role": "style",
+        "prompt": "A wordless material and lighting reference for premium 3D feature animation: glossy stylized CGI surfaces, soft ambient occlusion, warm golden-hour three-point lighting, gentle rim light, painterly stylized background blur, saturated storybook color palette of warm amber, honey, soft coral, and a light teal accent. Abstract material and lighting study only. No person, animal, character, room, recognizable object, lettering, logo, panel, or border."
+      }
+    ]
+  },
+  {
+    "id": "gemini-pixar-pets",
+    "label": "Google Gemini Pixar-style pet storybook (cloud)",
+    "provider": "gemini",
+    "promptProfile": "pixar-pet-cartoon",
+    "summary": "Cloud-generated glossy 3D feature-animation pet scenes through Google image generation. Recommended when the local/Cloudflare FLUX.2 result reads too painterly and a stronger, more literal glossy-CGI toy-render finish is needed. Needs GEMINI_API_KEY and billing.",
+    "download": "No download. Set GEMINI_API_KEY in .env with image-generation quota enabled.",
+    "sampling": {}
   },
   {
     "id": "pastel-watercolor-ink",
@@ -581,7 +683,7 @@
         "strength": 0.9
       }
     ],
-    "download": "Same Krea 2 Turbo BF16/text-encoder/VAE as krea2-photographic, plus the Disposable Camera LoRA (civitai.com model id 2764401) in the loras folder ComfyUI is configured to scan. Optional trigger words to push the look further: \"DisposableCamera\", \"film grain\", \"heavy film grain\", \"out of focus\", \"faded color\", \"frontal flash\". No documented cfg requirement, so this defaults to the pipeline's native turbo settings (8 steps, cfg 1).",
+    "download": "Same Krea 2 Turbo BF16/text-encoder/VAE as krea2-photographic, plus the Disposable Camera LoRA (civitai.com model id 2764401) in the loras folder ComfyUI is configured to scan. Optional trigger words to push the look further: \"DisposableCamera\", \"film grain\", \"heavy film grain\", \"out of focus\", \"faded color\", \"frontal flash\". No documented cfg requirement, so this defaults to the pipeline's native turbo settings (8 steps, cfg 1). negativeExtra has no effect on this provider (ConditioningZeroOut always zeroes the negative branch on this distilled workflow) — on architecturally complex scenes the LoRA can drift toward a painted/illustrated look with nothing pulling it back, so for those scenes add explicit positive-side language like \"a real photograph, photographic realism, not an illustration, not a painting, not cel-shaded\" to the styleSuffix rather than relying on the negative prompt.",
     "sampling": {
       "steps": 8,
       "guidance": 1,

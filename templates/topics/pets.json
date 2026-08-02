@@ -1,0 +1,107 @@
+{
+  "id": "pets",
+  "label": "Pets & companionship",
+  "summary": "A face-free-of-humans pets niche built around one recurring companion dog. Everything reads through the dog's ordinary daily behavior — waiting by the door, chasing a ball, curling up at the end of the day — so the same warm 3D storybook look can carry stories about loyalty, comfort, growing older together, and unconditional love.",
+  "castTags": "",
+  "topicDirection": "Feature the recurring golden retriever companion in nearly every scene, reacting to the narration with one clear physical gesture: ears up, tail wagging, head tilted, curled asleep, nose pressed to a hand. Humans may appear only as an implied presence — a hand, a leg, a shadow, an empty leash by the door — never as a fully rendered face, so the dog stays the emotional center of the frame.",
+  "storyBeats": {
+    "single": "one small moment of companionship",
+    "opening": "the ordinary routine that makes the bond visible",
+    "early": "a small daily ritual between the dog and its person",
+    "middle": "a moment of worry, waiting, or change",
+    "late": "reassurance and closeness returning",
+    "final": "quiet, settled affection"
+  },
+  "sentimentRules": [
+    {
+      "match": "\\b(?:wait\\w*|door|window|listen\\w*|ears? up)\\b",
+      "phrase": "alert, hopeful anticipation"
+    },
+    {
+      "match": "\\b(?:play\\w*|fetch|ball|run\\w*|chase\\w*|zoomies|park)\\b",
+      "phrase": "unguarded joy and bursting energy"
+    },
+    {
+      "match": "\\b(?:scared|thunder|storm|vet|alone|left|afraid|nervous|hide\\w*)\\b",
+      "phrase": "quiet fear soothed by nearby comfort"
+    },
+    {
+      "match": "\\b(?:old\\w*|grey\\w*|gray\\w*|slow\\w*|tired|age\\w*|years)\\b",
+      "phrase": "gentle, tender awareness of time passing together"
+    },
+    {
+      "match": "\\b(?:sick|hurt|hospital|surgery|recover\\w*|heal\\w*)\\b",
+      "phrase": "worried tenderness and careful watching-over"
+    },
+    {
+      "match": "\\b(?:sleep\\w*|nap\\w*|curl\\w*|couch|bed|blanket)\\b",
+      "phrase": "settled, safe, unhurried contentment"
+    },
+    {
+      "match": "\\b(?:love\\w*|loyal\\w*|trust\\w*|forever|always|best friend|family)\\b",
+      "phrase": "plain, steady, unconditional devotion"
+    },
+    {
+      "match": "\\b(?:rescue\\w*|shelter|adopt\\w*|found|abandon\\w*)\\b",
+      "phrase": "cautious hope turning into belonging"
+    }
+  ],
+  "fallbackSentiment": "warm, plainspoken affection between a dog and its person",
+  "cast": {
+    "mode": "none"
+  },
+  "personSignal": "\\b(?:i|me|my|you|your|we|our|owner|family|hand|voice)\\b",
+  "subjectTypePerson": "the recurring companion dog reacting to an implied, mostly unseen person",
+  "subjectTypeOther": "the recurring companion dog as the clear main subject",
+  "continuityTemplate": "Scene {{sceneNumber}} of {{total}}. Keep the same recurring dog and the same warm storybook world while changing the room, camera distance, and light from neighboring scenes.",
+  "sceneDirectionRules": [
+    {
+      "match": "\\bwaits? by the door\\b|\\bheard the car\\b|\\bcame home\\b",
+      "visualAction": "The dog sits alert by the front door, ears perked and head tilted toward a faint sound just outside, tail beginning to sweep the floor.",
+      "shotPlan": "Medium view at the dog's eye level with the door and a warm entry light dominant, plenty of open floor in the foreground."
+    },
+    {
+      "match": "\\bfetch\\b|\\bchase\\w*\\b|\\bball\\b|\\bpark\\b|\\bzoomies\\b",
+      "visualAction": "The dog bounds across an open sunlit yard or park mid-leap, ears flying, tongue out, chasing a bright ball just ahead of it.",
+      "shotPlan": "Wide dynamic action view with clear motion energy, the dog off-center and a generous stretch of open ground and sky."
+    },
+    {
+      "match": "\\bthunder\\b|\\bstorm\\b|\\bscared\\b|\\bhide\\w*\\b|\\bafraid\\b",
+      "visualAction": "The dog presses against a familiar leg beside a rain-streaked window, ears back and body low, comforted by a resting hand on its head.",
+      "shotPlan": "Close-medium interior view with warm lamp light against the dim storm outside, the dog and the comforting hand clearly readable."
+    },
+    {
+      "match": "\\bvet\\b|\\bsick\\b|\\bhurt\\b|\\bsurgery\\b|\\brecover\\w*\\b",
+      "visualAction": "The dog rests quietly on a soft blanket in a bright room, a gentle hand resting on its side, a water bowl and worn toy nearby.",
+      "shotPlan": "Soft medium view from slightly above, calm even light, the resting dog centered with the caring hand entering from one side."
+    },
+    {
+      "match": "\\bold\\w*\\b|\\bgrey\\w*\\b|\\bgray\\w*\\b|\\byears\\b|\\bslow\\w*\\b",
+      "visualAction": "The dog, muzzle softly greyed, naps in a warm patch of afternoon sun on a familiar rug, one paw twitching mid-dream.",
+      "shotPlan": "Wide-ish interior view with long warm window light crossing the floor, the dog small but clearly the emotional center."
+    },
+    {
+      "match": "\\brescue\\w*\\b|\\bshelter\\b|\\badopt\\w*\\b|\\bfound\\b",
+      "visualAction": "The dog peers cautiously from behind a leg at a new front doorway, tail low but curious, one hand extended low and open toward it.",
+      "shotPlan": "Medium doorway composition with soft threshold light, the dog's cautious posture and the open hand both clearly visible."
+    },
+    {
+      "match": "\\bsleep\\w*\\b|\\bnap\\w*\\b|\\bcurl\\w*\\b|\\bcouch\\b|\\bblanket\\b",
+      "visualAction": "The dog curls into a tight, contented ball at the foot of a bed or on a well-worn couch cushion, one ear flopped over its eye.",
+      "shotPlan": "Close-medium warm nighttime view with a single soft lamp, generous negative space in the surrounding dark room."
+    },
+    {
+      "match": "\\blove\\w*\\b|\\bloyal\\w*\\b|\\bbest friend\\b|\\bforever\\b|\\balways\\b",
+      "visualAction": "The dog leans its full weight affectionately against a familiar leg, head tipped up, eyes closed in plain contentment.",
+      "shotPlan": "Medium eye-level view with warm even light, the dog and the person's leg sharing the frame with no other distractions."
+    }
+  ],
+  "fallbackVisualAction": "Show the recurring companion dog reacting physically and readably to the feeling of the narration line, in an ordinary warm domestic or outdoor setting, with any human presence implied rather than fully shown.",
+  "fallbackShots": [
+    "Medium eye-level view with the dog as the clear single subject and generous warm negative space.",
+    "Wide establishing view of the dog in its everyday room, yard, or park setting.",
+    "Close detail view on an expressive gesture: a tilted head, a raised paw, a resting muzzle.",
+    "Slightly low angle from the dog's own eye level looking up toward the implied person."
+  ],
+  "negatives": "fully rendered human face, crowd of people, other dogs unless the line names them, photorealistic animal photography, disfigured paws, extra limbs, extra tails, human hands replaced by paws, text, letters, captions, logo, watermark, dark horror mood, aggressive or menacing expression unless the line calls for it"
+}

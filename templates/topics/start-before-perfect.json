@@ -1,0 +1,187 @@
+{
+  "id": "start-before-perfect",
+  "label": "Starting before you feel ready (creator paralysis)",
+  "summary": "A face-free topic pack about the gap between wanting to start a YouTube channel and actually pressing record. Everything lives in the ordinary evidence of stalled momentum and quiet progress: the phone, the notes app, the unopened gear, the blinking cursor, the messy desk at 2am. No cast, no drama — just the objects that carry the feeling.",
+  "castTags": "",
+  "topicDirection": "Use phones, laptops, notebooks, desks, unopened gear boxes, cameras, and bedroom-studio setups to carry the feeling of wanting to start versus actually starting. No people, faces, hands, or bodies; keep every surface unoccupied so the object itself does the emotional work.",
+  "storyBeats": {
+    "single": "one moment of stalled or resumed momentum",
+    "opening": "the spark and the pull toward starting",
+    "early": "the stall dressed up as preparation",
+    "middle": "the fear underneath the stall, named plainly",
+    "late": "the small real action that breaks the freeze",
+    "final": "the plain, unglamorous first step, taken anyway"
+  },
+  "sentimentRules": [
+    {
+      "match": "\\b(?:itch|spark|excited|picture|imagine|dream)\\b",
+      "phrase": "restless, hopeful pull toward something not yet started"
+    },
+    {
+      "match": "\\b(?:research|tutorial|watch\\w*|read\\w*|plan\\w*|prepar\\w*)\\b",
+      "phrase": "busy stillness, motion that never leaves the couch"
+    },
+    {
+      "match": "\\b(?:gear|camera|mic|lighting|setup|equipment)\\b",
+      "phrase": "a reasonable-sounding excuse standing in for the real one"
+    },
+    {
+      "match": "\\b(?:fear|afraid|terrified|scared|embarrass\\w*|judge\\w*|nervous)\\b",
+      "phrase": "quiet, specific fear of being seen before you're good"
+    },
+    {
+      "match": "\\b(?:delet\\w*|rewatch\\w*|redo\\w*|refilm\\w*|again)\\b",
+      "phrase": "private, repetitive self-editing nobody else will ever see"
+    },
+    {
+      "match": "\\b(?:ready|standard|perfect\\w*|polish\\w*|flawless)\\b",
+      "phrase": "an impossible bar that only exists in your own head"
+    },
+    {
+      "match": "\\b(?:record|film|press|button|start\\w*|begin\\w*)\\b",
+      "phrase": "small, plain, unglamorous action taken anyway"
+    },
+    {
+      "match": "\\b(?:first video|early|beginner|awkward|rough|unpolished|messy)\\b",
+      "phrase": "an honest, unfinished-feeling beginning, kept rather than hidden"
+    }
+  ],
+  "fallbackSentiment": "quiet, self-aware honesty about wanting to start and being stuck on making it perfect first",
+  "cast": {
+    "mode": "none"
+  },
+  "personSignal": "\\b(?:i|me|my|you|your|we|our|they|them|person|people|human|creator|beginner)\\b",
+  "subjectTypePerson": "an unoccupied object or space that stands in for the person without depicting them",
+  "subjectTypeOther": "one clearly recognizable everyday object tied to making or not-yet-making a video",
+  "continuityTemplate": "Scene {{sceneNumber}} of {{total}}. Keep the same lived-in, ordinary world while changing the dominant object, room, camera distance, and light from neighboring scenes.",
+  "sceneDirectionRules": [
+    {
+      "match": "\\b(?:itch|months|whispers|finally|start a channel)\\b",
+      "visualAction": "A phone rests screen-up on a rumpled bed at night, a blank new-video-idea note glowing faintly on the lock screen.",
+      "shotPlan": "Close overhead 50mm view, shallow focus on the screen, dark room falling away around it."
+    },
+    {
+      "match": "\\b(?:picture|intro|thumbnail|comment)\\b",
+      "visualAction": "A laptop sits open on a desk with an empty, cursor-blinking document behind a browser tab bar full of open research pages.",
+      "shotPlan": "Medium desk-level view, screen glow as the only light source, keyboard and desk objects soft in the foreground."
+    },
+    {
+      "match": "\\b(?:open your phone|film something|locks up|whole body)\\b",
+      "visualAction": "A phone propped shakily against a stack of books faces an empty chair, the camera app open but not recording.",
+      "shotPlan": "Low tripod-height angle looking past the phone toward the empty seat, room dim and still."
+    },
+    {
+      "match": "\\b(?:terrified|embarrass|scared|afraid)\\b",
+      "visualAction": "A closed laptop sits at the far edge of a desk, everything else pushed away from it, one small lamp casting a narrow pool of light.",
+      "shotPlan": "Wide, mostly empty desk composition with heavy negative space around the one lit object."
+    },
+    {
+      "match": "\\b(?:research|fortieth time|tutorials|record button)\\b",
+      "visualAction": "A phone screen shows a long list of saved how-to videos, thumbnails stacked far past the visible screen edge.",
+      "shotPlan": "Close handheld-style phone-screen framing, warm lamp light spilling in from one side."
+    },
+    {
+      "match": "\\b(?:preparing|softer way|avoid starting)\\b",
+      "visualAction": "A notebook lies open to a page of crossed-out video title ideas, pen resting diagonally across the page.",
+      "shotPlan": "Overhead flat-lay at desk height, soft window light, notebook centered with room to breathe around it."
+    },
+    {
+      "match": "\\b(?:gear|lighting|nicer mic|script|poetry)\\b",
+      "visualAction": "An unopened ring-light box and a boxed microphone sit stacked in a corner, shrink wrap still sealed.",
+      "shotPlan": "Medium corner-of-room view, boxes slightly dusty, rest of the room softly out of focus."
+    },
+    {
+      "match": "\\b(?:webcam|voice|good enough)\\b",
+      "visualAction": "A basic laptop webcam sits above a screen in an ordinary bedroom, the room around it plain and lived-in.",
+      "shotPlan": "Close three-quarter view of the laptop lid and camera, bedroom detail soft behind it."
+    },
+    {
+      "match": "\\b(?:filmed|ten seconds|deleting|before it even saved)\\b",
+      "visualAction": "A phone's camera-roll grid shows the same short clip thumbnail repeated many times over.",
+      "shotPlan": "Close top-down phone-screen shot, grid filling most of the frame, thumb hovering near the edge."
+    },
+    {
+      "match": "\\b(?:fear|watch and quietly judge|every second)\\b",
+      "visualAction": "A single desk chair faces an empty wall where a backdrop has been half clipped up and left unfinished.",
+      "shotPlan": "Wide static room view, chair and half-hung backdrop as the only subjects, evening light through a window."
+    },
+    {
+      "match": "\\b(?:perfectionism|disguise|fear wearing)\\b",
+      "visualAction": "A bedroom mirror reflects an empty room and an unmade tripod leaning unused against the wall beside it.",
+      "shotPlan": "Medium mirror-reflection composition, soft available light, no figure present in the reflection."
+    },
+    {
+      "match": "\\b(?:every creator|posted something|rough and awkward)\\b",
+      "visualAction": "An old, slightly worn phone plays a grainy home-video clip on its cracked screen, propped against a stack of paperbacks.",
+      "shotPlan": "Close object-level view, screen glow lighting the surrounding desk clutter."
+    },
+    {
+      "match": "\\b(?:their first video|badly lit|badly cut|unpolished)\\b",
+      "visualAction": "A cheap ring light glows unevenly in a cluttered bedroom corner, cables tangled across the floor beneath it.",
+      "shotPlan": "Medium-wide corner view, uneven light spill, ordinary mess kept fully in frame."
+    },
+    {
+      "match": "\\b(?:cringeworthy|never stopped anyone|growing)\\b",
+      "visualAction": "A stack of old notebooks and a worn external hard drive sit beside a laptop, corners curled from use.",
+      "shotPlan": "Close 50mm still life, desk-level, warm practical light from one side."
+    },
+    {
+      "match": "\\b(?:nobody ever asks|subscribing|first upload)\\b",
+      "visualAction": "A phone screen shows a video with a single view count, sitting quietly among a longer list of titles.",
+      "shotPlan": "Close phone-screen framing, screen the only bright element in a dim room."
+    },
+    {
+      "match": "\\b(?:standard|holding yourself|doesn't even exist|your head)\\b",
+      "visualAction": "A blank sheet of paper sits center-desk under a single lamp, nothing written on it yet.",
+      "shotPlan": "Tight overhead flat-lay, one lamp, generous dark negative space surrounding the paper."
+    },
+    {
+      "match": "\\b(?:ready|feeling|shows up after)\\b",
+      "visualAction": "A clock reads past 2am on a nightstand beside a phone lit up with an unfinished notes app draft.",
+      "shotPlan": "Close nightstand-level still life, warm low light, rest of the bedroom dark around it."
+    },
+    {
+      "match": "\\b(?:tenth video|not before|first one|haven't made yet)\\b",
+      "visualAction": "A row of ten identical blank index cards lies fanned across a desk, only the first one slightly worn at the corner.",
+      "shotPlan": "Overhead flat-lay, even light, cards arranged left to right in a clean line."
+    },
+    {
+      "match": "\\b(?:edits confidently|earlier you|hit record scared)\\b",
+      "visualAction": "An editing timeline glows on a laptop screen in a dark room, a single rough clip already dropped into place.",
+      "shotPlan": "Medium desk-level view, screen light dominant, keyboard and mouse soft in the foreground."
+    },
+    {
+      "match": "\\b(?:stop treating|represent|whole channel|forever)\\b",
+      "visualAction": "A single blank sticky note is pressed onto an otherwise empty wall above a desk.",
+      "shotPlan": "Close wall-level shot, soft daylight, wide empty wall space surrounding the one note."
+    },
+    {
+      "match": "\\b(?:just needs to exist|notes app|imagination)\\b",
+      "visualAction": "A phone's notes app shows a single unfinished draft, cursor blinking at the end of an incomplete line.",
+      "shotPlan": "Close phone-screen framing, shallow depth of field, warm indoor light."
+    },
+    {
+      "match": "\\b(?:open your camera|right now|true thing|press the button)\\b",
+      "visualAction": "A phone camera app sits open with the shutter button glowing, aimed at a plain, ordinary room.",
+      "shotPlan": "Medium point-of-view framing over the top of the phone, room softly lit, nothing staged."
+    },
+    {
+      "match": "\\b(?:messy|awkward|unfinished-feeling|clip|actual first step)\\b",
+      "visualAction": "A single video file icon sits alone in an otherwise empty folder window on a laptop screen.",
+      "shotPlan": "Close screen-level shot, folder mostly empty, one file catching the light."
+    },
+    {
+      "match": "\\b(?:every channel|started exactly here|scared enough)\\b",
+      "visualAction": "Early morning light breaks through a bedroom window onto a small desk setup, camera finally powered on and steady.",
+      "shotPlan": "Wide window-lit room view, warm sunrise tone, desk setup calm and resolved in the frame."
+    }
+  ],
+  "fallbackVisualAction": "Show one ordinary object from an aspiring creator's world — a phone, laptop, notebook, unopened gear box, or plain bedroom desk — as the literal subject of the line, without inventing drama beyond what the line states.",
+  "fallbackShots": [
+    "Close desk-level or nightstand-level still life with one object dominant and soft ambient light.",
+    "Medium bedroom or desk view with one supporting object and a calm, uncluttered background.",
+    "Close phone-screen or laptop-screen framing with the screen as the only bright element.",
+    "Wide, mostly empty room view using window light or lamp light to isolate the one subject."
+  ],
+  "negatives": "person, people, human, face, facial features, skin, body, hands, fingers, arms, legs, silhouette, reflection of a person, visible occupant, crowd, portrait, readable text, readable screen content, logos"
+}

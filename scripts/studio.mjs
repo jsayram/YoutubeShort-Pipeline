@@ -1047,6 +1047,28 @@ async function waitForVoiceboxStable(timeoutMs = 120000) {
   return null;
 }
 
+// COMFYUI_LISTEN_HOSTS defaults to loopback-only. Set it to a comma-separated list to reach
+// ComfyUI's own web UI from another device, e.g. "127.0.0.1,tailscale" — the literal token
+// "tailscale" resolves to this machine's current Tailscale IPv4 via the CLI, so the address
+// stays correct across reconnects instead of being pasted in once and going stale.
+async function resolveComfyListenHosts() {
+  const configured = process.env.COMFYUI_LISTEN_HOSTS;
+  if (!configured) return "127.0.0.1";
+  const hosts = configured
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean);
+  const resolved = await Promise.all(
+    hosts.map(async (host) => {
+      if (host.toLowerCase() !== "tailscale") return host;
+      const ip = await commandOutput("tailscale", ["ip", "-4"]).catch(() => null);
+      if (!ip) throw new Error('COMFYUI_LISTEN_HOSTS has "tailscale" but `tailscale ip -4` failed. Is Tailscale running?');
+      return ip;
+    }),
+  );
+  return resolved.join(",");
+}
+
 async function restartComfyUi() {
   // First ask ComfyUI to abandon both the active prompt and anything queued. This also prevents
   // a just-cancelled Studio worker from leaving a job that immediately starts after the restart.
@@ -1080,12 +1102,13 @@ async function restartComfyUi() {
   const exists = await fs.access(mainFile).then(() => true, () => false);
   if (!exists) throw new Error(`Cannot restart ComfyUI because ${mainFile} does not exist.`);
 
+  const listenHosts = await resolveComfyListenHosts();
   const child = spawn(
     python,
     [
       mainFile,
       "--listen",
-      "127.0.0.1",
+      listenHosts,
       "--port",
       "8188",
       "--enable-cors-header",
