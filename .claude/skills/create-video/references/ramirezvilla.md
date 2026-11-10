@@ -182,11 +182,11 @@ cost of finding out, given how directly it reinforces the recommended "running j
 
 ## Repo touchpoints referenced
 
-- `/Users/jramirez/Git/YoutubeShort Pipeline/.claude/skills/create-video/SKILL.md` — channel
+- `.claude/skills/create-video/SKILL.md` — channel
   profile table, `disposable-camera` known failure modes, cast-free convention.
-- `/Users/jramirez/Git/YoutubeShort Pipeline/templates/image-styles.json` — `disposable-camera`
+- `templates/image-styles.json` — `disposable-camera`
   (line 568) and `nostalgic-vhs-2000` (line 510) engine definitions.
-- `/Users/jramirez/Git/YoutubeShort Pipeline/videos/start-before-perfect/design.md` — the existing
+- `videos/start-before-perfect/design.md` — the existing
   `disposable-camera` design spec this recommendation was compared against.
 
 ## Update: `nostalgic-vhs-2000` tested and rejected (post-research)

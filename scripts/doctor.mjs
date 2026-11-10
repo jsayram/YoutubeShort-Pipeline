@@ -107,13 +107,13 @@ if (provider === "drawthings" || provider === "draw-things") {
     else {
       failures.push(
         `ComfyUI cannot see checkpoint "${wanted}". Found: ${seen.join(", ") || "none"}. ` +
-          "Check ~/ComfyUI/extra_model_paths.yaml.",
+          "Check extra_model_paths.yaml in your ComfyUI folder (COMFYUI_ROOT in .env).",
       );
     }
   } else {
     failures.push(
       `ComfyUI is not reachable at ${comfyUrl}. Start it with: ` +
-        "cd ~/ComfyUI && venv/bin/python main.py --listen 127.0.0.1 --port 8188",
+        "cd <your ComfyUI folder, COMFYUI_ROOT in .env> && venv/bin/python main.py --listen 127.0.0.1 --port 8188",
     );
   }
 } else if (provider === "cloudflare-flux2") {

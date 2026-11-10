@@ -177,7 +177,7 @@ const stats = await fetch(`${baseUrl}/system_stats`).catch(() => null);
 if (!stats?.ok) {
   throw new Error(
     `ComfyUI is not reachable at ${baseUrl}. Start it with:\n` +
-      `  cd ~/ComfyUI && venv/bin/python main.py --listen 127.0.0.1 --port 8188`,
+      `  cd <your ComfyUI folder, COMFYUI_ROOT in .env> && venv/bin/python main.py --listen 127.0.0.1 --port 8188`,
   );
 }
 const systemStats = await stats.json().catch(() => null);
